@@ -1,0 +1,74 @@
+# EditorConfig for EZSpecCam
+# Cross-platform code formatting standards
+
+root = true
+
+# ===========================================
+# Global Settings
+# ===========================================
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+
+# ===========================================
+# C++ Source Files
+# ===========================================
+[*.{cpp,h,hpp}]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+# ===========================================
+# Qt Project Files
+# ===========================================
+[*.{pro,pri}]
+indent_style = space
+indent_size = 4
+
+# ===========================================
+# CMake Files
+# ===========================================
+[CMakeLists.txt]
+indent_style = space
+indent_size = 4
+
+[*.{cmake,cmake.in}]
+indent_style = space
+indent_size = 4
+
+# ===========================================
+# Configuration Files
+# ===========================================
+[*.{yml,yaml,json}]
+indent_style = space
+indent_size = 2
+
+# ===========================================
+# Documentation
+# ===========================================
+[*.md]
+trim_trailing_whitespace = false
+
+# ===========================================
+# Script Files
+# ===========================================
+[*.{sh,bat,ps1}]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+
+# ===========================================
+# XML Files
+# ===========================================
+[*.{xml,xaml}]
+indent_style = space
+indent_size = 4
+
+# ===========================================
+# Python Files (if any)
+# ===========================================
+[*.py]
+indent_style = space
+indent_size = 4

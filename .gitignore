@@ -111,3 +111,43 @@ node_modules/
 *.js
 package*.json
 test_result/
+
+# ===========================================
+# CMake Generated Files
+# ===========================================
+CMakeUserPresets.json
+CMakeCache.txt
+CMakeFiles/
+CMakeLists.txt.user*
+cmake_install.cmake
+CTestTestfile.cmake
+install_manifest.txt
+
+# ===========================================
+# Qt MOC/UIC/RCC Generated
+# ===========================================
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.moc
+*.jrc
+*.rcc
+
+# ===========================================
+# Build Configuration Directories
+# ===========================================
+msvc-debug/
+msvc-release/
+gcc-debug/
+gcc-release/
+
+# ===========================================
+# Compile Commands (for tooling)
+# ===========================================
+compile_commands.json
+
+# ===========================================
+# Clang-Tidy Backup
+# ===========================================
+*.clang-tidy.bak

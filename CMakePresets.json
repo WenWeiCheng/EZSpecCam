@@ -1,0 +1,214 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 20,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "msvc-debug",
+            "displayName": "MSVC Debug",
+            "description": "Visual Studio 2022 with MSVC compiler, Debug configuration",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/msvc-debug",
+            "architecture": {
+                "value": "x64",
+                "strategy": "set"
+            },
+            "toolset": {
+                "value": "host=x64",
+                "strategy": "set"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_COMPILER": "cl",
+                "CMAKE_C_COMPILER": "cl",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "QT_DIR": "$env{QT_DIR}",
+                "Qt6_DIR": "$env{QT_DIR}/lib/cmake/Qt6",
+                "CMAKE_PREFIX_PATH": "$env{QT_DIR};$env{EXIV2_DIR}",
+                "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDebug",
+                "CMAKE_POLICY_VERSION_MINIMUM": "3.20"
+            },
+            "environment": {
+                "QT_DIR": {
+                    "type": "PATH",
+                    "value": "C:/Qt/6.8.2/msvc2022_64"
+                },
+                "EXIV2_DIR": {
+                    "type": "PATH",
+                    "value": "C:/Exiv2"
+                },
+                "VCINSTALLDIR": {
+                    "type": "PATH",
+                    "value": "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC"
+                }
+            }
+        },
+        {
+            "name": "msvc-release",
+            "displayName": "MSVC Release",
+            "description": "Visual Studio 2022 with MSVC compiler, Release configuration",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/msvc-release",
+            "architecture": {
+                "value": "x64",
+                "strategy": "set"
+            },
+            "toolset": {
+                "value": "host=x64",
+                "strategy": "set"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_COMPILER": "cl",
+                "CMAKE_C_COMPILER": "cl",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "QT_DIR": "$env{QT_DIR}",
+                "Qt6_DIR": "$env{QT_DIR}/lib/cmake/Qt6",
+                "CMAKE_PREFIX_PATH": "$env{QT_DIR};$env{EXIV2_DIR}",
+                "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded",
+                "CMAKE_POLICY_VERSION_MINIMUM": "3.20"
+            },
+            "environment": {
+                "QT_DIR": {
+                    "type": "PATH",
+                    "value": "C:/Qt/6.8.2/msvc2022_64"
+                },
+                "EXIV2_DIR": {
+                    "type": "PATH",
+                    "value": "C:/Exiv2"
+                },
+                "VCINSTALLDIR": {
+                    "type": "PATH",
+                    "value": "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC"
+                }
+            }
+        },
+        {
+            "name": "gcc-debug",
+            "displayName": "GCC Debug (Linux)",
+            "description": "GCC compiler, Debug configuration for Linux",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/gcc-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_COMPILER": "g++",
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_PREFIX_PATH": "$env{QT_DIR};$env{EXIV2_DIR}",
+                "CMAKE_POLICY_VERSION_MINIMUM": "3.20"
+            },
+            "environment": {
+                "QT_DIR": {
+                    "type": "PATH",
+                    "value": "$env{HOME}/Qt/6.8.2/gcc_64"
+                },
+                "EXIV2_DIR": {
+                    "type": "PATH",
+                    "value": "$env{HOME}/Exiv2"
+                }
+            }
+        },
+        {
+            "name": "gcc-release",
+            "displayName": "GCC Release (Linux)",
+            "description": "GCC compiler, Release configuration for Linux",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/gcc-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_COMPILER": "g++",
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_PREFIX_PATH": "$env{QT_DIR};$env{EXIV2_DIR}",
+                "CMAKE_POLICY_VERSION_MINIMUM": "3.20"
+            },
+            "environment": {
+                "QT_DIR": {
+                    "type": "PATH",
+                    "value": "$env{HOME}/Qt/6.8.2/gcc_64"
+                },
+                "EXIV2_DIR": {
+                    "type": "PATH",
+                    "value": "$env{HOME}/Exiv2"
+                }
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "msvc-debug",
+            "configurePreset": "msvc-debug",
+            "description": "Build MSVC Debug configuration",
+            "configuration": "Debug"
+        },
+        {
+            "name": "msvc-release",
+            "configurePreset": "msvc-release",
+            "description": "Build MSVC Release configuration",
+            "configuration": "Release"
+        },
+        {
+            "name": "msvc-release-install",
+            "configurePreset": "msvc-release",
+            "description": "Build and install MSVC Release configuration",
+            "configuration": "Release",
+            "targets": ["install"]
+        },
+        {
+            "name": "gcc-debug",
+            "configurePreset": "gcc-debug",
+            "description": "Build GCC Debug configuration",
+            "configuration": "Debug"
+        },
+        {
+            "name": "gcc-release",
+            "configurePreset": "gcc-release",
+            "description": "Build GCC Release configuration",
+            "configuration": "Release"
+        },
+        {
+            "name": "gcc-release-install",
+            "configurePreset": "gcc-release",
+            "description": "Build and install GCC Release configuration",
+            "configuration": "Release",
+            "targets": ["install"]
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "msvc-debug",
+            "configurePreset": "msvc-debug",
+            "description": "Run tests with MSVC Debug configuration",
+            "configuration": "Debug",
+            "output": "onnx",
+            "outputOnFailure": true
+        },
+        {
+            "name": "msvc-release",
+            "configurePreset": "msvc-release",
+            "description": "Run tests with MSVC Release configuration",
+            "configuration": "Release",
+            "output": "onnx",
+            "outputOnFailure": true
+        },
+        {
+            "name": "gcc-debug",
+            "configurePreset": "gcc-debug",
+            "description": "Run tests with GCC Debug configuration",
+            "configuration": "Debug",
+            "output": "onnx",
+            "outputOnFailure": true
+        },
+        {
+            "name": "gcc-release",
+            "configurePreset": "gcc-release",
+            "description": "Run tests with GCC Release configuration",
+            "configuration": "Release",
+            "output": "onnx",
+            "outputOnFailure": true
+        }
+    ]
+}

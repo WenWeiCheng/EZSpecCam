@@ -1,0 +1,18 @@
+# GUI application
+qt_add_executable(ezspeccam_gui)
+
+target_link_libraries(ezspeccam_gui PRIVATE
+    ezspeccam_core
+    Qt6::Core Qt6::Gui Qt6::Widgets
+)
+
+target_sources(ezspeccam_gui PRIVATE
+    main.cpp
+    AppController.h AppController.cpp
+    MainWindow.h MainWindow.cpp
+    MainWindowUi.h MainWindowUi.cpp
+    CameraTab.h CameraTab.cpp
+    ImageViewWidget.h ImageViewWidget.cpp
+    SpectrumViewWidget.h SpectrumViewWidget.cpp
+    qcustomplot.h qcustomplot.cpp
+)
