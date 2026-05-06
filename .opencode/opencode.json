@@ -1,0 +1,17 @@
+{
+	"$schema": "https://opencode.ai/config.json",
+	"lsp": {
+		"clangd":{
+			"disabled": true
+		},
+    "cpp": {
+      "command": [
+        "/mnt/c/Qt/Tools/QtCreator/bin/clang/bin/clangd.exe",
+        "--background-index",
+        "--compile-commands-dir=./build/Qt_6_8_2_MSVC2022_64bit-Debug/.qtc_clangd/"
+      ],
+      "extensions": [".cpp", ".h", ".hpp", ".c", ".cc"],
+      "disabled": false
+    }
+  }
+}
