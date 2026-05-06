@@ -1,0 +1,42 @@
+@echo off
+echo ============================================
+echo EZSpecCam Build using CMakePresets
+echo ============================================
+
+call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Failed to setup MSVC environment
+    exit /b 1
+)
+
+echo MSVC environment ready
+echo.
+
+set SOURCE_DIR=D:\10_Projects\2502-Sw-EZSpecCam-shadow
+
+echo Available presets:
+cmake --list-presets -S "%SOURCE_DIR%"
+echo.
+
+echo Configuring with msvc-debug preset...
+cmake --preset msvc-debug -S "%SOURCE_DIR%"
+
+if errorlevel 1 (
+    echo ERROR: CMake configure failed
+    exit /b 1
+)
+
+echo.
+echo Building with msvc-debug preset...
+cmake --build --preset msvc-debug
+
+if errorlevel 1 (
+    echo ERROR: Build failed
+    exit /b 1
+)
+
+echo.
+echo ============================================
+echo BUILD SUCCESSFUL
+echo ============================================
+exit /b 0
