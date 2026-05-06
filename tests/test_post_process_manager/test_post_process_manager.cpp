@@ -189,4 +189,4 @@ void TestPostProcessManager::testProcessFrame()
 }
 
 QTEST_MAIN(TestPostProcessManager)
-#include "tst_test_post_process_manager.moc"
+#include "test_post_process_manager.moc"

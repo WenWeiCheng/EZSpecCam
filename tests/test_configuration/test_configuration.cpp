@@ -201,4 +201,4 @@ void TestConfigurationManager::testValidateReason()
 }
 
 QTEST_MAIN(TestConfigurationManager)
-#include "tst_test_configuration.moc"
+#include "test_configuration.moc"

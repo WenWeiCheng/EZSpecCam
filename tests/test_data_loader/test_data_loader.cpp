@@ -134,4 +134,4 @@ void TestDataLoader::testListConfigsInDirectory()
 }
 
 QTEST_MAIN(TestDataLoader)
-#include "tst_test_data_loader.moc"
+#include "test_data_loader.moc"

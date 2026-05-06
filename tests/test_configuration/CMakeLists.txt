@@ -7,7 +7,7 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 COMPONENTS Core Test REQUIRED)
 
-add_executable(test_configuration tst_test_configuration.cpp)
+add_executable(test_configuration test_configuration.cpp)
 target_link_libraries(test_configuration PRIVATE Qt6::Core Qt6::Test EZSpecCam::Core)
 
 add_test(NAME test_configuration COMMAND test_configuration)

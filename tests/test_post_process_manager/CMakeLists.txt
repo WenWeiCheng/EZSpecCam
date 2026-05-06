@@ -7,7 +7,7 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 COMPONENTS Core Test REQUIRED)
 
-add_executable(test_post_process_manager tst_test_post_process_manager.cpp)
+add_executable(test_post_process_manager test_post_process_manager.cpp)
 target_link_libraries(test_post_process_manager PRIVATE Qt6::Core Qt6::Test EZSpecCam::Core)
 
 add_test(NAME test_post_process_manager COMMAND test_post_process_manager)

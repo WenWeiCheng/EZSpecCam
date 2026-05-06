@@ -116,4 +116,4 @@ void TestDataSaver::testSaveOptions()
 }
 
 QTEST_MAIN(TestDataSaver)
-#include "tst_test_data_saver.moc"
+#include "test_data_saver.moc"
