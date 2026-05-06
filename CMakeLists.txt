@@ -19,9 +19,6 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-# Qt warning suppression for deprecated members
-set(CMAKE_AUTOMOC_RELAXED_MODE ON)
-
 # ===========================================
 # Build Options
 # ===========================================
@@ -48,7 +45,7 @@ endif()
 # ===========================================
 
 # Exiv2 for image metadata
-find_package(Exiv2 0.28 QUIET)
+find_package(Exiv2 CONFIG QUIET)
 if(Exiv2_FOUND)
     message(STATUS "Exiv2 found: ${Exiv2_VERSION}")
     set(EZSPECCAM_HAVE_EXIV2 ON)
