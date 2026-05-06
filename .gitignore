@@ -105,6 +105,9 @@ temp/
 .cache/
 output/
 data/
+# Allow source code data/ directories
+!src/core/data/
+!src/core/data/*
 
 material/
 node_modules/
