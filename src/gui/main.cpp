@@ -11,6 +11,8 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationVersion("1.0.0");
     QCoreApplication::setOrganizationName("EZSpecCam");
 
+    QApplication::setStyle("Fusion");
+
     QSurfaceFormat format;
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);

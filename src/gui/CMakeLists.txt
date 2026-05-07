@@ -27,5 +27,4 @@ target_sources(ezspeccam_gui PRIVATE
     widgets/PluginTab.h widgets/PluginTab.cpp
     widgets/CameraConfigDialogUi.h widgets/CameraConfigDialogUi.cpp
     widgets/CameraConfigDialog.h widgets/CameraConfigDialog.cpp
-    resources.qrc
 )

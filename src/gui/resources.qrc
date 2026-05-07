@@ -1,8 +1,0 @@
-<!DOCTYPE RCC>
-<RCC version="1.0">
-    <qresource prefix="/styles">
-        <file>styles/dracula.qss</file>
-    </qresource>
-    <qresource prefix="/images">
-    </qresource>
-</RCC>
