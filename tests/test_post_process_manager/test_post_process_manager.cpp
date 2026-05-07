@@ -45,46 +45,50 @@ void TestPostProcessManager::testEnabled()
 {
     PostProcessManager manager;
 
-    QVERIFY2(manager.isEnabled() == false, "Should be disabled by default");
+    PostProcessManager::ProcessConfig configDisabled;
+    configDisabled.enabled = false;
+    QVERIFY2(configDisabled.enabled == false, "Config should be disabled by default");
 
-    manager.setEnabled(true);
-    QVERIFY2(manager.isEnabled() == true, "Should be enabled after setEnabled(true)");
+    PostProcessManager::ProcessConfig configEnabled;
+    configEnabled.enabled = true;
+    QVERIFY2(configEnabled.enabled == true, "Config should be enabled when set to true");
 
-    manager.setEnabled(false);
-    QVERIFY2(manager.isEnabled() == false, "Should be disabled after setEnabled(false)");
+    configEnabled.enabled = false;
+    QVERIFY2(configEnabled.enabled == false, "Config should be disabled when set to false");
 }
 
 void TestPostProcessManager::testOperations()
 {
     PostProcessManager manager;
 
-    QVERIFY2(manager.operations() == PostProcessManager::None, "Should have no operations by default");
+    PostProcessManager::ProcessConfig config;
+    QVERIFY2(config.operations == PostProcessManager::None, "Should have no operations by default");
 
-    manager.setOperationEnabled(PostProcessManager::VerticalBinning, true);
-    QVERIFY2(manager.isOperationEnabled(PostProcessManager::VerticalBinning) == true,
+    config.operations = PostProcessManager::VerticalBinning;
+    QVERIFY2((config.operations & PostProcessManager::VerticalBinning) == PostProcessManager::VerticalBinning,
              "VerticalBinning should be enabled");
 
-    manager.setOperationEnabled(PostProcessManager::DarkFrameSubtraction, true);
-    QVERIFY2(manager.isOperationEnabled(PostProcessManager::DarkFrameSubtraction) == true,
+    config.operations |= PostProcessManager::DarkFrameSubtraction;
+    QVERIFY2((config.operations & PostProcessManager::DarkFrameSubtraction) == PostProcessManager::DarkFrameSubtraction,
              "DarkFrameSubtraction should be enabled");
 
-    manager.setOperationEnabled(PostProcessManager::VerticalBinning, false);
-    QVERIFY2(manager.isOperationEnabled(PostProcessManager::VerticalBinning) == false,
-             "VerticalBinning should be disabled after setOperationEnabled(false)");
+    config.operations &= ~PostProcessManager::VerticalBinning;
+    QVERIFY2((config.operations & PostProcessManager::VerticalBinning) == 0,
+             "VerticalBinning should be disabled after clearing it");
 }
 
 void TestPostProcessManager::testVerticalBinningRowRange()
 {
     PostProcessManager manager;
 
-    QPair<int, int> range = manager.verticalBinningRowRange();
-    QVERIFY2(range.first == 0, "Default start row should be 0");
-    QVERIFY2(range.second == -1, "Default end row should be -1");
+    PostProcessManager::ProcessConfig config;
+    QVERIFY2(config.vBinStartRow == 0, "Default start row should be 0");
+    QVERIFY2(config.vBinEndRow == -1, "Default end row should be -1");
 
-    manager.setVerticalBinningRowRange(10, 100);
-    range = manager.verticalBinningRowRange();
-    QVERIFY2(range.first == 10, "Start row should be 10");
-    QVERIFY2(range.second == 100, "End row should be 100");
+    config.vBinStartRow = 10;
+    config.vBinEndRow = 100;
+    QVERIFY2(config.vBinStartRow == 10, "Start row should be 10");
+    QVERIFY2(config.vBinEndRow == 100, "End row should be 100");
 }
 
 void TestPostProcessManager::testVerticalBinning()
@@ -98,15 +102,17 @@ void TestPostProcessManager::testVerticalBinning()
         }
     }
 
-    manager.setEnabled(true);
-    manager.setOperationEnabled(PostProcessManager::VerticalBinning, true);
-    manager.setVerticalBinningRowRange(0, 4);
+    PostProcessManager::ProcessConfig config;
+    config.enabled = true;
+    config.operations = PostProcessManager::VerticalBinning;
+    config.vBinStartRow = 0;
+    config.vBinEndRow = 4;
 
     ImageData frame;
     frame.image = testImage;
     frame.timestamp = QDateTime::currentMSecsSinceEpoch();
 
-    manager.processFrame(frame);
+    manager.processFrame(frame, config);
 
     QVERIFY2(frame.image.width() == 10, "Width should remain 10");
     QVERIFY2(frame.image.height() == 1, "Height should be binned to 1");
@@ -123,15 +129,16 @@ void TestPostProcessManager::testDarkFrameSubtraction()
     QImage darkFrame(10, 10, QImage::Format_Grayscale8);
     darkFrame.fill(50);
 
-    manager.setEnabled(true);
-    manager.setOperationEnabled(PostProcessManager::DarkFrameSubtraction, true);
-    manager.setDarkFrame(darkFrame);
+    PostProcessManager::ProcessConfig config;
+    config.enabled = true;
+    config.operations = PostProcessManager::DarkFrameSubtraction;
+    config.darkFrame = darkFrame;
 
     ImageData frame;
     frame.image = testImage;
     frame.timestamp = QDateTime::currentMSecsSinceEpoch();
 
-    manager.processFrame(frame);
+    manager.processFrame(frame, config);
 
     QVERIFY2(frame.image.width() == 10, "Width should remain 10");
     QVERIFY2(frame.image.height() == 10, "Height should remain 10");
@@ -150,15 +157,16 @@ void TestPostProcessManager::testFlatFieldCorrection()
     QImage flatField(10, 10, QImage::Format_Grayscale8);
     flatField.fill(64);
 
-    manager.setEnabled(true);
-    manager.setOperationEnabled(PostProcessManager::FlatFieldCorrection, true);
-    manager.setFlatField(flatField);
+    PostProcessManager::ProcessConfig config;
+    config.enabled = true;
+    config.operations = PostProcessManager::FlatFieldCorrection;
+    config.flatField = flatField;
 
     ImageData frame;
     frame.image = testImage;
     frame.timestamp = QDateTime::currentMSecsSinceEpoch();
 
-    manager.processFrame(frame);
+    manager.processFrame(frame, config);
 
     QVERIFY2(frame.image.width() == 10, "Width should remain 10");
     QVERIFY2(frame.image.height() == 10, "Height should remain 10");
@@ -174,7 +182,8 @@ void TestPostProcessManager::testProcessFrame()
     QImage testImage(10, 10, QImage::Format_Grayscale8);
     testImage.fill(100);
 
-    manager.setEnabled(false);
+    PostProcessManager::ProcessConfig config;
+    config.enabled = false;
 
     ImageData frame;
     frame.image = testImage;
@@ -182,9 +191,9 @@ void TestPostProcessManager::testProcessFrame()
 
     QImage originalBefore = frame.image;
 
-    manager.processFrame(frame);
+    manager.processFrame(frame, config);
 
-    QVERIFY2(frame.image == originalBefore, "Image should not change when manager is disabled");
+    QVERIFY2(frame.image == originalBefore, "Image should not change when config is disabled");
     QVERIFY2(frame.hasOriginal() == false, "Should not store original when disabled");
 }
 

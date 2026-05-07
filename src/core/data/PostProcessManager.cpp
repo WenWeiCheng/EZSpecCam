@@ -6,10 +6,6 @@
 
 PostProcessManager::PostProcessManager(QObject *parent)
     : QObject(parent)
-    , m_enabled(false)
-    , m_operations(None)
-    , m_vBinStartRow(0)
-    , m_vBinEndRow(-1)
 {
 }
 
@@ -17,65 +13,9 @@ PostProcessManager::~PostProcessManager()
 {
 }
 
-void PostProcessManager::setEnabled(bool enabled)
+void PostProcessManager::processFrame(ImageData &frame, const ProcessConfig &config)
 {
-    if (m_enabled != enabled) {
-        m_enabled = enabled;
-        emit enabledChanged(enabled);
-    }
-}
-
-bool PostProcessManager::isEnabled() const
-{
-    return m_enabled;
-}
-
-void PostProcessManager::setOperationEnabled(Operation operation, bool enabled)
-{
-    bool wasEnabled = m_operations.testFlag(operation);
-    if (enabled) {
-        m_operations |= operation;
-    } else {
-        m_operations &= ~operation;
-    }
-
-    if (wasEnabled != enabled) {
-        emit operationEnabledChanged(operation, enabled);
-    }
-}
-
-bool PostProcessManager::isOperationEnabled(Operation operation) const
-{
-    return m_operations.testFlag(operation);
-}
-
-void PostProcessManager::setOperations(Operations operations)
-{
-    m_operations = operations;
-}
-
-PostProcessManager::Operations PostProcessManager::operations() const
-{
-    return m_operations;
-}
-
-void PostProcessManager::setVerticalBinningRowRange(int start, int end)
-{
-    if (m_vBinStartRow != start || m_vBinEndRow != end) {
-        m_vBinStartRow = start;
-        m_vBinEndRow = end;
-        emit verticalBinningRowRangeChanged(start, end);
-    }
-}
-
-QPair<int, int> PostProcessManager::verticalBinningRowRange() const
-{
-    return qMakePair(m_vBinStartRow, m_vBinEndRow);
-}
-
-void PostProcessManager::processFrame(ImageData &frame)
-{
-    if (!m_enabled) {
+    if (!config.enabled) {
         return;
     }
 
@@ -83,9 +23,9 @@ void PostProcessManager::processFrame(ImageData &frame)
         frame.originalImage = frame.image;
     }
 
-    if (m_operations.testFlag(VerticalBinning)) {
-        int startRow = m_vBinStartRow;
-        int endRow = m_vBinEndRow;
+    if (config.operations.testFlag(VerticalBinning)) {
+        int startRow = config.vBinStartRow;
+        int endRow = config.vBinEndRow;
 
         if (endRow < 0 || endRow >= frame.originalImage.height()) {
             endRow = frame.originalImage.height() - 1;
@@ -100,43 +40,13 @@ void PostProcessManager::processFrame(ImageData &frame)
         }
     }
 
-    if (m_operations.testFlag(DarkFrameSubtraction) && hasDarkFrame()) {
-        frame.image = applyDarkFrameSubtraction(frame.image, m_darkFrame);
+    if (config.operations.testFlag(DarkFrameSubtraction) && config.hasDarkFrame()) {
+        frame.image = applyDarkFrameSubtraction(frame.image, config.darkFrame);
     }
 
-    if (m_operations.testFlag(FlatFieldCorrection) && hasFlatField()) {
-        frame.image = applyFlatFieldCorrection(frame.image, m_flatField);
+    if (config.operations.testFlag(FlatFieldCorrection) && config.hasFlatField()) {
+        frame.image = applyFlatFieldCorrection(frame.image, config.flatField);
     }
-}
-
-void PostProcessManager::setDarkFrame(const QImage &darkFrame)
-{
-    m_darkFrame = darkFrame;
-}
-
-void PostProcessManager::clearDarkFrame()
-{
-    m_darkFrame = QImage();
-}
-
-bool PostProcessManager::hasDarkFrame() const
-{
-    return !m_darkFrame.isNull();
-}
-
-void PostProcessManager::setFlatField(const QImage &flatField)
-{
-    m_flatField = flatField;
-}
-
-void PostProcessManager::clearFlatField()
-{
-    m_flatField = QImage();
-}
-
-bool PostProcessManager::hasFlatField() const
-{
-    return !m_flatField.isNull();
 }
 
 QImage PostProcessManager::applyVerticalBinning(const QImage &image, int startRow, int endRow)
