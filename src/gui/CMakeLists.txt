@@ -14,17 +14,17 @@ target_sources(ezspeccam_gui PRIVATE
     AppController.h AppController.cpp
     widgets/MainWindow.h widgets/MainWindow.cpp
     ui/MainWindowUi.h ui/MainWindowUi.cpp
-    widgets/CameraTab.h widgets/CameraTab.cpp
-    widgets/ImageViewWidget.h widgets/ImageViewWidget.cpp
-    widgets/SpectrumViewWidget.h widgets/SpectrumViewWidget.cpp
     qcustomplot.h qcustomplot.cpp
-    widgets/LoadingIndicator.h widgets/LoadingIndicator.cpp
-    widgets/ParameterWidgetFactory.h widgets/ParameterWidgetFactory.cpp
-    widgets/StatisticsDialog.h widgets/StatisticsDialog.cpp
-    widgets/CustomRangeDialog.h widgets/CustomRangeDialog.cpp
-    widgets/RowRangeDialog.h widgets/RowRangeDialog.cpp
-    widgets/DataTab.h widgets/DataTab.cpp
-    widgets/PluginTab.h widgets/PluginTab.cpp
-    widgets/CameraConfigDialogUi.h widgets/CameraConfigDialogUi.cpp
-    widgets/CameraConfigDialog.h widgets/CameraConfigDialog.cpp
+    widgets/config/CameraTab.h widgets/config/CameraTab.cpp
+    widgets/config/LoadingIndicator.h widgets/config/LoadingIndicator.cpp
+    widgets/config/ParameterWidgetFactory.h widgets/config/ParameterWidgetFactory.cpp
+    widgets/config/DataTab.h widgets/config/DataTab.cpp
+    widgets/config/PluginTab.h widgets/config/PluginTab.cpp
+    widgets/config/CameraConfigDialogUi.h widgets/config/CameraConfigDialogUi.cpp
+    widgets/config/CameraConfigDialog.h widgets/config/CameraConfigDialog.cpp
+    widgets/display/ImageViewWidget.h widgets/display/ImageViewWidget.cpp
+    widgets/display/SpectrumViewWidget.h widgets/display/SpectrumViewWidget.cpp
+    widgets/display/StatisticsDialog.h widgets/display/StatisticsDialog.cpp
+    widgets/dialogs/CustomRangeDialog.h widgets/dialogs/CustomRangeDialog.cpp
+    widgets/dialogs/RowRangeDialog.h widgets/dialogs/RowRangeDialog.cpp
 )

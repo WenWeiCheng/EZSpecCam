@@ -18,7 +18,7 @@
 #include <QThread>
 #include <QVariantMap>
 
-#include "../AppController.h"
+#include "../../AppController.h"
 #include "CameraTypes.h"
 #include "LoadingIndicator.h"
 

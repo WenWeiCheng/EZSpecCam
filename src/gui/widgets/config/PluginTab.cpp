@@ -1,6 +1,6 @@
 #include "PluginTab.h"
 #include "CameraTab.h"
-#include "../AppController.h"
+#include "../../AppController.h"
 
 #include <QFileInfo>
 #include <QDir>

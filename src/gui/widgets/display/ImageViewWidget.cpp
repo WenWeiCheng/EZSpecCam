@@ -4,7 +4,7 @@
 #include <QMouseEvent>
 #include <QDebug>
 #include <QTimer>
-#include "../qcustomplot.h"
+#include "../../qcustomplot.h"
 
 ImageViewWidget::ImageViewWidget(QWidget *parent)
     : QWidget(parent)

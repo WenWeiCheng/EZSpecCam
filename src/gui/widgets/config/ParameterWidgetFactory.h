@@ -4,7 +4,7 @@
 #include <QWidget>
 #include <QVariant>
 
-#include "../../core/CameraTypes.h"
+#include "../../../core/CameraTypes.h"
 
 /**
  * @brief Factory class for creating Qt widgets from parameter definitions

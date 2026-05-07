@@ -1,13 +1,13 @@
 #include "MainWindow.h"
 #include "../ui/MainWindowUi.h"
-#include "CameraTab.h"
-#include "ImageViewWidget.h"
-#include "SpectrumViewWidget.h"
+#include "config/CameraTab.h"
+#include "display/ImageViewWidget.h"
+#include "display/SpectrumViewWidget.h"
 #include "CameraTypes.h"
-#include "StatisticsDialog.h"
-#include "RowRangeDialog.h"
-#include "CustomRangeDialog.h"
-#include "CameraConfigDialog.h"
+#include "display/StatisticsDialog.h"
+#include "dialogs/RowRangeDialog.h"
+#include "dialogs/CustomRangeDialog.h"
+#include "config/CameraConfigDialog.h"
 
 #include <QMessageBox>
 #include <QCloseEvent>

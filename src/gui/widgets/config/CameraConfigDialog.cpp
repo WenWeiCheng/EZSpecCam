@@ -2,7 +2,7 @@
 #include "CameraConfigDialogUi.h"
 #include "CameraTab.h"
 #include "PluginTab.h"
-#include "../AppController.h"
+#include "../../AppController.h"
 
 #include <QShowEvent>
 #include <QHash>

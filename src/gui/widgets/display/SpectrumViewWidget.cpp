@@ -3,7 +3,7 @@
 #include <QVBoxLayout>
 #include <QMouseEvent>
 #include <QDebug>
-#include "../qcustomplot.h"
+#include "../../qcustomplot.h"
 
 SpectrumViewWidget::SpectrumViewWidget(QWidget *parent)
     : QWidget(parent)
