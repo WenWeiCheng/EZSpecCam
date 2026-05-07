@@ -1,8 +1,8 @@
 #include "MainWindow.h"
-#include "MainWindowUi.h"
-#include "CameraTab.h"
-#include "ImageViewWidget.h"
-#include "SpectrumViewWidget.h"
+#include "ui/MainWindowUi.h"
+#include "widgets/CameraTab.h"
+#include "widgets/ImageViewWidget.h"
+#include "widgets/SpectrumViewWidget.h"
 #include "CameraTypes.h"
 
 #include <QMessageBox>

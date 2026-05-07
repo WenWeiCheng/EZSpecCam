@@ -17,7 +17,7 @@
 #include <QTimer>
 #include <QThread>
 
-#include "AppController.h"
+#include "../AppController.h"
 #include "CameraTypes.h"
 
 class CameraTab : public QWidget

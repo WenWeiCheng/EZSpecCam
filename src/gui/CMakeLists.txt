@@ -13,9 +13,9 @@ target_sources(ezspeccam_gui PRIVATE
     main.cpp
     AppController.h AppController.cpp
     MainWindow.h MainWindow.cpp
-    MainWindowUi.h MainWindowUi.cpp
-    CameraTab.h CameraTab.cpp
-    ImageViewWidget.h ImageViewWidget.cpp
-    SpectrumViewWidget.h SpectrumViewWidget.cpp
+    ui/MainWindowUi.h ui/MainWindowUi.cpp
+    widgets/CameraTab.h widgets/CameraTab.cpp
+    widgets/ImageViewWidget.h widgets/ImageViewWidget.cpp
+    widgets/SpectrumViewWidget.h widgets/SpectrumViewWidget.cpp
     qcustomplot.h qcustomplot.cpp
 )

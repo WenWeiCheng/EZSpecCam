@@ -1,6 +1,6 @@
 #include "MainWindowUi.h"
-#include "ImageViewWidget.h"
-#include "SpectrumViewWidget.h"
+#include "../widgets/ImageViewWidget.h"
+#include "../widgets/SpectrumViewWidget.h"
 
 #include <QMenuBar>
 #include <QMenu>

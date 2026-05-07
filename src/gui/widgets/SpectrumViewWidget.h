@@ -8,7 +8,7 @@
 #include <QShowEvent>
 #include <QString>
 
-#include "qcustomplot.h"
+#include "../qcustomplot.h"
 
 class QCPGraph;
 class QCPItemLine;
