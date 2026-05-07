@@ -14,7 +14,7 @@ class MockCameraDriver : public QObject
 {
     Q_OBJECT
 public:
-    MockCameraDriver() : m_connected(false), m_capturing(false) {}
+    MockCameraDriver() : m_connected(false) {}
 
     bool connectToCamera(const QString &cameraId) {
         Q_UNUSED(cameraId);
@@ -24,7 +24,6 @@ public:
 
     void disconnectCamera() {
         m_connected = false;
-        m_capturing = false;
     }
 
     bool isConnected() const { return m_connected; }
@@ -39,16 +38,12 @@ public:
     bool startCapture(int count = 0) {
         Q_UNUSED(count);
         if (!m_connected) return false;
-        m_capturing = true;
         return true;
     }
 
     void stopCapture(int timeoutMs = 5000) {
         Q_UNUSED(timeoutMs);
-        m_capturing = false;
     }
-
-    bool isCapturing() const { return m_capturing; }
 
     QStringList parameterNames() const {
         return QStringList() << "exposure" << "gain";
@@ -81,7 +76,6 @@ signals:
 
 private:
     bool m_connected;
-    bool m_capturing;
     QString m_cameraId;
     double m_exposure = 100.0;
     double m_gain = 1.0;

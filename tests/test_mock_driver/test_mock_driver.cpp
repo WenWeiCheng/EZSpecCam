@@ -3,8 +3,8 @@
 #include <QDebug>
 #include <QSharedPointer>
 
-#include "core/interfaces/ICameraDriver.h"
-#include "core/interfaces/CameraTypes.h"
+#include "core/ICameraDriver.h"
+#include "core/CameraTypes.h"
 #include "plugins/mock/MockCameraDriver.h"
 
 class TestMockDriver : public QObject
@@ -223,7 +223,7 @@ private slots:
     {
         bool started = m_driver->startCapture(1);
         QVERIFY2(started == false, "Should fail to start capture without connection");
-        QVERIFY2(m_driver->isCapturing() == false, "isCapturing should return false");
+        QVERIFY2(m_driver->state() != CameraState::Acquiring, "state should not be Acquiring");
     }
 
     void test_single_capture()
@@ -238,7 +238,7 @@ private slots:
 
         bool started = m_driver->startCapture(1);
         QVERIFY2(started == true, "Should start single capture successfully");
-        QVERIFY2(m_driver->isCapturing() == true, "isCapturing should return true");
+        QVERIFY2(m_driver->state() == CameraState::Acquiring, "state should be Acquiring after capture start");
 
         QVERIFY2(startedSpy.count() > 0 || startedSpy.wait(500),
                  "captureStarted signal was not received");
@@ -261,7 +261,7 @@ private slots:
             QVERIFY2(cameraId == "mock-001", "Camera ID should be mock-001");
         }
 
-        QVERIFY2(!m_driver->isCapturing(), "Should stop capturing after single frame");
+        QVERIFY2(m_driver->state() != CameraState::Acquiring, "Should stop capturing after single frame");
     }
 
     void test_continuous_capture()
@@ -276,7 +276,7 @@ private slots:
 
         bool started = m_driver->startCapture(0);
         QVERIFY2(started == true, "Should start continuous capture");
-        QVERIFY2(m_driver->isCapturing() == true, "Should be capturing");
+        QVERIFY2(m_driver->state() == CameraState::Acquiring, "Should be capturing");
 
         QVERIFY2(startedSpy.count() > 0 || startedSpy.wait(500),
                  "captureStarted signal was not received");
@@ -290,7 +290,7 @@ private slots:
         QVERIFY2(stoppedSpy.count() > 0 || stoppedSpy.wait(500),
                  "captureStopped signal was not received");
 
-        QVERIFY2(!m_driver->isCapturing(), "Should stop capturing after stopCapture");
+        QVERIFY2(m_driver->state() != CameraState::Acquiring, "Should stop capturing after stopCapture");
         QVERIFY2(frameSpy.count() > frameCountBeforeStop,
                  "Should have received more frames before stop");
     }
@@ -315,7 +315,7 @@ private slots:
         QVERIFY2(frameSpy.count() == 3,
                  qPrintable(QString("Expected 3 frames, got %1").arg(frameSpy.count())));
 
-        QVERIFY2(!m_driver->isCapturing(), "Should stop capturing after burst complete");
+        QVERIFY2(m_driver->state() != CameraState::Acquiring, "Should stop capturing after burst complete");
     }
 
     void test_stop_capture_timeout()
@@ -331,7 +331,7 @@ private slots:
 
         m_driver->stopCapture(100);
 
-        QVERIFY2(!m_driver->isCapturing(), "Should stop capturing after stopCapture with timeout");
+        QVERIFY2(m_driver->state() != CameraState::Acquiring, "Should stop capturing after stopCapture with timeout");
     }
 
     //==========================================================================

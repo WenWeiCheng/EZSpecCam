@@ -265,11 +265,6 @@ void MockCameraDriver::stopCapture(int timeoutMs)
     emit captureStopped(m_connectedCameraId);
 }
 
-bool MockCameraDriver::isCapturing() const
-{
-    return m_capturing.load();
-}
-
 CameraState MockCameraDriver::state() const
 {
     return m_state.load();

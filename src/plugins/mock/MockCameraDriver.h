@@ -12,8 +12,8 @@
 
 #pragma once
 
-#include "core/interfaces/ICameraDriver.h"
-#include "core/interfaces/CameraTypes.h"
+#include "core/ICameraDriver.h"
+#include "core/CameraTypes.h"
 
 #include <QObject>
 #include <QTimer>
@@ -149,12 +149,6 @@ public:
      * @param timeoutMs Maximum time to wait for graceful stop
      */
     void stopCapture(int timeoutMs = 5000) override;
-
-    /**
-     * @brief Check if capture is in progress
-     * @return true if capturing
-     */
-    bool isCapturing() const override;
 
     /**
      * @brief Get current camera/driver state
