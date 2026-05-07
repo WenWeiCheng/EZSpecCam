@@ -14,7 +14,6 @@
 #include "CommandLineParser.h"
 #include "core/interfaces/ICameraDriver.h"
 #include "core/interfaces/CameraTypes.h"
-#include "core/data/DataSaver.h"
 
 class CaptureController : public QObject
 {

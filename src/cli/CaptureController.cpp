@@ -165,16 +165,10 @@ void CaptureController::onFrameReady(const QSharedPointer<QImage> &image,
     params["gain"] = m_args.gain;
     frameData.parameters = params;
 
-    // Inline sync save using DataSaver
-    DataSaver saver;
-    ImageSaveOptions imageOpts;
-    if (!m_args.format.isEmpty()) {
-        imageOpts.format = (m_args.format.toLower() == "jpg") 
-            ? ImageFormat::JPEG : ImageFormat::TIFF;
-    }
-    FrameSaveOptions frameOpts;
-    bool saved = saver.saveFrame(frameData, m_outputDir, frameNumber, imageOpts, frameOpts);
-    if (saved) {
+    QString filePath = QString("%1/img_%2.tiff")
+        .arg(m_outputDir)
+        .arg(frameNumber, 12, 10, QChar('0'));
+    if (frameData.image.save(filePath, "TIFF")) {
         m_capturedFrameCount++;
     }
 }

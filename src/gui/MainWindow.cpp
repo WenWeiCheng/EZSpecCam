@@ -4,7 +4,6 @@
 #include "ImageViewWidget.h"
 #include "SpectrumViewWidget.h"
 #include "core/interfaces/CameraTypes.h"
-#include "core/data/DataSaver.h"
 
 #include <QMessageBox>
 #include <QCloseEvent>
@@ -485,10 +484,10 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
         QDir().mkpath(fullDir);
 
         int frameNum = ++m_autoSaveFrameCounter;
-        DataSaver saver;
-        ImageSaveOptions imageOpts;
-        FrameSaveOptions frameOpts;
-        if (saver.saveFrame(frame, fullDir, frameNum, imageOpts, frameOpts)) {
+        QString filePath = QString("%1/img_%2.tiff")
+            .arg(fullDir)
+            .arg(frameNum, 12, 10, QChar('0'));
+        if (frame.image.save(filePath, "TIFF")) {
             showStatusMessage(tr("Auto-saved frame %1").arg(frameNum), 2000);
         }
     }
