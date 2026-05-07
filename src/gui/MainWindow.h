@@ -5,6 +5,7 @@
 #include <QElapsedTimer>
 #include <QTimer>
 #include <QShortcut>
+#include <QSettings>
 
 #include "AppController.h"
 
@@ -86,6 +87,7 @@ private:
     SpectrumViewWidget *m_spectrumViewWidget;
 
     int m_frameCount = 0;
+    int m_autoSaveFrameCounter = 0;
 };
 
 #endif // MAINWINDOW_H

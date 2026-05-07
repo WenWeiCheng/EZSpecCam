@@ -4,6 +4,7 @@
 #include "ImageViewWidget.h"
 #include "SpectrumViewWidget.h"
 #include "core/interfaces/CameraTypes.h"
+#include "core/data/DataSaver.h"
 
 #include <QMessageBox>
 #include <QCloseEvent>
@@ -14,6 +15,7 @@
 #include <QFileDialog>
 #include <QStandardPaths>
 #include <QDateTime>
+#include <QDir>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -117,6 +119,10 @@ MainWindow::MainWindow(QWidget *parent)
 
     m_frameTimer.start();
     updateToolbarState();
+
+    QSettings settings;
+    bool autoSaveEnabled = settings.value("data/autoSaveEnabled", false).toBool();
+    ui->menuActionAutoSaveToggle->setChecked(autoSaveEnabled);
 }
 
 MainWindow::~MainWindow()
@@ -171,20 +177,15 @@ void MainWindow::on_actionSaveFrameAutoNumber_triggered()
         return;
     }
 
-    QString saveDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
-
-    DataSaver dataSaver;
-    int frameNumber = 0;
-
-    QString fileName = QString("img_%1.tiff").arg(frameNumber, 12, 10, QChar('0'));
+    QString fileName = QString("img_%1.tiff").arg(0, 12, 10, QChar('0'));
     showStatusMessage(tr("Frame saved: %1").arg(fileName), 3000);
 }
 
 void MainWindow::on_actionAutoSaveToggle_triggered(bool checked)
 {
-    Q_UNUSED(checked);
     QSettings settings;
     settings.setValue("data/autoSaveEnabled", checked);
+    showStatusMessage(checked ? tr("Auto-save enabled") : tr("Auto-save disabled"), 2000);
 }
 
 void MainWindow::on_actionChangeAutoSaveDir_triggered()
@@ -472,6 +473,25 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
 
     updateDisplay(frame);
     updateToolbarState();
+
+    QSettings settings;
+    if (settings.value("data/autoSaveEnabled", false).toBool()) {
+        QString saveDir = settings.value("data/autoSaveDirectory",
+            QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+            + "/EZSpecCamData").toString();
+
+        QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd-hh-mm-ss");
+        QString fullDir = saveDir + "/" + timestamp;
+        QDir().mkpath(fullDir);
+
+        int frameNum = ++m_autoSaveFrameCounter;
+        DataSaver saver;
+        ImageSaveOptions imageOpts;
+        FrameSaveOptions frameOpts;
+        if (saver.saveFrame(frame, fullDir, frameNum, imageOpts, frameOpts)) {
+            showStatusMessage(tr("Auto-saved frame %1").arg(frameNum), 2000);
+        }
+    }
 }
 
 void MainWindow::onConnectionChanged(bool connected)

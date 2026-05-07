@@ -14,7 +14,7 @@
 #include "CommandLineParser.h"
 #include "core/interfaces/ICameraDriver.h"
 #include "core/interfaces/CameraTypes.h"
-#include "core/data/AutoSaveManager.h"
+#include "core/data/DataSaver.h"
 
 class CaptureController : public QObject
 {
@@ -43,8 +43,6 @@ private slots:
     void onCaptureStopped(const QString &cameraId);
     void onConnectionChanged(bool connected, const QString &cameraId);
     void onErrorOccurred(const CameraError &error);
-    void onFrameAutoSaved(const QString &filePath, bool success);
-
 private:
     bool waitForSignal(const char *signalName, int timeoutMs);
 
@@ -58,7 +56,6 @@ private:
 
     CommandLineArgs m_args;
     ICameraDriver *m_driver = nullptr;
-    AutoSaveManager *m_autoSaveManager = nullptr;
     volatile sig_atomic_t *m_signalFlag = nullptr;
 
     QString m_lastError;

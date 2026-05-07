@@ -7,7 +7,6 @@ target_include_directories(ezspeccam_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/interfaces>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/config>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/data>
         $<INSTALL_INTERFACE:include/ezspeccam>
 )
@@ -17,16 +16,7 @@ target_sources(ezspeccam_core PRIVATE
     # Interfaces
     interfaces/ICameraDriver.h
     interfaces/CameraTypes.h
-    # Config (to be written)
-    config/ConfigurationManager.h
-    config/ConfigurationManager.cpp
-    # Data (to be written)
-    data/DataLoader.h
-    data/DataLoader.cpp
-    data/DataSaver.h
-    data/DataSaver.cpp
-    data/AutoSaveManager.h
-    data/AutoSaveManager.cpp
+    # Data
     data/PostProcessManager.h
     data/PostProcessManager.cpp
 )

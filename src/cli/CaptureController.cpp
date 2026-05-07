@@ -26,18 +26,6 @@ CaptureController::CaptureController(const CommandLineArgs &args,
         connect(m_driver, &ICameraDriver::errorOccurred,
                 this, &CaptureController::onErrorOccurred);
     }
-
-    m_autoSaveManager = new AutoSaveManager(this);
-    m_autoSaveManager->setAutoSaveEnabled(true);
-
-    if (!m_args.format.isEmpty()) {
-        ImageFormat format = (m_args.format.toLower() == "jpg")
-            ? ImageFormat::JPEG : ImageFormat::TIFF;
-        m_autoSaveManager->setImageFormat(format);
-    }
-
-    connect(m_autoSaveManager, &AutoSaveManager::frameAutoSaved,
-            this, &CaptureController::onFrameAutoSaved);
 }
 
 CaptureController::~CaptureController()
@@ -77,8 +65,6 @@ int CaptureController::execute()
     }
 
     qInfo() << "Output directory:" << m_outputDir;
-
-    m_autoSaveManager->setAutoSaveDirectory(m_outputDir);
 
     m_capturedFrameCount = 0;
     m_captureStarted = false;
@@ -179,7 +165,18 @@ void CaptureController::onFrameReady(const QSharedPointer<QImage> &image,
     params["gain"] = m_args.gain;
     frameData.parameters = params;
 
-    m_autoSaveManager->onFrameReady(frameData);
+    // Inline sync save using DataSaver
+    DataSaver saver;
+    ImageSaveOptions imageOpts;
+    if (!m_args.format.isEmpty()) {
+        imageOpts.format = (m_args.format.toLower() == "jpg") 
+            ? ImageFormat::JPEG : ImageFormat::TIFF;
+    }
+    FrameSaveOptions frameOpts;
+    bool saved = saver.saveFrame(frameData, m_outputDir, frameNumber, imageOpts, frameOpts);
+    if (saved) {
+        m_capturedFrameCount++;
+    }
 }
 
 void CaptureController::onCaptureStarted(const QString &cameraId)
@@ -216,16 +213,6 @@ void CaptureController::onErrorOccurred(const CameraError &error)
 
     if (m_captureLoop) {
         m_captureLoop->quit();
-    }
-}
-
-void CaptureController::onFrameAutoSaved(const QString &filePath, bool success)
-{
-    if (success) {
-        m_capturedFrameCount++;
-        qInfo() << "Frame saved:" << filePath << "total:" << m_capturedFrameCount;
-    } else {
-        qWarning() << "Failed to save frame to:" << filePath;
     }
 }
 
