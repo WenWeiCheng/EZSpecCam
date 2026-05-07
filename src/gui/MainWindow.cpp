@@ -3,7 +3,7 @@
 #include "CameraTab.h"
 #include "ImageViewWidget.h"
 #include "SpectrumViewWidget.h"
-#include "core/interfaces/CameraTypes.h"
+#include "core/CameraTypes.h"
 
 #include <QMessageBox>
 #include <QCloseEvent>
@@ -551,7 +551,7 @@ void MainWindow::updateToolbarState()
     }
 
     const bool connected = m_appController->isConnected();
-    const bool acquiring = m_appController->isCapturing();
+    const bool acquiring = m_appController->state() == CameraState::Acquiring;
 
     ui->actionConfig->setEnabled(!acquiring);
     ui->toolbarActionConfig->setEnabled(!acquiring);

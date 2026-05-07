@@ -41,14 +41,6 @@ enum class CameraState {
 };
 
 /**
- * @brief Supported image file formats for saving
- */
-enum class ImageFormat {
-    TIFF,
-    JPEG
-};
-
-/**
  * @brief Parameter value type classification
  */
 enum class ParameterType {
@@ -72,14 +64,8 @@ enum class ParameterCategory {
     Debug     ///< Debug parameters
 };
 
-/**
- * @brief Metadata embedding format for saved images
- */
-enum class MetaDataSaveFormat {
-    Separate,  ///< Metadata saved as separate JSON file
-    Embedded   ///< Metadata embedded in image file
-};
-
+//==============================================================================
+// Parameter System Types
 //==============================================================================
 // Basic Types
 //==============================================================================
@@ -221,9 +207,9 @@ struct ParameterDefinition
     ParameterConstraint constraint;
     QVariant defaultValue;
     bool isReadOnly = false;
-    bool isDynamic = false;
-    bool isExtrinsic = false;
-    bool needReconnect = false;
+    bool isDynamic = false;            // True if parameter can be changed with other params, environment, time changing
+    bool isExtrinsic = false;          // True if parameter change with environment or time changing, but cannot be changed by user directly
+    bool needReconnect = false;        // True if parameter change need to reconnect
     float order = 0.0f;
 
     bool isValid() const { return !name.isEmpty() && constraint.isValid(); }
@@ -403,7 +389,6 @@ struct CameraError
         ConnectionFailed,
         CaptureFailed,
         Timeout,
-        BufferOverflow,
         StateInvalid,
         DriverError,
         PluginLoadFailed,
@@ -493,9 +478,6 @@ struct FrameMetadata
 // Configuration and Capabilities
 //==============================================================================
 
-/**
- * @brief Cooling system configuration
- */
 struct CoolingConfig {
     bool enabled = false;
     double targetTemperature = -10.0;
@@ -536,57 +518,9 @@ struct CameraCapabilities {
 };
 
 //==============================================================================
-// Save Options
-//==============================================================================
-
-/**
- * @brief Image saving options and format configuration
- */
-struct ImageSaveOptions {
-    ImageFormat format = ImageFormat::TIFF;
-    int quality = 100;
-    QString compression = "None";
-
-    QString fileExtension() const {
-        switch (format) {
-        case ImageFormat::TIFF: return "tiff";
-        case ImageFormat::JPEG: return "jpg";
-        }
-        return "tiff";
-    }
-
-    bool operator==(const ImageSaveOptions &other) const {
-        return format == other.format && quality == other.quality &&
-               compression == other.compression;
-    }
-};
-
-/**
- * @brief Frame saving options with metadata configuration
- */
-struct FrameSaveOptions : public ImageSaveOptions {
-    MetaDataSaveFormat frameFormat = MetaDataSaveFormat::Separate;
-    bool includeCoolingData = true;
-    bool includeTimestamp = true;
-    bool includeRoiInfo = true;
-
-    bool operator==(const FrameSaveOptions &other) const {
-        return ImageSaveOptions::operator==(other) &&
-               frameFormat == other.frameFormat &&
-               includeCoolingData == other.includeCoolingData &&
-               includeTimestamp == other.includeTimestamp &&
-               includeRoiInfo == other.includeRoiInfo;
-    }
-};
-
-//==============================================================================
 // MetaType Declarations (for Qt signals/slots)
 //==============================================================================
 
-Q_DECLARE_METATYPE(ImageFormat)
-Q_DECLARE_METATYPE(ImageSaveOptions)
-Q_DECLARE_METATYPE(MetaDataSaveFormat)
-Q_DECLARE_METATYPE(FrameSaveOptions)
 Q_DECLARE_METATYPE(ParameterType)
 Q_DECLARE_METATYPE(ParameterCategory)
 Q_DECLARE_METATYPE(ParameterConstraint)

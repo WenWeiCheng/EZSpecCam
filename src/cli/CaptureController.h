@@ -12,8 +12,8 @@
 #include <csignal>
 
 #include "CommandLineParser.h"
-#include "core/interfaces/ICameraDriver.h"
-#include "core/interfaces/CameraTypes.h"
+#include "core/ICameraDriver.h"
+#include "core/CameraTypes.h"
 
 class CaptureController : public QObject
 {

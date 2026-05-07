@@ -4,7 +4,7 @@
 #include <QDir>
 #include <QPluginLoader>
 
-#include "core/interfaces/ICameraDriver.h"
+#include "core/ICameraDriver.h"
 #include "plugins/mock/MockCameraDriver.h"
 
 class TestPluginLoading : public QObject

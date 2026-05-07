@@ -158,12 +158,6 @@ public:
      */
     virtual void stopCapture(int timeoutMs = 5000) = 0;
 
-    /**
-     * @brief Query whether capture is currently active.
-     * @return true if capturing, false otherwise.
-     */
-    virtual bool isCapturing() const = 0;
-
     // ——— Driver Info ———
 
     /**

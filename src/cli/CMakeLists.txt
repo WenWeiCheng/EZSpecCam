@@ -2,7 +2,7 @@
 qt_add_executable(ezspeccam_cli)
 
 target_link_libraries(ezspeccam_cli PRIVATE
-    egspeccam_core
+    ezspeccam_core
     Qt6::Core
 )
 

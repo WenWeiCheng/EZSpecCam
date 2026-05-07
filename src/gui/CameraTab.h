@@ -18,7 +18,7 @@
 #include <QThread>
 
 #include "AppController.h"
-#include "core/interfaces/CameraTypes.h"
+#include "core/CameraTypes.h"
 
 class CameraTab : public QWidget
 {

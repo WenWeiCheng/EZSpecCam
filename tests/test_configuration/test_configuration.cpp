@@ -3,7 +3,7 @@
 #include <QDir>
 #include <QtTest>
 
-#include "interfaces/CameraTypes.h"
+#include "CameraTypes.h"
 
 class TestConfigurationManager : public QObject
 {

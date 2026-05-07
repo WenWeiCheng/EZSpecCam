@@ -7,7 +7,7 @@
 
 #include "CommandLineParser.h"
 #include "CaptureController.h"
-#include "core/interfaces/ICameraDriver.h"
+#include "core/ICameraDriver.h"
 
 static volatile sig_atomic_t g_signalFlag = 0;
 

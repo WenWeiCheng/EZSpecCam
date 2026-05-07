@@ -1,19 +1,21 @@
-#include "PostProcessManager.h"
+#include "PostProcess.h"
 
 #include <QDebug>
 #include <QVector>
 #include <algorithm>
 
-PostProcessManager::PostProcessManager(QObject *parent)
-    : QObject(parent)
-{
-}
+namespace {
 
-PostProcessManager::~PostProcessManager()
-{
-}
+using PostProcess::Operation;
+using PostProcess::ProcessConfig;
 
-void PostProcessManager::processFrame(ImageData &frame, const ProcessConfig &config)
+QImage applyVerticalBinning(const QImage &image, int startRow, int endRow);
+QImage applyDarkFrameSubtraction(const QImage &image, const QImage &darkFrame);
+QImage applyFlatFieldCorrection(const QImage &image, const QImage &flatField);
+
+} // namespace
+
+void PostProcess::processFrame(ImageData &frame, const ProcessConfig &config)
 {
     if (!config.enabled) {
         return;
@@ -40,16 +42,18 @@ void PostProcessManager::processFrame(ImageData &frame, const ProcessConfig &con
         }
     }
 
-    if (config.operations.testFlag(DarkFrameSubtraction) && config.hasDarkFrame()) {
+    if (config.operations.testFlag(DarkFrameSubtraction) && !config.darkFrame.isNull()) {
         frame.image = applyDarkFrameSubtraction(frame.image, config.darkFrame);
     }
 
-    if (config.operations.testFlag(FlatFieldCorrection) && config.hasFlatField()) {
+    if (config.operations.testFlag(FlatFieldCorrection) && !config.flatField.isNull()) {
         frame.image = applyFlatFieldCorrection(frame.image, config.flatField);
     }
 }
 
-QImage PostProcessManager::applyVerticalBinning(const QImage &image, int startRow, int endRow)
+namespace {
+
+QImage applyVerticalBinning(const QImage &image, int startRow, int endRow)
 {
     const int width = image.width();
     const int height = image.height();
@@ -140,18 +144,18 @@ QImage PostProcessManager::applyVerticalBinning(const QImage &image, int startRo
             dstData[x * 3 + 2] = static_cast<uchar>(sumsB[x] / rowCount);
         }
     } else {
-        qWarning() << "PostProcessManager: Unsupported image format for vertical binning";
+        qWarning() << "PostProcess: Unsupported image format for vertical binning";
         return image;
     }
 
-    qDebug() << "PostProcessManager: Applied vertical binning:" << width << "x" << rowCount << "->" << width << "x1";
+    qDebug() << "PostProcess: Applied vertical binning:" << width << "x" << rowCount << "->" << width << "x1";
     return binnedImage;
 }
 
-QImage PostProcessManager::applyDarkFrameSubtraction(const QImage &image, const QImage &darkFrame)
+QImage applyDarkFrameSubtraction(const QImage &image, const QImage &darkFrame)
 {
     if (image.size() != darkFrame.size() || image.format() != darkFrame.format()) {
-        qWarning() << "PostProcessManager: Dark frame size/format mismatch";
+        qWarning() << "PostProcess: Dark frame size/format mismatch";
         return image;
     }
 
@@ -182,10 +186,10 @@ QImage PostProcessManager::applyDarkFrameSubtraction(const QImage &image, const 
     return result;
 }
 
-QImage PostProcessManager::applyFlatFieldCorrection(const QImage &image, const QImage &flatField)
+QImage applyFlatFieldCorrection(const QImage &image, const QImage &flatField)
 {
     if (image.size() != flatField.size() || image.format() != flatField.format()) {
-        qWarning() << "PostProcessManager: Flat field size/format mismatch";
+        qWarning() << "PostProcess: Flat field size/format mismatch";
         return image;
     }
 
@@ -223,3 +227,5 @@ QImage PostProcessManager::applyFlatFieldCorrection(const QImage &image, const Q
 
     return result;
 }
+
+} // namespace
