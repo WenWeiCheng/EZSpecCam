@@ -57,3 +57,21 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+# Project Specific
+
+## Build and Test
+
+use `build_preset.bat` script to build
+use `run_tests.bat` to test
+
+
+
+## Do not modify
+
+`qcustomplot` is an external module, do not modify it
+
+
+
+## ICameraDriver spec
+
