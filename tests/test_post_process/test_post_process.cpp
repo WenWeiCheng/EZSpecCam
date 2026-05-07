@@ -4,7 +4,7 @@
 
 #include "PostProcess.h"
 
-class TestPostProcessManager : public QObject
+class TestPostProcess : public QObject
 {
     Q_OBJECT
 
@@ -25,23 +25,23 @@ private slots:
 private:
 };
 
-void TestPostProcessManager::initTestCase()
+void TestPostProcess::initTestCase()
 {
 }
 
-void TestPostProcessManager::cleanupTestCase()
+void TestPostProcess::cleanupTestCase()
 {
 }
 
-void TestPostProcessManager::init()
+void TestPostProcess::init()
 {
 }
 
-void TestPostProcessManager::cleanup()
+void TestPostProcess::cleanup()
 {
 }
 
-void TestPostProcessManager::testEnabled()
+void TestPostProcess::testEnabled()
 {
 
     PostProcess::ProcessConfig configDisabled;
@@ -56,7 +56,7 @@ void TestPostProcessManager::testEnabled()
     QVERIFY2(configEnabled.enabled == false, "Config should be disabled when set to false");
 }
 
-void TestPostProcessManager::testOperations()
+void TestPostProcess::testOperations()
 {
 
     PostProcess::ProcessConfig config;
@@ -75,7 +75,7 @@ void TestPostProcessManager::testOperations()
              "VerticalBinning should be disabled after clearing it");
 }
 
-void TestPostProcessManager::testVerticalBinningRowRange()
+void TestPostProcess::testVerticalBinningRowRange()
 {
 
     PostProcess::ProcessConfig config;
@@ -88,7 +88,7 @@ void TestPostProcessManager::testVerticalBinningRowRange()
     QVERIFY2(config.vBinEndRow == 100, "End row should be 100");
 }
 
-void TestPostProcessManager::testVerticalBinning()
+void TestPostProcess::testVerticalBinning()
 {
 
     QImage testImage(10, 5, QImage::Format_Grayscale8);
@@ -115,7 +115,7 @@ void TestPostProcessManager::testVerticalBinning()
     QVERIFY2(frame.hasOriginal() == true, "Should have original image stored");
 }
 
-void TestPostProcessManager::testDarkFrameSubtraction()
+void TestPostProcess::testDarkFrameSubtraction()
 {
 
     QImage testImage(10, 10, QImage::Format_Grayscale8);
@@ -142,7 +142,7 @@ void TestPostProcessManager::testDarkFrameSubtraction()
     QVERIFY2(pixelValue == 150, "Pixel value should be 200 - 50 = 150 after dark frame subtraction");
 }
 
-void TestPostProcessManager::testFlatFieldCorrection()
+void TestPostProcess::testFlatFieldCorrection()
 {
 
     QImage testImage(10, 10, QImage::Format_Grayscale8);
@@ -169,7 +169,7 @@ void TestPostProcessManager::testFlatFieldCorrection()
     QVERIFY2(pixelValue == 255, "Pixel value should be saturated to 255 after flat field correction (128/64*255)");
 }
 
-void TestPostProcessManager::testProcessFrame()
+void TestPostProcess::testProcessFrame()
 {
 
     QImage testImage(10, 10, QImage::Format_Grayscale8);
@@ -190,5 +190,5 @@ void TestPostProcessManager::testProcessFrame()
     QVERIFY2(frame.hasOriginal() == false, "Should not store original when disabled");
 }
 
-QTEST_MAIN(TestPostProcessManager)
-#include "test_post_process_manager.moc"
+QTEST_MAIN(TestPostProcess)
+#include "test_post_process.moc"
