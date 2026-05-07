@@ -7,7 +7,7 @@
 #include <QShortcut>
 #include <QSettings>
 
-#include "AppController.h"
+#include "../AppController.h"
 
 class MainWindowUi;
 class CameraTab;

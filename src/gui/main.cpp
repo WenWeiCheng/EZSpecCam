@@ -1,7 +1,7 @@
 #include <QApplication>
 #include <QSurfaceFormat>
 
-#include "MainWindow.h"
+#include "widgets/MainWindow.h"
 
 int main(int argc, char *argv[])
 {

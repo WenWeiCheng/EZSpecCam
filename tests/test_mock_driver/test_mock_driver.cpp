@@ -427,6 +427,533 @@ private slots:
         QVERIFY2(height.toInt() == 1024, "mock-003 height should be 1024");
     }
 
+    //==========================================================================
+    // ConnectionChanged Signal Tests
+    //==========================================================================
+    void test_connection_changed_on_disconnect()
+    {
+        QSignalSpy spy(m_driver, &ICameraDriver::connectionChanged);
+
+        m_driver->connectToCamera("mock-001");
+
+        QVERIFY2(spy.count() >= 1, "Should emit connectionChanged on connect");
+        spy.clear();
+
+        m_driver->disconnectCamera();
+
+        QVERIFY2(spy.count() == 1,
+                 qPrintable(QString("Expected 1 connectionChanged signal on disconnect, got %1").arg(spy.count())));
+        if (spy.count() > 0) {
+            QVariantList args = spy.takeFirst();
+            QVERIFY2(args.at(0).toBool() == false,
+                     "First argument should be false for disconnection");
+            QVERIFY2(args.at(1).toString() == "mock-001",
+                     "Second argument should be camera ID 'mock-001'");
+        }
+    }
+
+    //==========================================================================
+    // Error Signal Payload Tests
+    //==========================================================================
+    void test_error_payload_on_invalid_connect()
+    {
+        QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+
+        m_driver->connectToCamera("invalid-camera");
+
+        QVERIFY2(errorSpy.count() >= 1,
+                 "Should emit errorOccurred for invalid camera");
+
+        if (errorSpy.count() > 0) {
+            QVariantList args = errorSpy.takeFirst();
+            QVERIFY2(args.size() >= 1, "Signal should have at least 1 argument");
+            CameraError err = args.at(0).value<CameraError>();
+            QVERIFY2(err.code != CameraError::Code::None,
+                     "Error code should not be None for invalid camera");
+            QVERIFY2(err.severity == CameraError::Severity::Error ||
+                     err.severity == CameraError::Severity::Fatal,
+                     "Error severity should be Error or Fatal");
+            QVERIFY2(!err.description.isEmpty(),
+                     "Error description should be non-empty");
+        }
+    }
+
+    void test_error_payload_on_invalid_parameter()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+
+        bool result = m_driver->setParameter("exposure", -100.0);
+        QVERIFY2(result == false, "Should reject negative exposure");
+
+        QVERIFY2(errorSpy.count() >= 1,
+                 "Should emit errorOccurred for invalid parameter value");
+
+        if (errorSpy.count() > 0) {
+            QVariantList args = errorSpy.takeFirst();
+            CameraError err = args.at(0).value<CameraError>();
+            QVERIFY2(err.code != CameraError::Code::None,
+                     "Error code should not be None for invalid parameter");
+            QVERIFY2(!err.description.isEmpty(),
+                     "Error description should be non-empty");
+        }
+    }
+
+    //==========================================================================
+    // Cooling Parameter Tests
+    //==========================================================================
+    void test_cooling_enable()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("cooling_enabled", true);
+        QVERIFY2(result == true, "Should set cooling_enabled to true");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QVariant value = m_driver->parameterValue("cooling_enabled");
+        QVERIFY2(value.toBool() == true, "cooling_enabled should be true after set and commit");
+    }
+
+    void test_cooling_disable()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        m_driver->setParameter("cooling_enabled", true);
+        m_driver->commitParameters();
+
+        bool result = m_driver->setParameter("cooling_enabled", false);
+        QVERIFY2(result == true, "Should set cooling_enabled to false");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QVariant value = m_driver->parameterValue("cooling_enabled");
+        QVERIFY2(value.toBool() == false, "cooling_enabled should be false after set and commit");
+    }
+
+    void test_cooling_target_temp_valid()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("cooling_target_temp", -30.0);
+        QVERIFY2(result == true, "Should set cooling_target_temp to -30.0");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QVariant value = m_driver->parameterValue("cooling_target_temp");
+        QVERIFY2(qAbs(value.toDouble() - (-30.0)) < 0.1,
+                 "cooling_target_temp should be -30.0 after commit");
+    }
+
+    void test_cooling_target_temp_min()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("cooling_target_temp", -40.0);
+        QVERIFY2(result == true, "Should set cooling_target_temp to -40.0 (min for mock-001)");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QVariant value = m_driver->parameterValue("cooling_target_temp");
+        QVERIFY2(qAbs(value.toDouble() - (-40.0)) < 0.1,
+                 "cooling_target_temp should be -40.0 after commit");
+    }
+
+    void test_cooling_target_temp_max()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("cooling_target_temp", 25.0);
+        QVERIFY2(result == true, "Should set cooling_target_temp to 25.0 (max for mock-001)");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QVariant value = m_driver->parameterValue("cooling_target_temp");
+        QVERIFY2(qAbs(value.toDouble() - 25.0) < 0.1,
+                 "cooling_target_temp should be 25.0 after commit");
+    }
+
+    void test_cooling_target_temp_below_min()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("cooling_target_temp", -50.0);
+        QVERIFY2(result == false,
+                 "Should reject cooling_target_temp -50.0 (below -40 min for mock-001)");
+    }
+
+    void test_cooling_target_temp_above_max()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("cooling_target_temp", 30.0);
+        QVERIFY2(result == false,
+                 "Should reject cooling_target_temp 30.0 (above 25 max for mock-001)");
+    }
+
+    void test_cooling_sensor_temp_readonly()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        ParameterDefinition def = m_driver->parameter("cooling_sensor_temp");
+        QVERIFY2(def.isReadOnly == true, "cooling_sensor_temp should be read-only");
+    }
+
+    void test_cooling_heatsink_temp_readonly()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        ParameterDefinition def = m_driver->parameter("cooling_heatsink_temp");
+        QVERIFY2(def.isReadOnly == true, "cooling_heatsink_temp should be read-only");
+    }
+
+    //==========================================================================
+    // ROI Parameter Tests (mock-001: max 2048x2048)
+    //==========================================================================
+    void test_roi_set_xy()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("roi_x", 100);
+        QVERIFY2(result == true, "Should set roi_x to 100");
+        result = m_driver->setParameter("roi_y", 200);
+        QVERIFY2(result == true, "Should set roi_y to 200");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QVariant xVal = m_driver->parameterValue("roi_x");
+        QVariant yVal = m_driver->parameterValue("roi_y");
+        QVERIFY2(xVal.toInt() == 100, "roi_x should be 100 after commit");
+        QVERIFY2(yVal.toInt() == 200, "roi_y should be 200 after commit");
+    }
+
+    void test_roi_set_width_height()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("roi_width", 1024);
+        QVERIFY2(result == true, "Should set roi_width to 1024");
+        result = m_driver->setParameter("roi_height", 1024);
+        QVERIFY2(result == true, "Should set roi_height to 1024");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QVariant wVal = m_driver->parameterValue("roi_width");
+        QVariant hVal = m_driver->parameterValue("roi_height");
+        QVERIFY2(wVal.toInt() == 1024, "roi_width should be 1024 after commit");
+        QVERIFY2(hVal.toInt() == 1024, "roi_height should be 1024 after commit");
+    }
+
+    void test_roi_full_sensor()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("roi_x", 0);
+        QVERIFY2(result == true, "Should set roi_x to 0");
+        result = m_driver->setParameter("roi_y", 0);
+        QVERIFY2(result == true, "Should set roi_y to 0");
+        result = m_driver->setParameter("roi_width", 2048);
+        QVERIFY2(result == true, "Should set roi_width to 2048");
+        result = m_driver->setParameter("roi_height", 2048);
+        QVERIFY2(result == true, "Should set roi_height to 2048");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QVariant xVal = m_driver->parameterValue("roi_x");
+        QVariant yVal = m_driver->parameterValue("roi_y");
+        QVariant wVal = m_driver->parameterValue("roi_width");
+        QVariant hVal = m_driver->parameterValue("roi_height");
+        QVERIFY2(xVal.toInt() == 0, "roi_x should be 0 for full sensor");
+        QVERIFY2(yVal.toInt() == 0, "roi_y should be 0 for full sensor");
+        QVERIFY2(wVal.toInt() == 2048, "roi_width should be 2048 for full sensor");
+        QVERIFY2(hVal.toInt() == 2048, "roi_height should be 2048 for full sensor");
+    }
+
+    void test_roi_x_below_min()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("roi_x", -1);
+        QVERIFY2(result == false, "Should reject roi_x = -1 (below min of 0)");
+    }
+
+    void test_roi_x_above_max()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("roi_x", 3000);
+        QVERIFY2(result == false, "Should reject roi_x = 3000 (above max 2047 for mock-001)");
+    }
+
+    void test_roi_width_zero()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("roi_width", 0);
+        QVERIFY2(result == false, "Should reject roi_width = 0 (min is 1)");
+    }
+
+    void test_roi_height_above_max()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("roi_height", 3000);
+        QVERIFY2(result == false, "Should reject roi_height = 3000 (above max 2048 for mock-001)");
+    }
+
+    //==========================================================================
+    // Binning Tests (mock-001: {1, 2, 4, 8})
+    //==========================================================================
+    void test_binning_valid_1()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("binning", 1);
+        QVERIFY2(result == true, "Should set binning to 1");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QVariant value = m_driver->parameterValue("binning");
+        QVERIFY2(value.toInt() == 1, "binning should be 1 after commit");
+    }
+
+    void test_binning_valid_8()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("binning", 8);
+        QVERIFY2(result == true, "Should set binning to 8");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QVariant value = m_driver->parameterValue("binning");
+        QVERIFY2(value.toInt() == 8, "binning should be 8 after commit");
+    }
+
+    void test_binning_invalid_3()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("binning", 3);
+        QVERIFY2(result == false, "Should reject binning = 3 (not in {1,2,4,8})");
+    }
+
+    void test_binning_invalid_0()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("binning", 0);
+        QVERIFY2(result == false, "Should reject binning = 0");
+    }
+
+    void test_binning_invalid_negative()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("binning", -1);
+        QVERIFY2(result == false, "Should reject binning = -1");
+    }
+
+    //==========================================================================
+    // Vertical Binning Tests (Boolean)
+    //==========================================================================
+    void test_vertical_binning_enable()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("vertical_binning", true);
+        QVERIFY2(result == true, "Should set vertical_binning to true");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QVariant value = m_driver->parameterValue("vertical_binning");
+        QVERIFY2(value.toBool() == true, "vertical_binning should be true after commit");
+    }
+
+    void test_vertical_binning_disable()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        m_driver->setParameter("vertical_binning", true);
+        m_driver->commitParameters();
+
+        bool result = m_driver->setParameter("vertical_binning", false);
+        QVERIFY2(result == true, "Should set vertical_binning to false");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QVariant value = m_driver->parameterValue("vertical_binning");
+        QVERIFY2(value.toBool() == false, "vertical_binning should be false after commit");
+    }
+
+    //==========================================================================
+    // Pattern Type Tests (IntRange 0-3)
+    //==========================================================================
+    void test_pattern_gradient()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("pattern_type", 0);
+        QVERIFY2(result == true, "Should set pattern_type to 0 (gradient)");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+        result = m_driver->startCapture(1);
+        QVERIFY2(result == true, "Should start capture with gradient pattern");
+
+        QVERIFY2(frameSpy.wait(500), "Should receive frameReady signal");
+
+        if (frameSpy.count() > 0) {
+            QVariantList args = frameSpy.takeFirst();
+            QSharedPointer<QImage> image = args.at(0).value<QSharedPointer<QImage>>();
+            QVERIFY2(!image->isNull(), "Image should not be null for gradient pattern");
+        }
+    }
+
+    void test_pattern_noise()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("pattern_type", 1);
+        QVERIFY2(result == true, "Should set pattern_type to 1 (noise)");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+        result = m_driver->startCapture(1);
+        QVERIFY2(result == true, "Should start capture with noise pattern");
+
+        QVERIFY2(frameSpy.wait(500), "Should receive frameReady signal");
+
+        if (frameSpy.count() > 0) {
+            QVariantList args = frameSpy.takeFirst();
+            QSharedPointer<QImage> image = args.at(0).value<QSharedPointer<QImage>>();
+            QVERIFY2(!image->isNull(), "Image should not be null for noise pattern");
+        }
+    }
+
+    void test_pattern_interference()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("pattern_type", 2);
+        QVERIFY2(result == true, "Should set pattern_type to 2 (interference)");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+        result = m_driver->startCapture(1);
+        QVERIFY2(result == true, "Should start capture with interference pattern");
+
+        QVERIFY2(frameSpy.wait(500), "Should receive frameReady signal");
+
+        if (frameSpy.count() > 0) {
+            QVariantList args = frameSpy.takeFirst();
+            QSharedPointer<QImage> image = args.at(0).value<QSharedPointer<QImage>>();
+            QVERIFY2(!image->isNull(), "Image should not be null for interference pattern");
+        }
+    }
+
+    void test_pattern_fastfill()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("pattern_type", 3);
+        QVERIFY2(result == true, "Should set pattern_type to 3 (fastfill)");
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit parameters");
+
+        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+        result = m_driver->startCapture(1);
+        QVERIFY2(result == true, "Should start capture with fastfill pattern");
+
+        QVERIFY2(frameSpy.wait(500), "Should receive frameReady signal");
+
+        if (frameSpy.count() > 0) {
+            QVariantList args = frameSpy.takeFirst();
+            QSharedPointer<QImage> image = args.at(0).value<QSharedPointer<QImage>>();
+            QVERIFY2(!image->isNull(), "Image should not be null for fastfill pattern");
+        }
+    }
+
+    void test_pattern_invalid()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        bool result = m_driver->setParameter("pattern_type", -1);
+        QVERIFY2(result == false, "Should reject pattern_type = -1 (below min 0)");
+
+        result = m_driver->setParameter("pattern_type", 4);
+        QVERIFY2(result == false, "Should reject pattern_type = 4 (above max 3)");
+    }
+
+    //==========================================================================
+    // Info Parameter Tests
+    //==========================================================================
+    void test_info_bit_depth()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        ParameterDefinition def = m_driver->parameter("bit_depth");
+        QVERIFY2(def.isReadOnly == true, "bit_depth should be read-only");
+
+        QVariant value = m_driver->parameterValue("bit_depth");
+        QVERIFY2(value.toString() == "16-bit",
+                 qPrintable(QString("bit_depth should be '16-bit', got '%1'").arg(value.toString())));
+    }
+
+    void test_info_camera_model()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        ParameterDefinition def = m_driver->parameter("camera_model");
+        QVERIFY2(def.isReadOnly == true, "camera_model should be read-only");
+
+        QVariant value = m_driver->parameterValue("camera_model");
+        QVERIFY2(value.toString() == "MockCamera-mock-001",
+                 qPrintable(QString("camera_model should be 'MockCamera-mock-001', got '%1'").arg(value.toString())));
+    }
+
+    //==========================================================================
+    // Capture with ROI/Binning Tests
+    //==========================================================================
+    void test_capture_with_roi_dimensions()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        m_driver->setParameter("roi_x", 0);
+        m_driver->setParameter("roi_y", 0);
+        m_driver->setParameter("roi_width", 512);
+        m_driver->setParameter("roi_height", 512);
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit ROI parameters");
+
+        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+        bool started = m_driver->startCapture(1);
+        QVERIFY2(started == true, "Should start capture with 512x512 ROI");
+
+        QVERIFY2(frameSpy.wait(500), "Should receive frameReady signal");
+
+        if (frameSpy.count() > 0) {
+            QVariantList args = frameSpy.takeFirst();
+            QSharedPointer<QImage> image = args.at(0).value<QSharedPointer<QImage>>();
+            QVERIFY2(!image->isNull(), "Image should not be null");
+            QVERIFY2(image->width() == 512,
+                     qPrintable(QString("Image width should be 512, got %1").arg(image->width())));
+            QVERIFY2(image->height() == 512,
+                     qPrintable(QString("Image height should be 512, got %1").arg(image->height())));
+        }
+    }
+
+    void test_capture_with_binning()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        m_driver->setParameter("binning", 2);
+        m_driver->setParameter("roi_x", 0);
+        m_driver->setParameter("roi_y", 0);
+        m_driver->setParameter("roi_width", 2048);
+        m_driver->setParameter("roi_height", 2048);
+        QVERIFY2(m_driver->commitParameters() == true, "Should commit binning parameters");
+
+        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+        bool started = m_driver->startCapture(1);
+        QVERIFY2(started == true, "Should start capture with binning=2");
+
+        QVERIFY2(frameSpy.wait(500), "Should receive frameReady signal");
+
+        if (frameSpy.count() > 0) {
+            QVariantList args = frameSpy.takeFirst();
+            QSharedPointer<QImage> image = args.at(0).value<QSharedPointer<QImage>>();
+            QVERIFY2(!image->isNull(), "Image should not be null with binning=2");
+        }
+    }
+
 private:
     MockCameraDriver *m_driver = nullptr;
 };

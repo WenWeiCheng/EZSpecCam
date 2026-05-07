@@ -12,7 +12,7 @@ target_compile_definitions(ezspeccam_gui PRIVATE QCUSTOMPLOT_USE_OPENGL)
 target_sources(ezspeccam_gui PRIVATE
     main.cpp
     AppController.h AppController.cpp
-    MainWindow.h MainWindow.cpp
+    widgets/MainWindow.h widgets/MainWindow.cpp
     ui/MainWindowUi.h ui/MainWindowUi.cpp
     widgets/CameraTab.h widgets/CameraTab.cpp
     widgets/ImageViewWidget.h widgets/ImageViewWidget.cpp

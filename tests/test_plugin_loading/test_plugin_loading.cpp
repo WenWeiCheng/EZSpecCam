@@ -1,37 +1,73 @@
 #include <QTest>
 #include <QSignalSpy>
-#include <QDebug>
-#include <QDir>
 #include <QPluginLoader>
+#include <QImage>
 
 #include "core/ICameraDriver.h"
-#include "plugins/mock/MockCameraDriver.h"
 
 class TestPluginLoading : public QObject
 {
     Q_OBJECT
 
+private:
+    QPluginLoader *m_loader = nullptr;
+
+    ICameraDriver *loadPlugin()
+    {
+        QObject *instance = m_loader->instance();
+        if (!instance) {
+            return nullptr;
+        }
+        return dynamic_cast<ICameraDriver*>(instance);
+    }
+
 private slots:
     void init()
     {
+        m_loader = new QPluginLoader(MOCK_PLUGIN_PATH);
     }
 
     void cleanup()
     {
+        if (m_loader) {
+            if (m_loader->isLoaded()) {
+                m_loader->unload();
+            }
+            delete m_loader;
+            m_loader = nullptr;
+        }
     }
 
-    void test_mock_driver_can_be_instantiated()
+    void test_plugin_load_valid()
     {
-        MockCameraDriver *driver = new MockCameraDriver();
-        QVERIFY2(driver != nullptr, "MockCameraDriver should be instantiable");
-        delete driver;
+        bool loaded = m_loader->load();
+        QVERIFY2(loaded, qPrintable(QString("load() failed: %1").arg(m_loader->errorString())));
+
+        QObject *instance = m_loader->instance();
+        QVERIFY2(instance != nullptr, "Plugin instance should be non-null after loading");
+
+        ICameraDriver *driver = loadPlugin();
+        QVERIFY2(driver != nullptr, "Instance should be castable to ICameraDriver");
     }
 
-    void test_mock_driver_enumerate()
+    void test_plugin_metadata()
     {
-        MockCameraDriver driver;
-        QStringList cameras = driver.enumerate();
+        QVERIFY2(m_loader->load(), qPrintable(QString("load() failed: %1").arg(m_loader->errorString())));
 
+        QJsonObject metaData = m_loader->metaData();
+        QString iid = metaData.value("IID").toString();
+        QVERIFY2(iid == "com.ezspeccam.ICameraDriver",
+                 qPrintable(QString("IID should be 'com.ezspeccam.ICameraDriver', got '%1'").arg(iid)));
+    }
+
+    void test_plugin_enumerate()
+    {
+        QVERIFY2(m_loader->load(), qPrintable(QString("load() failed: %1").arg(m_loader->errorString())));
+
+        ICameraDriver *driver = loadPlugin();
+        QVERIFY2(driver != nullptr, "Driver should be available");
+
+        QStringList cameras = driver->enumerate();
         QVERIFY2(cameras.size() == 3,
                  qPrintable(QString("Expected 3 cameras, got %1").arg(cameras.size())));
         QVERIFY2(cameras.contains("mock-001"), "Should contain mock-001");
@@ -39,104 +75,98 @@ private slots:
         QVERIFY2(cameras.contains("mock-003"), "Should contain mock-003");
     }
 
-    void test_mock_driver_connect()
+    void test_plugin_connect()
     {
-        MockCameraDriver driver;
+        QVERIFY2(m_loader->load(), qPrintable(QString("load() failed: %1").arg(m_loader->errorString())));
 
-        bool connected = driver.connectToCamera("mock-001");
-        QVERIFY2(connected == true, "Should connect to mock-001");
-        QVERIFY2(driver.isConnected() == true, "Should be connected");
-        QVERIFY2(driver.cameraId() == "mock-001", "Camera ID should be mock-001");
+        ICameraDriver *driver = loadPlugin();
+        QVERIFY2(driver != nullptr, "Driver should be available");
 
-        driver.disconnectCamera();
-        QVERIFY2(driver.isConnected() == false, "Should be disconnected");
+        QVERIFY2(driver->connectToCamera("mock-001"), "Should connect to mock-001");
+        QVERIFY2(driver->isConnected(), "Should be connected");
+        QVERIFY2(driver->cameraId() == "mock-001", "Camera ID should be mock-001");
+        QVERIFY2(driver->state() == CameraState::Connected, "State should be Connected");
     }
 
-    void test_mock_driver_connect_invalid()
+    void test_plugin_disconnect()
     {
-        MockCameraDriver driver;
+        QVERIFY2(m_loader->load(), qPrintable(QString("load() failed: %1").arg(m_loader->errorString())));
 
-        bool connected = driver.connectToCamera("invalid-camera");
-        QVERIFY2(connected == false, "Should fail to connect to invalid camera");
-        QVERIFY2(driver.isConnected() == false, "Should not be connected");
+        ICameraDriver *driver = loadPlugin();
+        QVERIFY2(driver != nullptr, "Driver should be available");
+        QVERIFY2(driver->connectToCamera("mock-001"), "Should connect to mock-001");
+
+        driver->disconnectCamera();
+        QVERIFY2(!driver->isConnected(), "Should be disconnected");
+        QVERIFY2(driver->state() == CameraState::Disconnected, "State should be Disconnected");
+        QVERIFY2(driver->cameraId() == "", "Camera ID should be empty after disconnect");
     }
 
-    void test_mock_driver_parameters()
+    void test_plugin_capture_single()
     {
-        MockCameraDriver driver;
-        driver.connectToCamera("mock-001");
+        QVERIFY2(m_loader->load(), qPrintable(QString("load() failed: %1").arg(m_loader->errorString())));
 
-        QStringList params = driver.parameterNames();
-        QVERIFY2(params.contains("exposure"), "Should have exposure parameter");
-        QVERIFY2(params.contains("gain"), "Should have gain parameter");
+        ICameraDriver *driver = loadPlugin();
+        QVERIFY2(driver != nullptr, "Driver should be available");
 
-        ParameterDefinition expDef = driver.parameter("exposure");
-        QVERIFY2(expDef.isValid(), "Exposure definition should be valid");
+        driver->connectToCamera("mock-001");
+        driver->setParameter("exposure", 10.0);
+        driver->commitParameters();
 
-        driver.disconnectCamera();
+        QSignalSpy frameSpy(driver, &ICameraDriver::frameReady);
+        QSignalSpy stoppedSpy(driver, &ICameraDriver::captureStopped);
+
+        QVERIFY2(driver->startCapture(1), "Should start capture");
+        QVERIFY2(frameSpy.wait(2000), "Should receive frame within 2 seconds");
+        QVERIFY2(stoppedSpy.wait(1000), "Should receive captureStopped signal");
+
+        QList<QVariant> frameArgs = frameSpy.takeFirst();
+        QSharedPointer<QImage> image = frameArgs.at(0).value<QSharedPointer<QImage>>();
+        QVERIFY2(!image.isNull(), "Frame image should be non-null");
+        QVERIFY2(!image->isNull(), "QImage should be valid");
     }
 
-    void test_mock_driver_capture()
+    void test_plugin_capture_continuous()
     {
-        MockCameraDriver driver;
-        driver.connectToCamera("mock-001");
-        driver.setParameter("exposure", 10.0);
-        driver.commitParameters();
+        QVERIFY2(m_loader->load(), qPrintable(QString("load() failed: %1").arg(m_loader->errorString())));
 
-        QSignalSpy frameSpy(&driver, &ICameraDriver::frameReady);
-        QSignalSpy stoppedSpy(&driver, &ICameraDriver::captureStopped);
+        ICameraDriver *driver = loadPlugin();
+        QVERIFY2(driver != nullptr, "Driver should be available");
 
-        bool started = driver.startCapture(1);
-        QVERIFY2(started == true, "Should start capture");
+        driver->connectToCamera("mock-001");
+        driver->setParameter("exposure", 10.0);
+        driver->commitParameters();
 
-        QVERIFY2(frameSpy.wait(1000), "Should receive frame");
+        QSignalSpy frameSpy(driver, &ICameraDriver::frameReady);
+        QSignalSpy stoppedSpy(driver, &ICameraDriver::captureStopped);
 
-        QVERIFY2(stoppedSpy.wait(500), "Should receive stopped signal");
+        QVERIFY2(driver->startCapture(0), "Should start continuous capture");
+        QVERIFY2(frameSpy.wait(1000), "Should receive at least one frame in continuous mode");
 
-        driver.disconnectCamera();
+        driver->stopCapture(1000);
+
+        QVERIFY2(stoppedSpy.count() > 0 || stoppedSpy.wait(500),
+                 "Should receive captureStopped signal after stopCapture");
     }
 
-    void test_mock_driver_continuous_capture()
+    void test_plugin_unload()
     {
-        MockCameraDriver driver;
-        driver.connectToCamera("mock-001");
-        driver.setParameter("exposure", 10.0);
-        driver.commitParameters();
+        QVERIFY2(m_loader->load(), qPrintable(QString("load() failed: %1").arg(m_loader->errorString())));
 
-        QSignalSpy frameSpy(&driver, &ICameraDriver::frameReady);
+        ICameraDriver *driver = loadPlugin();
+        QVERIFY2(driver != nullptr, "Driver should be available");
 
-        bool started = driver.startCapture(0);
-        QVERIFY2(started == true, "Should start continuous capture");
-
-        QVERIFY2(frameSpy.wait(500), "Should receive at least one frame");
-
-        driver.stopCapture(1000);
-
-        driver.disconnectCamera();
+        QVERIFY2(m_loader->unload(), "Plugin should unload successfully");
+        QVERIFY2(!m_loader->isLoaded(), "Plugin should no longer be loaded after unload");
     }
 
-    void test_mock_driver_plugin_metadata()
+    void test_plugin_load_nonexistent()
     {
-        MockCameraDriver *driver = new MockCameraDriver();
-        const QMetaObject *metaObject = driver->metaObject();
-
-        bool hasPluginMetadata = false;
-        for (int i = 0; i < metaObject->classInfoCount(); ++i) {
-            QMetaClassInfo classInfo = metaObject->classInfo(i);
-            if (QString(classInfo.name()) == "IID" ||
-                QString(classInfo.value()).contains("com.ezspeccam.ICameraDriver")) {
-                hasPluginMetadata = true;
-                break;
-            }
-        }
-
-        QVERIFY2(hasPluginMetadata || true, "Plugin metadata should be present");
-
-        delete driver;
+        QPluginLoader fakeLoader("C:/nonexistent/path/fake_plugin.dll");
+        QVERIFY2(!fakeLoader.load(), "Loading nonexistent plugin should fail");
+        QVERIFY2(!fakeLoader.errorString().isEmpty(), "Error string should be non-empty for failed load");
     }
-
-private:
 };
 
-QTEST_MAIN(TestPluginLoading)
+QTEST_GUILESS_MAIN(TestPluginLoading)
 #include "test_plugin_loading.moc"
