@@ -54,6 +54,7 @@
 class MockCameraDriver : public ICameraDriver {
     Q_OBJECT
     Q_PLUGIN_METADATA(IID "com.ezspeccam.ICameraDriver" FILE "mock.json")
+    Q_INTERFACES(ICameraDriver)
 
 public:
     /**
