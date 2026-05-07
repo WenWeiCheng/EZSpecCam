@@ -30,7 +30,7 @@ option(EZSPECCAM_BUILD_PLUGINS "Build plugins" ON)
 # ===========================================
 # Find Qt Components
 # ===========================================
-set(QT_COMPONENTS Core Gui Widgets)
+set(QT_COMPONENTS Core Gui Widgets PrintSupport OpenGL)
 if(EZSPECCAM_BUILD_TESTS)
     list(APPEND QT_COMPONENTS Test)
 endif()
@@ -53,6 +53,9 @@ else()
     message(WARNING "Exiv2 not found. Image metadata support will be limited.")
     set(EZSPECCAM_HAVE_EXIV2 OFF)
 endif()
+
+# OpenGL for QCustomPlot hardware acceleration
+find_package(OpenGL REQUIRED)
 
 # QCustomPlot (bundled in gui module)
 set(QCUSTOMPLOT_VERSION 2.1.1)

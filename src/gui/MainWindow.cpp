@@ -3,7 +3,7 @@
 #include "CameraTab.h"
 #include "ImageViewWidget.h"
 #include "SpectrumViewWidget.h"
-#include "core/CameraTypes.h"
+#include "CameraTypes.h"
 
 #include <QMessageBox>
 #include <QCloseEvent>

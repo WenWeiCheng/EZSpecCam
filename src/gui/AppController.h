@@ -11,8 +11,8 @@
 #include <QSharedPointer>
 #include <QImage>
 
-#include "core/ICameraDriver.h"
-#include "core/CameraTypes.h"
+#include "ICameraDriver.h"
+#include "CameraTypes.h"
 
 /**
  * @class AppController
@@ -96,6 +96,18 @@ public:
      * @return true if connected and ready
      */
     bool isConnected() const;
+
+    /**
+     * @brief Check if the controller is in an error state
+     * @return true if in error state
+     */
+    bool hasError() const;
+
+    /**
+     * @brief Get the currently connected camera ID
+     * @return Camera ID string, or empty if not connected
+     */
+    QString currentCameraId() const;
 
     // ——— Capture Control ———
 

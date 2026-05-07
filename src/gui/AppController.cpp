@@ -536,3 +536,109 @@ bool AppController::loadParameters(const QString &filePath,
 
     return true;
 }
+
+// ——— Public State Access ———
+
+CameraState AppController::state() const
+{
+    return m_state;
+}
+
+// ——— Private Helpers ———
+
+void AppController::setState(CameraState newState)
+{
+    if (m_state != newState) {
+        m_state = newState;
+        emit stateChanged(newState);
+    }
+}
+
+bool AppController::canConnect() const
+{
+    return m_state == CameraState::Disconnected || m_state == CameraState::Error;
+}
+
+// ——— Parameter Management ———
+
+QHash<QString, QVariant> AppController::allParameters() const
+{
+    return m_parameters;
+}
+
+bool AppController::setParameter(const QString &name, const QVariant &value)
+{
+    if (!m_driver) {
+        return false;
+    }
+    if (m_driver->setParameter(name, value)) {
+        m_parameters[name] = value;
+        return true;
+    }
+    return false;
+}
+
+bool AppController::setParameters(const QHash<QString, QVariant> &params)
+{
+    for (auto it = params.constBegin(); it != params.constEnd(); ++it) {
+        if (!setParameter(it.key(), it.value())) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// ——— Private Slots ———
+
+void AppController::onDriverFrameReady(const QSharedPointer<QImage> &image,
+                                        quint64 timestamp,
+                                        int frameNumber,
+                                        const QString &cameraId)
+{
+    if (!image) {
+        return;
+    }
+
+    ImageData frame;
+    frame.image = *image;
+    frame.timestamp = timestamp;
+    frame.frameNumber = frameNumber;
+    frame.cameraId = cameraId;
+
+    QVariantMap params;
+    for (auto it = m_parameters.constBegin(); it != m_parameters.constEnd(); ++it) {
+        params.insert(it.key(), it.value());
+    }
+    frame.parameters = params;
+
+    emit frameReady(frame);
+}
+
+void AppController::onDriverCaptureStarted(const QString &cameraId)
+{
+    Q_UNUSED(cameraId);
+    enterAcquiringState();
+    emit captureStarted();
+}
+
+void AppController::onDriverCaptureStopped(const QString &cameraId)
+{
+    Q_UNUSED(cameraId);
+    setState(CameraState::Connected);
+    emit captureStopped();
+}
+
+void AppController::onDriverConnectionChanged(bool connected, const QString &cameraId)
+{
+    Q_UNUSED(cameraId);
+    if (connected) {
+        setState(CameraState::Connected);
+    } else {
+        setState(CameraState::Disconnected);
+    }
+}
+
+void AppController::onDriverError(const CameraError &error)
+{
+    enterErrorState(error);
+}

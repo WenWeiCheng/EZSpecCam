@@ -3,8 +3,11 @@ qt_add_executable(ezspeccam_gui)
 
 target_link_libraries(ezspeccam_gui PRIVATE
     ezspeccam_core
-    Qt6::Core Qt6::Gui Qt6::Widgets
+    Qt6::Core Qt6::Gui Qt6::Widgets Qt6::PrintSupport Qt6::OpenGL
+    OpenGL::GL
 )
+
+target_compile_definitions(ezspeccam_gui PRIVATE QCUSTOMPLOT_USE_OPENGL)
 
 target_sources(ezspeccam_gui PRIVATE
     main.cpp

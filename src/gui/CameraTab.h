@@ -18,7 +18,7 @@
 #include <QThread>
 
 #include "AppController.h"
-#include "core/CameraTypes.h"
+#include "CameraTypes.h"
 
 class CameraTab : public QWidget
 {
@@ -54,6 +54,7 @@ private slots:
     void onCaptureModeChanged(int index);
     void onWorkerConnectionStateChanged(bool connected, const QString &cameraId, const QString &error);
     void onParametersCommitted();
+    void onCoolingTimerTimeout();
 
 private:
     void setupUi();
