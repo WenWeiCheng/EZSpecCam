@@ -242,6 +242,145 @@ struct ParameterDefinition
 };
 
 //==============================================================================
+// Parameter Validation (free functions)
+//==============================================================================
+
+inline bool validate(const QVariant &value,
+                     const ParameterConstraint &constraint,
+                     ParameterType type)
+{
+    switch (type) {
+    case ParameterType::FloatRange: {
+        double val = value.toDouble();
+        return val >= constraint.minValue && val <= constraint.maxValue;
+    }
+    case ParameterType::FloatCollection: {
+        double val = value.toDouble();
+        for (const QVariant &v : constraint.validValues) {
+            if (qAbs(v.toDouble() - val) < 0.0001) {
+                return true;
+            }
+        }
+        return false;
+    }
+    case ParameterType::IntRange: {
+        int val = value.toInt();
+        return val >= constraint.minValue && val <= constraint.maxValue;
+    }
+    case ParameterType::IntCollection: {
+        int val = value.toInt();
+        for (const QVariant &v : constraint.validValues) {
+            if (v.toInt() == val) {
+                return true;
+            }
+        }
+        return false;
+    }
+    case ParameterType::String: {
+        return value.canConvert<QString>();
+    }
+    case ParameterType::StringCollection: {
+        QString val = value.toString();
+        for (const QVariant &v : constraint.validValues) {
+            if (v.toString() == val) {
+                return true;
+            }
+        }
+        return false;
+    }
+    case ParameterType::Boolean: {
+        return value.canConvert<bool>();
+    }
+    default:
+        return true;
+    }
+}
+
+inline QString validateReason(const QVariant &value,
+                               const ParameterConstraint &constraint,
+                               ParameterType type)
+{
+    switch (type) {
+    case ParameterType::FloatRange: {
+        double val = value.toDouble();
+        if (val < constraint.minValue) {
+            return QString("Value %1 is below minimum %2").arg(val).arg(constraint.minValue);
+        }
+        if (val > constraint.maxValue) {
+            return QString("Value %1 is above maximum %2").arg(val).arg(constraint.maxValue);
+        }
+        return QString();
+    }
+    case ParameterType::FloatCollection: {
+        double val = value.toDouble();
+        bool found = false;
+        for (const QVariant &v : constraint.validValues) {
+            if (qAbs(v.toDouble() - val) < 0.0001) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            return QString("Value %1 is not in valid collection").arg(val);
+        }
+        return QString();
+    }
+    case ParameterType::IntRange: {
+        int val = value.toInt();
+        if (val < constraint.minValue) {
+            return QString("Value %1 is below minimum %2").arg(val).arg(static_cast<int>(constraint.minValue));
+        }
+        if (val > constraint.maxValue) {
+            return QString("Value %1 is above maximum %2").arg(val).arg(static_cast<int>(constraint.maxValue));
+        }
+        return QString();
+    }
+    case ParameterType::IntCollection: {
+        int val = value.toInt();
+        bool found = false;
+        for (const QVariant &v : constraint.validValues) {
+            if (v.toInt() == val) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            return QString("Value %1 is not in valid collection").arg(val);
+        }
+        return QString();
+    }
+    case ParameterType::String: {
+        if (!value.canConvert<QString>()) {
+            return QString("Value cannot be converted to string");
+        }
+        return QString();
+    }
+    case ParameterType::StringCollection: {
+        QString val = value.toString();
+        bool found = false;
+        for (const QVariant &v : constraint.validValues) {
+            if (v.toString() == val) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            return QString("Value '%1' is not in valid collection").arg(val);
+        }
+        return QString();
+    }
+    case ParameterType::Boolean: {
+        if (!value.canConvert<bool>()) {
+            return QString("Value cannot be converted to boolean");
+        }
+        return QString();
+    }
+    default:
+        return QString();
+    }
+}
+
+//==============================================================================
 // Error Handling
 //==============================================================================
 

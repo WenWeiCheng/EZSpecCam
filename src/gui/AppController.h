@@ -177,6 +177,20 @@ public:
     bool commitParameters();
 
     /**
+     * @brief Save dynamic configuration to INI file
+     * @param cameraId Camera identifier
+     * @param parameters Hash of parameters to save
+     */
+    void saveDynamicConfig(const QString &cameraId, const QHash<QString, QVariant> &parameters);
+
+    /**
+     * @brief Load dynamic configuration from INI file
+     * @param cameraId Camera identifier
+     * @return Hash of loaded parameters
+     */
+    QHash<QString, QVariant> loadDynamicConfig(const QString &cameraId);
+
+    /**
      * @brief Get all current parameters as a hash
      * @return Hash of parameter name → value
      */
@@ -294,6 +308,15 @@ private:
     bool loadPlugin(const QString &filePath);
     void unloadPlugin(const PluginInfo &info);
     void clearPlugins();
+
+    // INI persistence helpers
+    static QString getConfigDirectory();
+    static QString getConfigPath(const QString &cameraId);
+    bool saveParameters(const QString &filePath, const QString &cameraId, const QVariantMap &parameters);
+    bool loadParameters(const QString &filePath, QString &cameraId, QVariantMap &parameters);
+    QString variantToString(const QVariant &value);
+    QVariant stringToVariant(const QString &valueStr);
+    bool ensureDirectoryExists(const QString &dirPath);
 
     // State
     CameraState m_state = CameraState::Disconnected;
