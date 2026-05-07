@@ -4,6 +4,10 @@
 #include "ImageViewWidget.h"
 #include "SpectrumViewWidget.h"
 #include "CameraTypes.h"
+#include "StatisticsDialog.h"
+#include "RowRangeDialog.h"
+#include "CustomRangeDialog.h"
+#include "CameraConfigDialog.h"
 
 #include <QMessageBox>
 #include <QCloseEvent>
@@ -205,14 +209,9 @@ void MainWindow::on_actionChangeAutoSaveDir_triggered()
 
 void MainWindow::on_actionConfig_triggered()
 {
-    if (!m_cameraTab) {
-        m_cameraTab = new CameraTab(this);
-        m_cameraTab->setAppController(m_appController);
-    }
-
-    m_cameraTab->show();
-    m_cameraTab->raise();
-    m_cameraTab->activateWindow();
+    CameraConfigDialog *dialog = new CameraConfigDialog(this);
+    dialog->setAppController(m_appController);
+    dialog->show();
 }
 
 void MainWindow::on_actionAbout_triggered()
@@ -378,15 +377,26 @@ void MainWindow::on_spectrumRangeCustom_triggered()
     double currentMin = m_spectrumViewWidget->currentXMin();
     double currentMax = m_spectrumViewWidget->currentXMax();
 
-    m_spectrumViewWidget->setCustomXRange(currentMin, currentMax);
-    m_spectrumViewWidget->setXAxisRangeMode(SpectrumViewWidget::XAxisRangeMode::Custom);
+    CustomRangeDialog *dialog = new CustomRangeDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setImageWidth(imageWidth);
+    dialog->setValues(currentMin, currentMax);
 
-    ui->menuActionSpectrumRangeAuto->setChecked(false);
-    ui->menuActionSpectrumRangeFull->setChecked(false);
-    ui->menuActionSpectrumRangeZoomLeft->setChecked(false);
-    ui->menuActionSpectrumRangeZoomRight->setChecked(false);
-    ui->menuActionSpectrumRangeZoomCenter->setChecked(false);
-    ui->menuActionSpectrumRangeCustom->setChecked(true);
+    if (dialog->exec() == QDialog::Accepted) {
+        double minVal = dialog->minValue();
+        double maxVal = dialog->maxValue();
+        m_spectrumViewWidget->setCustomXRange(minVal, maxVal);
+        m_spectrumViewWidget->setXAxisRangeMode(SpectrumViewWidget::XAxisRangeMode::Custom);
+
+        ui->menuActionSpectrumRangeAuto->setChecked(false);
+        ui->menuActionSpectrumRangeFull->setChecked(false);
+        ui->menuActionSpectrumRangeZoomLeft->setChecked(false);
+        ui->menuActionSpectrumRangeZoomRight->setChecked(false);
+        ui->menuActionSpectrumRangeZoomCenter->setChecked(false);
+        ui->menuActionSpectrumRangeCustom->setChecked(true);
+    } else {
+        // If user cancels, keep the existing range mode
+    }
 }
 
 void MainWindow::on_showAxes_triggered(bool checked)
@@ -404,8 +414,10 @@ void MainWindow::on_statistics_triggered()
         return;
     }
 
-    QMessageBox::information(this, tr("Statistics"),
-        tr("Statistics feature not yet implemented."));
+    StatisticsDialog *dialog = new StatisticsDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setImageData(m_currentFrame.image);
+    dialog->show();
 }
 
 void MainWindow::on_verticalBinning_triggered()
@@ -426,8 +438,22 @@ void MainWindow::on_rowRange_triggered()
         return;
     }
 
-    QMessageBox::information(this, tr("Row Range"),
-        tr("Row range feature not yet implemented."));
+    int imageHeight = m_currentFrame.image.height();
+    RowRangeDialog *dialog = new RowRangeDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setImageHeight(imageHeight);
+    dialog->show();
+
+    connect(dialog, &RowRangeDialog::applyClicked, this, [this](int startRow, int endRow) {
+        // Apply row range for vertical binning
+        if (m_appController) {
+            QVariantMap params;
+            params["rowStart"] = startRow;
+            params["rowEnd"] = endRow;
+            m_appController->setParameters(params);
+            m_appController->commitParameters();
+        }
+    });
 }
 
 void MainWindow::onCameraStateChanged(CameraState newState)

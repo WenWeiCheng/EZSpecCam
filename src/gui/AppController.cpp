@@ -578,6 +578,22 @@ bool AppController::setParameters(const QVariantMap &params)
     return true;
 }
 
+bool AppController::validateParameters()
+{
+    if (!m_driver) {
+        return false;
+    }
+    return m_driver->validateParameters();
+}
+
+bool AppController::commitParameters()
+{
+    if (!m_driver || !m_driver->isConnected()) {
+        return false;
+    }
+    return m_driver->commitParameters();
+}
+
 // ——— Private Slots ———
 
 void AppController::onDriverFrameReady(const QSharedPointer<QImage> &image,
