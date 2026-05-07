@@ -1,0 +1,19 @@
+{
+    "lsp": {
+        "clangd": {
+            "command": [
+                "/mnt/c/Qt/Tools/QtCreator/bin/clang/bin/clangd.exe",
+                "--background-index",
+                "--compile-commands-dir=./build/msvc-debug"
+            ],
+            "extensions": [
+                ".cpp",
+                ".h",
+                ".hpp",
+                ".c",
+                ".cc"
+            ],
+            "disabled": false
+        }
+    }
+}

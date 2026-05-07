@@ -47,7 +47,6 @@ SpacesInParentheses: false
 SpacesInAngles: false
 SpacesInCStyleCastParentheses: false
 SpacesInContainerLiterals: false
-SpacesInParentheses: false
 SpaceBeforeRangeBasedForLoopColon: true
 
 # ===========================================
@@ -118,12 +117,3 @@ AlignConsecutiveMacros: false
 # ===========================================
 KeepEmptyLinesAtTheStartOfBlocks: false
 MaxEmptyLinesToKeep: 1
-NewlineAfterReturn: false
-
-# ===========================================
-# Objective-C specifics (not used but set for completeness)
-# ===========================================
-ObjCSpaceAfterProperty: false
-ObjCPropertyAlignWidth: -1
-ObjCBlockIndentWidth: 4
-ObjCBreakBeforeNestedBlockParam: true

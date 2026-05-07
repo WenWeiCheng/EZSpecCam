@@ -1,0 +1,4 @@
+Diagnostics:
+  Suppress: builtin_definition
+CompileFlags:
+  CompilationDatabase: build/msvc-debug
