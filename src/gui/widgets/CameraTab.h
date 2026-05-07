@@ -33,8 +33,8 @@ public:
 
     void refreshCameraList();
 
-    void setBufferedConfig(const QHash<QString, QVariant> &config);
-    QHash<QString, QVariant> getBufferedConfig() const;
+    void setBufferedConfig(const QVariantMap &config);
+    QVariantMap getBufferedConfig() const;
     void updateBufferedConfigFromWidgets();
 
     QPushButton *connectButton;
@@ -66,7 +66,7 @@ private:
     AppController *m_appController;
     QThread *m_workerThread;
     QLabel *m_statusLabel;
-    QHash<QString, QVariant> m_bufferedConfig;
+    QVariantMap m_bufferedConfig;
 
     QHash<QString, QWidget*> m_parameterWidgets;
     QMap<ParameterCategory, QGroupBox*> m_categoryGroups;

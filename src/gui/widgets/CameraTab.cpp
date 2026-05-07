@@ -202,7 +202,7 @@ void CameraTab::applyCaptureMode()
         count = captureCountSpinBox ? captureCountSpinBox->value() : 10;
     }
 
-    QHash<QString, QVariant> params;
+    QVariantMap params;
     params["captureCount"] = count;
     m_appController->setParameters(params);
 }
@@ -475,7 +475,7 @@ void CameraTab::refreshCameraList()
     updateConnectionState();
 }
 
-void CameraTab::setBufferedConfig(const QHash<QString, QVariant> &config)
+void CameraTab::setBufferedConfig(const QVariantMap &config)
 {
     m_bufferedConfig = config;
 }
@@ -538,7 +538,7 @@ void CameraTab::updateBufferedConfigFromWidgets()
     }
 }
 
-QHash<QString, QVariant> CameraTab::getBufferedConfig() const
+QVariantMap CameraTab::getBufferedConfig() const
 {
     return m_bufferedConfig;
 }

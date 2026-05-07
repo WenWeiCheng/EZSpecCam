@@ -368,7 +368,7 @@ QString AppController::getConfigPath(const QString &cameraId)
     return getConfigDirectory() + "/" + cameraId + ".ini";
 }
 
-void AppController::saveDynamicConfig(const QString &cameraId, const QHash<QString, QVariant> &parameters)
+void AppController::saveDynamicConfig(const QString &cameraId, const QVariantMap &parameters)
 {
     QString path = getConfigPath(cameraId);
 
@@ -381,19 +381,14 @@ void AppController::saveDynamicConfig(const QString &cameraId, const QHash<QStri
         }
     }
 
-    QVariantMap params;
-    for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
-        params.insert(it.key(), it.value());
-    }
-
-    if (!saveParameters(path, cameraId, params)) {
+    if (!saveParameters(path, cameraId, parameters)) {
         qWarning() << "AppController: Failed to save dynamic config to:" << path;
     }
 }
 
-QHash<QString, QVariant> AppController::loadDynamicConfig(const QString &cameraId)
+QVariantMap AppController::loadDynamicConfig(const QString &cameraId)
 {
-    QHash<QString, QVariant> parameters;
+    QVariantMap parameters;
     QString path = getConfigPath(cameraId);
 
     QFile file(path);
@@ -402,14 +397,9 @@ QHash<QString, QVariant> AppController::loadDynamicConfig(const QString &cameraI
     }
 
     QString camId;
-    QVariantMap params;
-    if (!loadParameters(path, camId, params)) {
+    if (!loadParameters(path, camId, parameters)) {
         qWarning() << "AppController: Failed to load dynamic config file:" << path;
-        return parameters;
-    }
-
-    for (auto it = params.constBegin(); it != params.constEnd(); ++it) {
-        parameters.insert(it.key(), it.value());
+        return QVariantMap();
     }
 
     return parameters;
@@ -561,7 +551,7 @@ bool AppController::canConnect() const
 
 // ——— Parameter Management ———
 
-QHash<QString, QVariant> AppController::allParameters() const
+QVariantMap AppController::allParameters() const
 {
     return m_parameters;
 }
@@ -578,7 +568,7 @@ bool AppController::setParameter(const QString &name, const QVariant &value)
     return false;
 }
 
-bool AppController::setParameters(const QHash<QString, QVariant> &params)
+bool AppController::setParameters(const QVariantMap &params)
 {
     for (auto it = params.constBegin(); it != params.constEnd(); ++it) {
         if (!setParameter(it.key(), it.value())) {
@@ -604,12 +594,7 @@ void AppController::onDriverFrameReady(const QSharedPointer<QImage> &image,
     frame.timestamp = timestamp;
     frame.frameNumber = frameNumber;
     frame.cameraId = cameraId;
-
-    QVariantMap params;
-    for (auto it = m_parameters.constBegin(); it != m_parameters.constEnd(); ++it) {
-        params.insert(it.key(), it.value());
-    }
-    frame.parameters = params;
+    frame.parameters = m_parameters;
 
     emit frameReady(frame);
 }

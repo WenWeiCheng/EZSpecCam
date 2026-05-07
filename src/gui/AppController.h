@@ -173,29 +173,29 @@ public:
     /**
      * @brief Save dynamic configuration to INI file
      * @param cameraId Camera identifier
-     * @param parameters Hash of parameters to save
+     * @param parameters Map of parameters to save
      */
-    void saveDynamicConfig(const QString &cameraId, const QHash<QString, QVariant> &parameters);
+    void saveDynamicConfig(const QString &cameraId, const QVariantMap &parameters);
 
     /**
      * @brief Load dynamic configuration from INI file
      * @param cameraId Camera identifier
-     * @return Hash of loaded parameters
+     * @return Map of loaded parameters
      */
-    QHash<QString, QVariant> loadDynamicConfig(const QString &cameraId);
+    QVariantMap loadDynamicConfig(const QString &cameraId);
 
     /**
-     * @brief Get all current parameters as a hash
-     * @return Hash of parameter name → value
+     * @brief Get all current parameters as a map
+     * @return Map of parameter name → value
      */
-    QHash<QString, QVariant> allParameters() const;
+    QVariantMap allParameters() const;
 
     /**
      * @brief Apply multiple parameters at once
-     * @param params Hash of parameters to apply
+     * @param params Map of parameters to apply
      * @return true if all parameters applied successfully
      */
-    bool setParameters(const QHash<QString, QVariant> &params);
+    bool setParameters(const QVariantMap &params);
 
     // ——— State Access ———
 
@@ -321,7 +321,7 @@ private:
     CameraError m_lastError;
 
     // Parameters cache
-    QHash<QString, QVariant> m_parameters;
+    QVariantMap m_parameters;
 
     // Capture tracking
     int m_captureCount = 0;
