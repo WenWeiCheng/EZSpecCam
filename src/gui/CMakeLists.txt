@@ -18,4 +18,14 @@ target_sources(ezspeccam_gui PRIVATE
     widgets/ImageViewWidget.h widgets/ImageViewWidget.cpp
     widgets/SpectrumViewWidget.h widgets/SpectrumViewWidget.cpp
     qcustomplot.h qcustomplot.cpp
+    widgets/LoadingIndicator.h widgets/LoadingIndicator.cpp
+    widgets/ParameterWidgetFactory.h widgets/ParameterWidgetFactory.cpp
+    widgets/StatisticsDialog.h widgets/StatisticsDialog.cpp
+    widgets/CustomRangeDialog.h widgets/CustomRangeDialog.cpp
+    widgets/RowRangeDialog.h widgets/RowRangeDialog.cpp
+    widgets/DataTab.h widgets/DataTab.cpp
+    widgets/PluginTab.h widgets/PluginTab.cpp
+    widgets/CameraConfigDialogUi.h widgets/CameraConfigDialogUi.cpp
+    widgets/CameraConfigDialog.h widgets/CameraConfigDialog.cpp
+    resources.qrc
 )
