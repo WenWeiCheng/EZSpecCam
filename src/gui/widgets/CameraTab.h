@@ -16,9 +16,13 @@
 #include <QScrollArea>
 #include <QTimer>
 #include <QThread>
+#include <QVariantMap>
 
 #include "../AppController.h"
 #include "CameraTypes.h"
+#include "LoadingIndicator.h"
+
+class CameraWorker;
 
 class CameraTab : public QWidget
 {
@@ -36,6 +40,7 @@ public:
     void setBufferedConfig(const QVariantMap &config);
     QVariantMap getBufferedConfig() const;
     void updateBufferedConfigFromWidgets();
+    void buildDynamicParameterPanel();
 
     QPushButton *connectButton;
     QPushButton *disconnectButton;
@@ -59,12 +64,12 @@ private slots:
 private:
     void setupUi();
     void updateConnectionState();
-    void buildDynamicParameterPanel();
     void clearDynamicParameterPanel();
     void applyCaptureMode();
 
     AppController *m_appController;
     QThread *m_workerThread;
+    CameraWorker *m_worker = nullptr;
     QLabel *m_statusLabel;
     QVariantMap m_bufferedConfig;
 
@@ -74,6 +79,7 @@ private:
     QVBoxLayout *m_dynamicParametersLayout;
     QScrollArea *m_scrollArea;
     QTimer *m_coolingTimer;
+    LoadingIndicator *m_loadingIndicator = nullptr;
 };
 
 class CameraWorker : public QObject
@@ -87,9 +93,11 @@ public:
 public slots:
     void doConnectCamera(const QString &cameraId);
     void doDisconnectCamera();
+    void doSetParameters(const QVariantMap &params);
 
 signals:
     void connectionStateChanged(bool connected, const QString &cameraId, const QString &error);
+    void parametersCommitted(bool success, const QString &error);
 
 private:
     AppController *m_controller;

@@ -45,6 +45,28 @@ void CameraWorker::doDisconnectCamera()
     }
 }
 
+void CameraWorker::doSetParameters(const QVariantMap &params)
+{
+    if (!m_controller || !m_controller->isConnected()) {
+        emit parametersCommitted(false, "Not connected");
+        return;
+    }
+
+    bool ok = m_controller->setParameters(params);
+    if (!ok) {
+        emit parametersCommitted(false, "Failed to set parameters");
+        return;
+    }
+
+    ok = m_controller->commitParameters();
+    if (!ok) {
+        emit parametersCommitted(false, "Failed to commit parameters");
+        return;
+    }
+
+    emit parametersCommitted(true, QString());
+}
+
 CameraTab::CameraTab(QWidget *parent)
     : QWidget(parent)
     , connectButton(nullptr)
@@ -91,13 +113,13 @@ void CameraTab::setAppController(AppController *controller)
         }
 
         m_workerThread = new QThread(this);
-        CameraWorker *worker = new CameraWorker(controller);
-        worker->moveToThread(m_workerThread);
+        m_worker = new CameraWorker(controller);
+        m_worker->moveToThread(m_workerThread);
         m_workerThread->start();
 
         connect(m_workerThread, &QThread::finished,
-                worker, &QObject::deleteLater);
-        connect(worker, &CameraWorker::connectionStateChanged,
+                m_worker, &QObject::deleteLater);
+        connect(m_worker, &CameraWorker::connectionStateChanged,
                 this, &CameraTab::onWorkerConnectionStateChanged,
                 Qt::QueuedConnection);
 
@@ -140,10 +162,14 @@ void CameraTab::onConnectButtonClicked()
     if (!selectedCamera.isEmpty()) {
         connectButton->setEnabled(false);
         cameraComboBox->setEnabled(false);
+        if (m_loadingIndicator) {
+            m_loadingIndicator->setVisible(true);
+            m_loadingIndicator->startAnimation();
+        }
         m_statusLabel->setText("Connecting...");
         m_statusLabel->setVisible(true);
 
-        QMetaObject::invokeMethod(m_workerThread, "doConnectCamera",
+        QMetaObject::invokeMethod(m_worker, "doConnectCamera",
                                  Qt::QueuedConnection,
                                  Q_ARG(QString, selectedCamera));
     }
@@ -151,6 +177,10 @@ void CameraTab::onConnectButtonClicked()
 
 void CameraTab::onWorkerConnectionStateChanged(bool connected, const QString &cameraId, const QString &error)
 {
+    if (m_loadingIndicator) {
+        m_loadingIndicator->stopAnimation();
+        m_loadingIndicator->setVisible(false);
+    }
     cameraComboBox->setEnabled(true);
 
     if (connected) {
@@ -174,7 +204,7 @@ void CameraTab::onDisconnectButtonClicked()
         return;
     }
 
-    QMetaObject::invokeMethod(m_workerThread, "doDisconnectCamera",
+    QMetaObject::invokeMethod(m_worker, "doDisconnectCamera",
                              Qt::QueuedConnection);
     updateConnectionState();
 }
@@ -254,6 +284,10 @@ void CameraTab::setupUi()
     m_statusLabel = new QLabel(this);
     m_statusLabel->setVisible(false);
 
+    m_loadingIndicator = new LoadingIndicator(this);
+    m_loadingIndicator->setFixedSize(24, 24);
+    m_loadingIndicator->setVisible(false);
+
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     buttonLayout->addWidget(connectButton);
     buttonLayout->addWidget(disconnectButton);
@@ -261,6 +295,7 @@ void CameraTab::setupUi()
     formLayout->addRow("", buttonLayout);
 
     QHBoxLayout *statusLayout = new QHBoxLayout();
+    statusLayout->addWidget(m_loadingIndicator);
     statusLayout->addWidget(m_statusLabel);
     statusLayout->addStretch();
     formLayout->addRow("", statusLayout);
