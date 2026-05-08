@@ -558,6 +558,21 @@ void MainWindow::onCaptureStopped()
 {
 }
 
+void MainWindow::onCrosshairCleared()
+{
+    if (ui->coordLabel) {
+        ui->coordLabel->setText("Crosshair: --");
+    }
+}
+
+void MainWindow::onCrosshairMoved(const QPointF &position, int value)
+{
+    ui->coordLabel->setText(QString("Crosshair: X: %1, Y: %2, Value: %3")
+                            .arg(static_cast<int>(position.x()))
+                            .arg(static_cast<int>(position.y()))
+                            .arg(value));
+}
+
 void MainWindow::onLiveModeTriggered()
 {
     if (m_appController) {
