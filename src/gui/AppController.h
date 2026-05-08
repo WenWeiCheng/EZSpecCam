@@ -62,6 +62,12 @@ public:
     void scanPlugins();
 
     /**
+     * @brief Set the plugin directory path (for testing)
+     * @param path Directory path to scan for plugins
+     */
+    void setPluginDirectory(const QString &path);
+
+    /**
      * @brief Get list of all available cameras from loaded plugins
      * @return List of camera identifiers
      */

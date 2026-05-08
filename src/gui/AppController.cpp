@@ -21,6 +21,11 @@ AppController::~AppController()
     clearPlugins();
 }
 
+void AppController::setPluginDirectory(const QString &path)
+{
+    m_pluginDir = path;
+}
+
 void AppController::scanPlugins()
 {
     clearPlugins();
