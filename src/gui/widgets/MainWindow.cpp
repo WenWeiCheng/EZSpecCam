@@ -210,6 +210,7 @@ void MainWindow::on_actionChangeAutoSaveDir_triggered()
 void MainWindow::on_actionConfig_triggered()
 {
     if (m_configDialog) {
+        m_configDialog->show();
         m_configDialog->raise();
         m_configDialog->activateWindow();
         return;
