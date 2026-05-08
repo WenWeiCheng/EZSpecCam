@@ -17,6 +17,7 @@
 #include <QTimer>
 #include <QThread>
 #include <QVariantMap>
+#include <QPointer>
 
 #include "../../AppController.h"
 #include "CameraTypes.h"
@@ -41,6 +42,10 @@ public:
     QVariantMap getBufferedConfig() const;
     void updateBufferedConfigFromWidgets();
     void buildDynamicParameterPanel();
+
+    // Get current capture count based on mode selection
+    // Returns: 0 for Live (continuous), 1 for Single, N for Burst
+    int getCaptureCount() const;
 
     QPushButton *connectButton;
     QPushButton *disconnectButton;
@@ -67,7 +72,7 @@ private:
     void clearDynamicParameterPanel();
     void applyCaptureMode();
 
-    AppController *m_appController;
+    QPointer<AppController> m_appController;
     QThread *m_workerThread;
     CameraWorker *m_worker = nullptr;
     QLabel *m_statusLabel;

@@ -79,6 +79,14 @@ AppController *CameraConfigDialog::appController() const
     return nullptr;
 }
 
+int CameraConfigDialog::getCaptureCount() const
+{
+    if (ui && ui->cameraTab) {
+        return ui->cameraTab->getCaptureCount();
+    }
+    return 0;
+}
+
 void CameraConfigDialog::on_buttonBox_accepted()
 {
     if (!ui || !ui->cameraTab) {

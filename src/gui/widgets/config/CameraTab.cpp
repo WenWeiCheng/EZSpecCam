@@ -237,6 +237,21 @@ void CameraTab::applyCaptureMode()
     m_appController->setParameters(params);
 }
 
+int CameraTab::getCaptureCount() const
+{
+    if (!captureModeComboBox) {
+        return 0;
+    }
+    QString mode = captureModeComboBox->currentText();
+    if (mode == QStringLiteral("Live")) {
+        return 0;
+    }
+    if (mode == QStringLiteral("Single")) {
+        return 1;
+    }
+    return captureCountSpinBox ? captureCountSpinBox->value() : 10;
+}
+
 void CameraTab::onCameraSelected(int index)
 {
     Q_UNUSED(index);

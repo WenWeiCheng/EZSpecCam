@@ -215,10 +215,8 @@ void MainWindow::on_actionConfig_triggered()
         return;
     }
     m_configDialog = new CameraConfigDialog(this);
-    m_configDialog->setAttribute(Qt::WA_DeleteOnClose);
     m_configDialog->setAppController(m_appController);
     m_configDialog->show();
-    connect(m_configDialog, &QDialog::destroyed, this, [this] { m_configDialog = nullptr; });
 }
 
 void MainWindow::on_actionAbout_triggered()
@@ -239,7 +237,8 @@ void MainWindow::on_actionStart_triggered()
         return;
     }
 
-    m_appController->startCapture();
+    int captureCount = m_configDialog ? m_configDialog->getCaptureCount() : 1;
+    m_appController->startCapture(captureCount);
 }
 
 void MainWindow::on_actionStop_triggered()

@@ -24,6 +24,7 @@ public:
     void setAppController(AppController *controller);
     AppController *appController() const;
     CameraConfigDialogUi *getUi() const { return ui; }
+    int getCaptureCount() const;
 
 protected:
     void showEvent(QShowEvent *event) override;
