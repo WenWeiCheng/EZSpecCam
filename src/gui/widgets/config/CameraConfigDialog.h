@@ -11,6 +11,7 @@
 
 class CameraConfigDialogUi;
 class AppController;
+class CameraWorker;
 
 class CameraConfigDialog : public QDialog
 {
@@ -37,6 +38,7 @@ public slots:
 private:
     CameraConfigDialogUi *ui;
     QThread *m_workerThread = nullptr;
+    CameraWorker *m_worker = nullptr;
     QHash<QString, QVariant> m_pendingConfig;
     bool m_acceptAfterCommit = false;
 };

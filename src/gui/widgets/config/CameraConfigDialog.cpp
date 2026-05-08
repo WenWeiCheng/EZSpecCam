@@ -11,8 +11,23 @@
 #include <QTimer>
 #include <QMetaObject>
 #include <QObject>
+#include <QDebug>
 
 class CameraWorker;
+
+// Filter out non-driver params (captureCount, captureMode are UI-layer concepts)
+static QVariantMap filterDriverParams(const QVariantMap &params)
+{
+    QVariantMap filtered;
+    for (auto it = params.constBegin(); it != params.constEnd(); ++it) {
+        if (it.key() == QStringLiteral("captureCount") ||
+            it.key() == QStringLiteral("captureMode")) {
+            continue;
+        }
+        filtered.insert(it.key(), it.value());
+    }
+    return filtered;
+}
 
 CameraConfigDialog::CameraConfigDialog(QWidget *parent)
     : QDialog(parent)
@@ -47,9 +62,9 @@ void CameraConfigDialog::setAppController(AppController *controller)
     }
 
     if (controller && ui && ui->cameraTab) {
-        CameraWorker *worker = new CameraWorker(controller, nullptr);
-        worker->moveToThread(m_workerThread);
-        connect(worker, &CameraWorker::parametersCommitted,
+        m_worker = new CameraWorker(controller, nullptr);
+        m_worker->moveToThread(m_workerThread);
+        connect(m_worker, &CameraWorker::parametersCommitted,
                 this, &CameraConfigDialog::onWorkerParametersCommitted,
                 Qt::QueuedConnection);
         m_workerThread->start();
@@ -76,22 +91,21 @@ void CameraConfigDialog::on_buttonBox_accepted()
 
     AppController *controller = ui->cameraTab->appController();
     if (controller && controller->isConnected() && m_workerThread && m_workerThread->isRunning()) {
-        if (!bufferedConfig.isEmpty()) {
+        QVariantMap driverParams = filterDriverParams(bufferedConfig);
+        if (!driverParams.isEmpty()) {
             ui->showLoading("Applying parameters...");
             m_pendingConfig.clear();
-            for (auto it = bufferedConfig.constBegin(); it != bufferedConfig.constEnd(); ++it) {
+            for (auto it = driverParams.constBegin(); it != driverParams.constEnd(); ++it) {
                 m_pendingConfig.insert(it.key(), it.value());
             }
             m_acceptAfterCommit = true;
 
-            CameraWorker *worker = m_workerThread->findChild<CameraWorker*>();
-            if (worker) {
-                QMetaObject::invokeMethod(worker, "doSetParameters",
+            if (m_worker) {
+                QMetaObject::invokeMethod(m_worker, "doSetParameters",
                     Qt::QueuedConnection,
-                    Q_ARG(QVariantMap, bufferedConfig));
+                    Q_ARG(QVariantMap, driverParams));
             } else {
-                controller->setParameters(bufferedConfig);
-                controller->commitParameters();
+                ui->hideLoading();
                 accept();
             }
             return;
@@ -123,22 +137,21 @@ void CameraConfigDialog::on_buttonBox_clicked(QAbstractButton *button)
 
         AppController *controller = ui->cameraTab->appController();
         if (controller && controller->isConnected() && m_workerThread && m_workerThread->isRunning()) {
-            if (!bufferedConfig.isEmpty()) {
+            QVariantMap driverParams = filterDriverParams(bufferedConfig);
+            if (!driverParams.isEmpty()) {
                 ui->showLoading("Applying parameters...");
                 m_pendingConfig.clear();
-                for (auto it = bufferedConfig.constBegin(); it != bufferedConfig.constEnd(); ++it) {
+                for (auto it = driverParams.constBegin(); it != driverParams.constEnd(); ++it) {
                     m_pendingConfig.insert(it.key(), it.value());
                 }
                 m_acceptAfterCommit = false;
 
-                CameraWorker *worker = m_workerThread->findChild<CameraWorker*>();
-                if (worker) {
-                    QMetaObject::invokeMethod(worker, "doSetParameters",
+                if (m_worker) {
+                    QMetaObject::invokeMethod(m_worker, "doSetParameters",
                         Qt::QueuedConnection,
-                        Q_ARG(QVariantMap, bufferedConfig));
+                        Q_ARG(QVariantMap, driverParams));
                 } else {
-                    controller->setParameters(bufferedConfig);
-                    controller->commitParameters();
+                    ui->hideLoading();
                 }
             }
         }
@@ -159,7 +172,9 @@ void CameraConfigDialog::on_restoreButton_clicked()
 
 void CameraConfigDialog::onWorkerParametersCommitted(bool success, const QString &error)
 {
-    Q_UNUSED(error);
+    if (!success) {
+        qWarning() << "CameraConfigDialog: parameter commit failed:" << error;
+    }
     ui->hideLoading();
     m_pendingConfig.clear();
 
