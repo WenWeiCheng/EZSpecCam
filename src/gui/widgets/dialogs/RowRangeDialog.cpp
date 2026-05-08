@@ -51,15 +51,16 @@ void RowRangeDialog::setImageHeight(int height)
     m_startSpinBox->setMaximum(maxRow);
     m_endSpinBox->setMaximum(maxRow);
 
-    if (height > 0 && m_endSpinBox->value() == 0 && m_startSpinBox->value() == 0) {
+    if (height > 0) {
         m_endSpinBox->setValue(maxRow);
     }
 }
 
 void RowRangeDialog::setRange(int start, int end)
 {
-    m_startSpinBox->setValue(start);
-    m_endSpinBox->setValue(end);
+    int maxRow = qMax(0, m_imageHeight - 1);
+    m_startSpinBox->setValue(qBound(0, start, maxRow));
+    m_endSpinBox->setValue(qBound(0, end, maxRow));
 }
 
 int RowRangeDialog::startRow() const
@@ -78,6 +79,7 @@ void RowRangeDialog::onOkClicked()
         QMessageBox::warning(this, "Invalid Range", "Start row must be less than or equal to end row.");
         return;
     }
+    emit applyClicked(m_startSpinBox->value(), m_endSpinBox->value());
     accept();
 }
 
