@@ -227,6 +227,10 @@ void MainWindow::on_actionAbout_triggered()
         "<p>Spectral Camera Control Application</p>"
         "<p><b>Version:</b> 1.0.0</p>"
         "<p><b>Qt Version:</b> %1</p>"
+        "<hr>"
+        "<p>A graphical application for controlling spectral cameras "
+        "and acquiring spectroscopic data.</p>"
+        "<p><small>Built with Qt %1</small></p>"
     ).arg(QT_VERSION_STR);
 
     QMessageBox::about(this, "About EZSpecCam", aboutText);
