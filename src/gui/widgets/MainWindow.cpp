@@ -651,3 +651,13 @@ void MainWindow::showStatusMessage(const QString &message, int timeoutMs)
         statusBar()->showMessage(message, timeoutMs);
     }
 }
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (m_appController) {
+        m_appController->stopCapture(100);
+        m_appController->disconnectCamera();
+    }
+    QCoreApplication::processEvents();
+    event->accept();
+}

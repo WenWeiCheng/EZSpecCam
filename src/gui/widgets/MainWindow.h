@@ -25,6 +25,9 @@ public:
 
     MainWindowUi *getUi() const { return ui; }
 
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
 private slots:
     void on_actionSaveFrame_triggered();
     void on_actionSaveFrameAs_triggered();

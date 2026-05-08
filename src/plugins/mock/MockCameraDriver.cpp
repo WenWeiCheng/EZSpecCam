@@ -17,8 +17,8 @@ MockCameraDriver::MockCameraDriver(QObject *parent)
 
 MockCameraDriver::~MockCameraDriver()
 {
-    stopCapture(100);
-    disconnectCamera();
+    m_capturing.store(false);
+    m_state.store(CameraState::Disconnected);
 }
 
 QStringList MockCameraDriver::enumerate()
