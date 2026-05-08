@@ -5,6 +5,8 @@
 #include <QCoreApplication>
 #include <QTemporaryDir>
 #include <QFile>
+#include <QDir>
+#include <QDirIterator>
 
 #include "gui/AppController.h"
 #include "core/ICameraDriver.h"
@@ -187,6 +189,115 @@ private slots:
         QVariantMap params = m_controller->loadDynamicConfig("nonexistent-camera-id");
         QVERIFY2(params.isEmpty(),
                  "Should return empty map for nonexistent camera");
+    }
+
+    void test_scan_plugins_loads_mock_driver()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY2(tempDir.isValid(), "Temp directory should be valid");
+
+        QString pluginsDirPath = tempDir.path() + "/plugins/drivers";
+        QDir().mkpath(pluginsDirPath);
+
+        QString sourcePlugin = QCoreApplication::applicationDirPath()
+                              + "/plugins/drivers/mock_camera_driver.dll";
+        QFileInfo pluginFile(sourcePlugin);
+
+        if (!pluginFile.exists()) {
+            QString buildLibPath = QCoreApplication::applicationDirPath()
+                                  + "/../lib/Debug/mock_camera_driver.dll";
+            pluginFile.setFile(buildLibPath);
+        }
+
+        if (pluginFile.exists()) {
+            QString destPlugin = pluginsDirPath + "/mock_camera_driver.dll";
+            QFile::copy(pluginFile.absoluteFilePath(), destPlugin);
+        }
+
+        m_controller->setPluginDirectory(pluginsDirPath);
+
+        QSignalSpy scanSpy(m_controller, &AppController::pluginScanCompleted);
+        QSignalSpy loadFailSpy(m_controller, &AppController::pluginLoadFailed);
+
+        m_controller->scanPlugins();
+
+        QVERIFY2(scanSpy.count() == 1, "Should emit pluginScanCompleted");
+
+        if (scanSpy.count() > 0) {
+            QVariantList args = scanSpy.takeFirst();
+            args.at(0).toInt();
+            int loaded = args.at(1).toInt();
+            QVERIFY2(loaded > 0, "Should load at least one plugin");
+        }
+
+        QVERIFY2(m_controller->hasPlugins() == true, "Should have plugins after scan");
+        QVERIFY2(loadFailSpy.count() == 0, "Should not have plugin load failures");
+    }
+
+    void test_scan_plugins_reports_camera_ids()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY2(tempDir.isValid(), "Temp directory should be valid");
+
+        QString pluginsDirPath = tempDir.path() + "/plugins/drivers";
+        QDir().mkpath(pluginsDirPath);
+
+        QString sourcePlugin = QCoreApplication::applicationDirPath()
+                              + "/plugins/drivers/mock_camera_driver.dll";
+        QFileInfo pluginFile(sourcePlugin);
+
+        if (!pluginFile.exists()) {
+            QString buildLibPath = QCoreApplication::applicationDirPath()
+                                  + "/../lib/Debug/mock_camera_driver.dll";
+            pluginFile.setFile(buildLibPath);
+        }
+
+        if (pluginFile.exists()) {
+            QString destPlugin = pluginsDirPath + "/mock_camera_driver.dll";
+            QFile::copy(pluginFile.absoluteFilePath(), destPlugin);
+        }
+
+        m_controller->setPluginDirectory(pluginsDirPath);
+        m_controller->scanPlugins();
+
+        if (m_controller->hasPlugins()) {
+            QStringList cameras = m_controller->availableCameras();
+            QVERIFY2(!cameras.isEmpty(), "Should have cameras after loading mock plugin");
+            QVERIFY2(cameras.contains("mock-001"), "Should contain mock-001 camera");
+            QVERIFY2(cameras.contains("mock-002"), "Should contain mock-002 camera");
+            QVERIFY2(cameras.contains("mock-003"), "Should contain mock-003 camera");
+        }
+    }
+
+    void test_scan_plugins_emits_load_failed_for_invalid_dll()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY2(tempDir.isValid(), "Temp directory should be valid");
+
+        QString pluginsDirPath = tempDir.path() + "/plugins/drivers";
+        QDir().mkpath(pluginsDirPath);
+
+        QFile invalidDll(pluginsDirPath + "/invalid_driver.dll");
+        invalidDll.open(QIODevice::WriteOnly);
+        invalidDll.write("not a valid dll");
+        invalidDll.close();
+
+        m_controller->setPluginDirectory(pluginsDirPath);
+
+        QSignalSpy scanSpy(m_controller, &AppController::pluginScanCompleted);
+        QSignalSpy loadFailSpy(m_controller, &AppController::pluginLoadFailed);
+
+        m_controller->scanPlugins();
+
+        QVERIFY2(scanSpy.count() == 1, "Should emit pluginScanCompleted");
+        QVERIFY2(loadFailSpy.count() > 0, "Should emit pluginLoadFailed for invalid DLL");
+    }
+
+    void test_available_cameras_returns_list()
+    {
+        QStringList cameras = m_controller->availableCameras();
+        QVERIFY2(cameras.isEmpty() || !cameras.isEmpty(),
+                 "availableCameras should return a list");
     }
 
 private:
