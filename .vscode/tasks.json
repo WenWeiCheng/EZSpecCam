@@ -17,6 +17,15 @@
             "dependsOn": [],
             "group": "test",
             "detail": "Build the project"
+        },
+        {
+            "label": "Test",
+            "type": "shell",
+            "command": "D:\\10_Projects\\2502-Sw-EZSpecCam-shadow\\run_tests.bat",
+            "problemMatcher": [],
+            "dependsOn": [],
+            "group": "test",
+            "detail": "Run the tests"
         }
     ]
 }
