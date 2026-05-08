@@ -27,6 +27,7 @@ private slots:
         for (int i = 0; i < runs; ++i) {
             ImageViewWidget widget;
             widget.resize(800, 600);
+            QApplication::processEvents();
 
             QImage image(6000, 6000, QImage::Format_Grayscale16);
             image.fill(0);
@@ -54,6 +55,7 @@ private slots:
         for (int i = 0; i < runs; ++i) {
             ImageViewWidget widget;
             widget.resize(800, 600);
+            QApplication::processEvents();
             widget.setDownsamplingEnabled(false);
 
             QImage image(6000, 6000, QImage::Format_Grayscale16);
@@ -89,6 +91,7 @@ private slots:
             for (int i = 0; i < runs; ++i) {
                 ImageViewWidget widget;
                 widget.resize(size);
+                QApplication::processEvents();
 
                 QImage image(6000, 6000, QImage::Format_Grayscale16);
                 image.fill(0);
@@ -170,6 +173,7 @@ private slots:
         const int runs = 10;
         ImageViewWidget widget;
         widget.resize(800, 600);
+        QApplication::processEvents();
 
         QImage image(6000, 6000, QImage::Format_Grayscale16);
         image.fill(0);

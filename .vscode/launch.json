@@ -10,7 +10,6 @@
             "cwd": "${workspaceFolder}/build/msvc-debug/bin/Debug",
             "environment": [],
             "console": "externalTerminal",
-            "MIMode": "msvc"
         },
         {
             "name": "Debug CLI (cppvsdbg)",
@@ -21,7 +20,16 @@
             "cwd": "${workspaceFolder}/build/msvc-debug/bin/Debug",
             "environment": [],
             "console": "externalTerminal",
-            "MIMode": "msvc"
-        }
+        }, 
+        {
+            "name": "Debug test_view_widgets_perf (cppvsdbg)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/msvc-debug/bin/Debug/test_view_widgets_perf.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/build/msvc-debug/bin/Debug",
+            "environment": [],
+            "console": "externalTerminal",
+        } 
     ]
 }
