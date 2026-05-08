@@ -52,7 +52,6 @@ void SpectrumViewWidget::setupPlot()
     m_plot->axisRect()->setAutoMargins(QCP::msNone);
     m_plot->axisRect()->setMargins(QMargins(80, 20, 20, 50));
 
-    m_plot->setOpenGl(true);
     m_plot->setNoAntialiasingOnDrag(true);
 
     m_cursorLine = new QCPItemLine(m_plot);
