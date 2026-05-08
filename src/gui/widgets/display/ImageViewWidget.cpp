@@ -2,6 +2,7 @@
 
 #include <QVBoxLayout>
 #include <QMouseEvent>
+#include <QKeyEvent>
 #include <QDebug>
 #include <QTimer>
 #include "../../qcustomplot.h"
@@ -26,10 +27,7 @@ ImageViewWidget::ImageViewWidget(QWidget *parent)
     setupPlot();
 }
 
-ImageViewWidget::~ImageViewWidget()
-{
-    clearCrosshairs();
-}
+ImageViewWidget::~ImageViewWidget() = default;
 
 void ImageViewWidget::setupPlot()
 {
@@ -213,6 +211,7 @@ void ImageViewWidget::clearCrosshairs()
         m_plot->removeItem(pair.second);
     }
     m_crosshairs.clear();
+    m_currentCrosshairPos = QPointF();
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 
     emit crosshairsCleared();
@@ -223,6 +222,8 @@ void ImageViewWidget::addCrosshair(int x, int y)
     if (!m_imageValid || m_originalImage.isNull()) {
         return;
     }
+
+    clearCrosshairs();
 
     QPen crosshairPen(QColor(255, 0, 0, 180));
     crosshairPen.setWidth(1);
@@ -241,9 +242,11 @@ void ImageViewWidget::addCrosshair(int x, int y)
     horizontalLine->end->setCoords(m_originalImage.width(), y);
 
     m_crosshairs.append(qMakePair(verticalLine, horizontalLine));
+    m_currentCrosshairPos = QPointF(x, y);
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 
-    emit crosshairAdded(QPointF(x, y));
+    int value = pixelValue(x, y);
+    emit crosshairMoved(QPointF(x, y), value);
 }
 
 void ImageViewWidget::mousePressEvent(QMouseEvent *event)
@@ -298,6 +301,59 @@ void ImageViewWidget::mouseMoveEvent(QMouseEvent *event)
     }
 
     QWidget::mouseMoveEvent(event);
+}
+
+void ImageViewWidget::keyPressEvent(QKeyEvent *event)
+{
+    if (!m_imageValid || m_originalImage.isNull()) {
+        QWidget::keyPressEvent(event);
+        return;
+    }
+
+    if (m_crosshairs.isEmpty()) {
+        QWidget::keyPressEvent(event);
+        return;
+    }
+
+    int x = static_cast<int>(m_currentCrosshairPos.x());
+    int y = static_cast<int>(m_currentCrosshairPos.y());
+
+    switch (event->key()) {
+        case Qt::Key_Up:
+            y -= 1;
+            break;
+        case Qt::Key_Down:
+            y += 1;
+            break;
+        case Qt::Key_Left:
+            x -= 1;
+            break;
+        case Qt::Key_Right:
+            x += 1;
+            break;
+        default:
+            QWidget::keyPressEvent(event);
+            return;
+    }
+
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x >= m_originalImage.width()) x = m_originalImage.width() - 1;
+    if (y >= m_originalImage.height()) y = m_originalImage.height() - 1;
+
+    auto &pair = m_crosshairs.first();
+    pair.first->start->setCoords(x, 0);
+    pair.first->end->setCoords(x, m_originalImage.height());
+    pair.second->start->setCoords(0, y);
+    pair.second->end->setCoords(m_originalImage.width(), y);
+
+    m_currentCrosshairPos = QPointF(x, y);
+    m_plot->replot(QCustomPlot::rpQueuedReplot);
+
+    int value = pixelValue(x, y);
+    emit crosshairMoved(QPointF(x, y), value);
+
+    event->accept();
 }
 
 void ImageViewWidget::leaveEvent(QEvent *event)

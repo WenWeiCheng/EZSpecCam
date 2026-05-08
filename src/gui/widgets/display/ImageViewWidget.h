@@ -46,14 +46,18 @@ public:
     bool isDownsamplingEnabled() const;
     void setDownsamplingEnabled(bool enabled);
 
+    int pixelValue(int x, int y) const;
+
 signals:
     void crosshairAdded(const QPointF &position);
+    void crosshairMoved(const QPointF &position, int value);
     void crosshairsCleared();
     void pixelInfo(int x, int y, int value);
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
     void leaveEvent(QEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     bool eventFilter(QObject *obj, QEvent *event) override;
@@ -65,7 +69,6 @@ private:
     void setupPlot();
     void updateColorMap(const QImage &image);
     void applyColorScaleMode();
-    int pixelValue(int x, int y) const;
     QPointF widgetToImageCoords(int widgetX, int widgetY) const;
     void updateDisplayData();
     void calculateDownsampleFactors();
@@ -75,6 +78,7 @@ private:
     QCPColorMap *m_colorMap;
     QImage m_currentImage;
     QList<QPair<QCPItemLine *, QCPItemLine *>> m_crosshairs;
+    QPointF m_currentCrosshairPos;
     bool m_imageValid;
     ColorScaleMode m_colorScaleMode = ColorScaleMode::Auto;
     bool m_axesVisible = false;

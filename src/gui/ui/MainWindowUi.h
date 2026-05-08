@@ -63,6 +63,7 @@ public:
     QLabel *stateLabel;
     QLabel *frameCountLabel;
     QLabel *fpsLabel;
+    QLabel *coordLabel;
     QToolBar *toolBar;
     QStackedWidget *centralStackedWidget;
     ImageViewWidget *imageViewWidget;

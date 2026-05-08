@@ -54,6 +54,11 @@ MainWindow::MainWindow(QWidget *parent)
     m_imageViewWidget = ui->imageViewWidget;
     m_spectrumViewWidget = ui->spectrumViewWidget;
 
+    connect(m_imageViewWidget, &ImageViewWidget::crosshairsCleared,
+            this, &MainWindow::onCrosshairCleared);
+    connect(m_imageViewWidget, &ImageViewWidget::crosshairMoved,
+            this, &MainWindow::onCrosshairMoved);
+
     connect(m_appController, &AppController::stateChanged,
             this, &MainWindow::onCameraStateChanged);
     connect(m_appController, &AppController::frameReady,

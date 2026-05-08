@@ -18,6 +18,7 @@ MainWindowUi::MainWindowUi(QObject *parent)
     , stateLabel(nullptr)
     , frameCountLabel(nullptr)
     , fpsLabel(nullptr)
+    , coordLabel(nullptr)
     , toolBar(nullptr)
     , menuActionSaveFrame(nullptr)
     , menuActionConfig(nullptr)
@@ -210,6 +211,10 @@ void MainWindowUi::createStatusBar(QMainWindow *mainWindow)
     stateLabel->setMinimumWidth(150);
     statusBar->addWidget(stateLabel);
 
+    coordLabel = new QLabel("Crosshair: --", statusBar);
+    coordLabel->setMinimumWidth(150);
+    statusBar->addWidget(coordLabel);
+
     fpsLabel = new QLabel("FPS: 0", statusBar);
     fpsLabel->setMinimumWidth(80);
     statusBar->addPermanentWidget(fpsLabel);
@@ -229,6 +234,9 @@ void MainWindowUi::initializeLabels()
     }
     if (fpsLabel) {
         fpsLabel->setText("FPS: 0");
+    }
+    if (coordLabel) {
+        coordLabel->setText("Crosshair: --");
     }
 }
 

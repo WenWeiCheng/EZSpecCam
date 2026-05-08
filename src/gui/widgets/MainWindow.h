@@ -63,6 +63,9 @@ private slots:
     void onCaptureStarted();
     void onCaptureStopped();
 
+    void onCrosshairCleared();
+    void onCrosshairMoved(const QPointF &position, int value);
+
     void onLiveModeTriggered();
     void onSingleModeTriggered();
     void onBurstModeTriggered();
