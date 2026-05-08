@@ -357,10 +357,15 @@ void AppController::unloadPlugin(const PluginInfo &info)
 
 void AppController::clearPlugins()
 {
-    for (const PluginInfo &info : m_plugins) {
+    for (auto it = m_plugins.begin(); it != m_plugins.end(); ) {
+        const PluginInfo &info = *it;
+        if (m_driver && info.loader && info.loader->instance() == m_driver) {
+            ++it;
+            continue;
+        }
         unloadPlugin(info);
+        it = m_plugins.erase(it);
     }
-    m_plugins.clear();
 }
 
 QString AppController::getConfigDirectory()

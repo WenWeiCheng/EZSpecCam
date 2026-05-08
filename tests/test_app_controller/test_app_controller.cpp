@@ -300,6 +300,55 @@ private slots:
                  "availableCameras should return a list");
     }
 
+    void test_scan_plugins_preserves_active_driver()
+    {
+        // Bug fix verification: scanPlugins() should preserve the active plugin
+        // when connected, not unload it and cause a dangling pointer crash.
+
+        QTemporaryDir tempDir;
+        QVERIFY2(tempDir.isValid(), "Temp directory should be valid");
+
+        QString pluginsDirPath = tempDir.path() + "/plugins/drivers";
+        QDir().mkpath(pluginsDirPath);
+
+        QString sourcePlugin = QCoreApplication::applicationDirPath()
+                              + "/plugins/drivers/mock_camera_driver.dll";
+        QFileInfo pluginFile(sourcePlugin);
+
+        if (!pluginFile.exists()) {
+            QString buildLibPath = QCoreApplication::applicationDirPath()
+                                  + "/../lib/Debug/mock_camera_driver.dll";
+            pluginFile.setFile(buildLibPath);
+        }
+
+        if (!pluginFile.exists()) {
+            QSKIP("Mock driver DLL not found, skipping test");
+        }
+
+        QString destPlugin = pluginsDirPath + "/mock_camera_driver.dll";
+        QFile::copy(pluginFile.absoluteFilePath(), destPlugin);
+
+        m_controller->setPluginDirectory(pluginsDirPath);
+        m_controller->scanPlugins();
+
+        QVERIFY2(m_controller->hasPlugins(), "Should have plugins after scan");
+
+        bool connected = m_controller->connectCamera("mock-001");
+        QVERIFY2(connected, "Should connect to mock-001");
+        QVERIFY2(m_controller->isConnected(), "Should be connected after connectCamera");
+
+        ICameraDriver *driverBefore = m_controller->driver();
+        QVERIFY2(driverBefore != nullptr, "Driver should be valid while connected");
+
+        // Scan plugins while connected - active plugin should be preserved
+        m_controller->scanPlugins();
+
+        QVERIFY2(m_controller->isConnected(),
+                 "Should remain connected after scanPlugins()");
+        QVERIFY2(m_controller->driver() != nullptr,
+                 "Driver should not be nullptr after scanPlugins() - active plugin preserved");
+    }
+
 private:
     AppController *m_controller = nullptr;
     MockCameraDriver *m_mockDriver = nullptr;
