@@ -20,6 +20,70 @@
 #include <QDateTime>
 #include <QDir>
 
+namespace PostProcess {
+
+void verticalBinning(ImageData &frame, int startRow, int endRow)
+{
+    if (startRow < 0) startRow = 0;
+    if (endRow < 0 || endRow >= frame.image.height()) endRow = frame.image.height() - 1;
+    if (startRow > endRow) return;
+
+    const int width = frame.image.width();
+    int rowCount = endRow - startRow + 1;
+
+    if (frame.originalImage.isNull()) {
+        frame.originalImage = frame.image;
+    }
+
+    QImage binnedImage(width, 1, frame.image.format());
+
+    if (frame.image.format() == QImage::Format_Grayscale16) {
+        const ushort *srcData = reinterpret_cast<const ushort *>(frame.image.bits());
+        ushort *dstData = reinterpret_cast<ushort *>(binnedImage.bits());
+        static quint64 sums[16384];
+        for (int x = 0; x < width; x++) sums[x] = 0;
+        for (int y = startRow; y <= endRow; y++) {
+            const ushort *row = srcData + y * width;
+            for (int x = 0; x < width; x++) sums[x] += row[x];
+        }
+        for (int x = 0; x < width; x++) dstData[x] = static_cast<ushort>(sums[x] / rowCount);
+    } else if (frame.image.format() == QImage::Format_Grayscale8) {
+        const uchar *srcData = frame.image.bits();
+        uchar *dstData = binnedImage.bits();
+        static quint32 sums[16384];
+        for (int x = 0; x < width; x++) sums[x] = 0;
+        for (int y = startRow; y <= endRow; y++) {
+            const uchar *row = srcData + y * width;
+            for (int x = 0; x < width; x++) sums[x] += row[x];
+        }
+        for (int x = 0; x < width; x++) dstData[x] = static_cast<uchar>(sums[x] / rowCount);
+    } else if (frame.image.format() == QImage::Format_RGB888) {
+        const uchar *srcData = frame.image.bits();
+        uchar *dstData = binnedImage.bits();
+        const int rowStride = width * 3;
+        static quint32 sumsR[16384], sumsG[16384], sumsB[16384];
+        for (int x = 0; x < width; x++) sumsR[x] = sumsG[x] = sumsB[x] = 0;
+        for (int y = startRow; y <= endRow; y++) {
+            const uchar *row = srcData + y * rowStride;
+            for (int x = 0; x < width; x++) {
+                int idx = x * 3;
+                sumsR[x] += row[idx];
+                sumsG[x] += row[idx + 1];
+                sumsB[x] += row[idx + 2];
+            }
+        }
+        for (int x = 0; x < width; x++) {
+            dstData[x * 3] = static_cast<uchar>(sumsR[x] / rowCount);
+            dstData[x * 3 + 1] = static_cast<uchar>(sumsG[x] / rowCount);
+            dstData[x * 3 + 2] = static_cast<uchar>(sumsB[x] / rowCount);
+        }
+    }
+
+    frame.image = binnedImage;
+}
+
+} // namespace PostProcess
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new MainWindowUi(this))
@@ -438,12 +502,22 @@ void MainWindow::on_statistics_triggered()
 
 void MainWindow::on_verticalBinning_triggered()
 {
-    bool enabled = ui->menuActionVerticalBinning->isChecked();
-    Q_UNUSED(enabled);
+    m_vBinEnabled = ui->menuActionVerticalBinning->isChecked();
 
-    if (m_currentFrame.isValid()) {
-        updateDisplay(m_currentFrame);
+    if (!m_currentFrame.isValid()) {
+        return;
     }
+
+    ImageData frame = m_currentFrame;
+    if (m_vBinEnabled && frame.hasOriginal()) {
+        frame.image = frame.originalImage;
+        PostProcess::verticalBinning(frame, m_vBinStartRow, m_vBinEndRow);
+    } else if (m_vBinEnabled) {
+        PostProcess::verticalBinning(frame, m_vBinStartRow, m_vBinEndRow);
+    } else if (frame.hasOriginal()) {
+        frame.image = frame.originalImage;
+    }
+    updateDisplay(frame);
 }
 
 void MainWindow::on_rowRange_triggered()
@@ -458,16 +532,20 @@ void MainWindow::on_rowRange_triggered()
     RowRangeDialog *dialog = new RowRangeDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setImageHeight(imageHeight);
+    dialog->setRange(m_vBinStartRow, m_vBinEndRow < 0 ? imageHeight - 1 : m_vBinEndRow);
     dialog->show();
 
     connect(dialog, &RowRangeDialog::applyClicked, this, [this](int startRow, int endRow) {
-        // Apply row range for vertical binning
-        if (m_appController) {
-            QVariantMap params;
-            params["rowStart"] = startRow;
-            params["rowEnd"] = endRow;
-            m_appController->setParameters(params);
-            m_appController->commitParameters();
+        m_vBinStartRow = startRow;
+        m_vBinEndRow = endRow;
+
+        if (m_vBinEnabled && m_currentFrame.isValid()) {
+            ImageData frame = m_currentFrame;
+            if (frame.hasOriginal()) {
+                frame.image = frame.originalImage;
+            }
+            PostProcess::verticalBinning(frame, m_vBinStartRow, m_vBinEndRow);
+            updateDisplay(frame);
         }
     });
 }
@@ -512,7 +590,13 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
 
     m_fpsFrameCount++;
 
-    updateDisplay(frame);
+    if (m_vBinEnabled) {
+        ImageData processed = frame;
+        PostProcess::verticalBinning(processed, m_vBinStartRow, m_vBinEndRow);
+        updateDisplay(processed);
+    } else {
+        updateDisplay(frame);
+    }
     updateToolbarState();
 
     QSettings settings;

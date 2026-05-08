@@ -12,8 +12,6 @@ target_include_directories(ezspeccam_core
 target_sources(ezspeccam_core PRIVATE
     ICameraDriver.h
     CameraTypes.h
-    PostProcess.h
-    PostProcess.cpp
 )
 
 target_link_libraries(ezspeccam_core PUBLIC Qt6::Core Qt6::Gui)

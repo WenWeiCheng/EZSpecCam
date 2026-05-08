@@ -96,6 +96,10 @@ private:
 
     int m_frameCount = 0;
     int m_autoSaveFrameCounter = 0;
+
+    bool m_vBinEnabled = false;
+    int m_vBinStartRow = 0;
+    int m_vBinEndRow = -1;
 };
 
 #endif // MAINWINDOW_H
