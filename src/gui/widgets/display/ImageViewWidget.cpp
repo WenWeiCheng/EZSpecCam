@@ -64,7 +64,7 @@ void ImageViewWidget::setupPlot()
         m_plot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
     }
 
-    m_plot->setOpenGl(true);
+    // m_plot->setOpenGl(true);
     m_plot->setNoAntialiasingOnDrag(true);
 
     m_axesVisible = false;
