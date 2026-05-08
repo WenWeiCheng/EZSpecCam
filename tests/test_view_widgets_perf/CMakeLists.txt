@@ -11,6 +11,7 @@ target_link_libraries(test_view_widgets_perf PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test Qt6::OpenGL Qt6::PrintSupport
     OpenGL::GL
 )
+target_compile_definitions(test_view_widgets_perf PRIVATE QCUSTOMPLOT_USE_OPENGL)
 target_include_directories(test_view_widgets_perf PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display

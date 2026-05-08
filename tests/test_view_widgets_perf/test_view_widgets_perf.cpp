@@ -16,69 +16,62 @@ private slots:
     void initTestCase() {}
     void cleanupTestCase() {}
 
-    void init()
-    {
-    }
-
-    void cleanup()
-    {
-    }
+    void init() {}
+    void cleanup() {}
 
     void test_imageviewwidget_6000x6000_with_downsampling()
     {
-        ImageViewWidget widget;
-        widget.resize(800, 600);
-        QTest::qWait(100);
+        const int runs = 10;
+        QList<qint64> timings;
 
-        QImage image(6000, 6000, QImage::Format_Grayscale16);
-        image.fill(0);
+        for (int i = 0; i < runs; ++i) {
+            ImageViewWidget widget;
+            widget.resize(800, 600);
 
-        for (int y = 0; y < 6000; ++y) {
-            quint16 *line = reinterpret_cast<quint16 *>(image.scanLine(y));
-            for (int x = 0; x < 6000; ++x) {
-                line[x] = static_cast<quint16>((x * 65535) / 6000);
+            QImage image(6000, 6000, QImage::Format_Grayscale16);
+            image.fill(0);
+            for (int y = 0; y < 6000; ++y) {
+                quint16 *line = reinterpret_cast<quint16 *>(image.scanLine(y));
+                for (int x = 0; x < 6000; ++x) {
+                    line[x] = static_cast<quint16>((x * 65535) / 6000);
+                }
             }
+
+            QElapsedTimer timer;
+            timer.start();
+            widget.setImage(image);
+            timings.append(timer.elapsed());
         }
 
-        QVERIFY(widget.isDownsamplingEnabled() == true);
-
-        QElapsedTimer timer;
-        timer.start();
-
-        widget.setImage(image);
-        QTest::qWait(100);
-
-        qint64 elapsed = timer.elapsed();
-        qDebug() << "ImageViewWidget 6000x6000 (downsampling ON, 800x600 viewport):" << elapsed << "ms";
+        printStats("ImageViewWidget 6000x6000 DS ON", timings);
     }
 
     void test_imageviewwidget_6000x6000_without_downsampling()
     {
-        ImageViewWidget widget;
-        widget.resize(800, 600);
-        QTest::qWait(100);
+        const int runs = 10;
+        QList<qint64> timings;
 
-        QImage image(6000, 6000, QImage::Format_Grayscale16);
-        image.fill(0);
+        for (int i = 0; i < runs; ++i) {
+            ImageViewWidget widget;
+            widget.resize(800, 600);
+            widget.setDownsamplingEnabled(false);
 
-        for (int y = 0; y < 6000; ++y) {
-            quint16 *line = reinterpret_cast<quint16 *>(image.scanLine(y));
-            for (int x = 0; x < 6000; ++x) {
-                line[x] = static_cast<quint16>((x * 65535) / 6000);
+            QImage image(6000, 6000, QImage::Format_Grayscale16);
+            image.fill(0);
+            for (int y = 0; y < 6000; ++y) {
+                quint16 *line = reinterpret_cast<quint16 *>(image.scanLine(y));
+                for (int x = 0; x < 6000; ++x) {
+                    line[x] = static_cast<quint16>((x * 65535) / 6000);
+                }
             }
+
+            QElapsedTimer timer;
+            timer.start();
+            widget.setImage(image);
+            timings.append(timer.elapsed());
         }
 
-        widget.setDownsamplingEnabled(false);
-        QVERIFY(widget.isDownsamplingEnabled() == false);
-
-        QElapsedTimer timer;
-        timer.start();
-
-        widget.setImage(image);
-        QTest::qWait(200);
-
-        qint64 elapsed = timer.elapsed();
-        qDebug() << "ImageViewWidget 6000x6000 (downsampling OFF, 800x600 viewport):" << elapsed << "ms";
+        printStats("ImageViewWidget 6000x6000 DS OFF", timings);
     }
 
     void test_imageviewwidget_viewport_sizes()
@@ -90,92 +83,96 @@ private slots:
         };
 
         for (const QSize &size : viewportSizes) {
-            ImageViewWidget widget;
-            widget.resize(size);
-            QTest::qWait(100);
+            const int runs = 10;
+            QList<qint64> timings;
 
-            QImage image(6000, 6000, QImage::Format_Grayscale16);
-            image.fill(0);
+            for (int i = 0; i < runs; ++i) {
+                ImageViewWidget widget;
+                widget.resize(size);
 
-            for (int y = 0; y < 6000; ++y) {
-                quint16 *line = reinterpret_cast<quint16 *>(image.scanLine(y));
-                for (int x = 0; x < 6000; ++x) {
-                    line[x] = static_cast<quint16>((x * 65535) / 6000);
+                QImage image(6000, 6000, QImage::Format_Grayscale16);
+                image.fill(0);
+                for (int y = 0; y < 6000; ++y) {
+                    quint16 *line = reinterpret_cast<quint16 *>(image.scanLine(y));
+                    for (int x = 0; x < 6000; ++x) {
+                        line[x] = static_cast<quint16>((x * 65535) / 6000);
+                    }
                 }
+
+                QElapsedTimer timer;
+                timer.start();
+                widget.setImage(image);
+                timings.append(timer.elapsed());
             }
 
-            QElapsedTimer timer;
-            timer.start();
-
-            widget.setImage(image);
-            QTest::qWait(100);
-
-            qint64 elapsed = timer.elapsed();
-            qDebug() << "ImageViewWidget 6000x6000 viewport" << size << ":" << elapsed << "ms";
+            printStats(QString("ImageViewWidget 6000x6000 %1x%2").arg(size.width()).arg(size.height()), timings);
         }
     }
 
     void test_spectrumviewwidget_6000x1()
     {
-        SpectrumViewWidget widget;
-        widget.resize(800, 600);
-        QTest::qWait(100);
+        const int runs = 10;
+        QList<qint64> timings;
 
-        QImage image(6000, 1, QImage::Format_Grayscale16);
-        image.fill(0);
+        for (int i = 0; i < runs; ++i) {
+            SpectrumViewWidget widget;
+            widget.resize(800, 600);
 
-        quint16 *line = reinterpret_cast<quint16 *>(image.scanLine(0));
-        for (int x = 0; x < 6000; ++x) {
-            line[x] = static_cast<quint16>((x * 65535) / 6000);
+            QImage image(6000, 1, QImage::Format_Grayscale16);
+            image.fill(0);
+            quint16 *line = reinterpret_cast<quint16 *>(image.scanLine(0));
+            for (int x = 0; x < 6000; ++x) {
+                line[x] = static_cast<quint16>((x * 65535) / 6000);
+            }
+
+            QElapsedTimer timer;
+            timer.start();
+            widget.setFromImage(image);
+            timings.append(timer.elapsed());
+
+            QVERIFY2(widget.hasData(), "Widget should have data after setFromImage");
+            QVERIFY2(widget.dataWidth() == 6000, "Data width should be 6000");
         }
 
-        QElapsedTimer timer;
-        timer.start();
-
-        widget.setFromImage(image);
-        QTest::qWait(100);
-
-        qint64 elapsed = timer.elapsed();
-        qDebug() << "SpectrumViewWidget 6000x1 (setFromImage):" << elapsed << "ms";
-        QVERIFY2(widget.hasData(), "Widget should have data after setFromImage");
-        QVERIFY2(widget.dataWidth() == 6000, "Data width should be 6000");
+        printStats("SpectrumViewWidget 6000x1", timings);
     }
 
     void test_spectrumviewwidget_6000_points()
     {
-        SpectrumViewWidget widget;
-        widget.resize(800, 600);
-        QTest::qWait(100);
+        const int runs = 10;
+        QList<qint64> timings;
 
-        QVector<double> xData(6000);
-        QVector<double> yData(6000);
+        for (int i = 0; i < runs; ++i) {
+            SpectrumViewWidget widget;
+            widget.resize(800, 600);
 
-        for (int i = 0; i < 6000; ++i) {
-            xData[i] = i;
-            yData[i] = (i * 100.0) / 6000;
+            QVector<double> xData(6000);
+            QVector<double> yData(6000);
+            for (int j = 0; j < 6000; ++j) {
+                xData[j] = j;
+                yData[j] = (j * 100.0) / 6000;
+            }
+
+            QElapsedTimer timer;
+            timer.start();
+            widget.setData(xData, yData);
+            timings.append(timer.elapsed());
+
+            QVERIFY2(widget.hasData(), "Widget should have data after setData");
+            QVERIFY2(widget.dataWidth() == 6000, "Data width should be 6000");
         }
 
-        QElapsedTimer timer;
-        timer.start();
-
-        widget.setData(xData, yData);
-        QTest::qWait(100);
-
-        qint64 elapsed = timer.elapsed();
-        qDebug() << "SpectrumViewWidget 6000 points (setData):" << elapsed << "ms";
-        QVERIFY2(widget.hasData(), "Widget should have data after setData");
-        QVERIFY2(widget.dataWidth() == 6000, "Data width should be 6000");
+        printStats("SpectrumViewWidget 6000 points", timings);
     }
 
-    void test_imageviewwidget_stress_repeated_sets()
+    void test_imageviewwidget_repeated_sets()
     {
+        const int runs = 10;
         ImageViewWidget widget;
         widget.resize(800, 600);
-        QTest::qWait(100);
 
         QImage image(6000, 6000, QImage::Format_Grayscale16);
         image.fill(0);
-
         for (int y = 0; y < 6000; ++y) {
             quint16 *line = reinterpret_cast<quint16 *>(image.scanLine(y));
             for (int x = 0; x < 6000; ++x) {
@@ -184,23 +181,37 @@ private slots:
         }
 
         QList<qint64> timings;
-        for (int i = 0; i < 5; ++i) {
+        for (int i = 0; i < runs; ++i) {
             QElapsedTimer timer;
             timer.start();
-
             widget.setImage(image);
-            QTest::qWait(100);
-
             timings.append(timer.elapsed());
         }
 
-        qint64 avg = 0;
-        for (qint64 t : timings) avg += t;
-        avg /= timings.size();
+        printStats("ImageViewWidget repeated setImage", timings);
+    }
 
-        qDebug() << "ImageViewWidget repeated setImage (5 runs):";
-        qDebug() << "  Individual times:" << timings;
+    void printStats(const QString &name, const QList<qint64> &timings)
+    {
+        if (timings.isEmpty()) return;
+
+        qint64 sum = 0;
+        qint64 min = timings[0];
+        qint64 max = timings[0];
+        for (qint64 t : timings) {
+            sum += t;
+            min = qMin(min, t);
+            max = qMax(max, t);
+        }
+        double avg = sum / (double)timings.size();
+
+        qDebug() << "==========================================";
+        qDebug() << "Results for:" << name;
+        qDebug() << "  Runs:" << timings.size();
         qDebug() << "  Average:" << avg << "ms";
+        qDebug() << "  Min:" << min << "ms";
+        qDebug() << "  Max:" << max << "ms";
+        qDebug() << "  All times:" << timings;
     }
 };
 

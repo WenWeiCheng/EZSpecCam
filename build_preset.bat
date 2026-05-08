@@ -14,12 +14,26 @@ echo.
 
 set SOURCE_DIR=D:\10_Projects\2502-Sw-EZSpecCam-shadow
 
+:: Get build type from argument, default to debug
+set BUILD_TYPE=%1
+if "%BUILD_TYPE%"=="" set BUILD_TYPE=debug
+
+:: Map build type to preset
+if /i "%BUILD_TYPE%"=="debug" (
+    set PRESET=msvc-debug
+) else if /i "%BUILD_TYPE%"=="release" (
+    set PRESET=msvc-release
+) else (
+    echo ERROR: Invalid build type '%BUILD_TYPE%'. Use 'debug' or 'release'.
+    exit /b 1
+)
+
 echo Available presets:
 cmake --list-presets -S "%SOURCE_DIR%"
 echo.
 
-echo Configuring with msvc-debug preset...
-cmake --preset msvc-debug -S "%SOURCE_DIR%"
+echo Configuring with %PRESET% preset...
+cmake --preset %PRESET% -S "%SOURCE_DIR%"
 
 if errorlevel 1 (
     echo ERROR: CMake configure failed
@@ -27,8 +41,8 @@ if errorlevel 1 (
 )
 
 echo.
-echo Building with msvc-debug preset...
-cmake --build --preset msvc-debug
+echo Building with %PRESET% preset...
+cmake --build --preset %PRESET%
 
 if errorlevel 1 (
     echo ERROR: Build failed
