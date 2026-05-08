@@ -209,9 +209,16 @@ void MainWindow::on_actionChangeAutoSaveDir_triggered()
 
 void MainWindow::on_actionConfig_triggered()
 {
-    CameraConfigDialog *dialog = new CameraConfigDialog(this);
-    dialog->setAppController(m_appController);
-    dialog->show();
+    if (m_configDialog) {
+        m_configDialog->raise();
+        m_configDialog->activateWindow();
+        return;
+    }
+    m_configDialog = new CameraConfigDialog(this);
+    m_configDialog->setAttribute(Qt::WA_DeleteOnClose);
+    m_configDialog->setAppController(m_appController);
+    m_configDialog->show();
+    connect(m_configDialog, &QDialog::destroyed, this, [this] { m_configDialog = nullptr; });
 }
 
 void MainWindow::on_actionAbout_triggered()

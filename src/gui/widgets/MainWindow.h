@@ -11,6 +11,7 @@
 
 class MainWindowUi;
 class CameraTab;
+class CameraConfigDialog;
 class ImageViewWidget;
 class SpectrumViewWidget;
 struct ImageData;
@@ -88,6 +89,7 @@ private:
     CameraTab *m_cameraTab;
     ImageViewWidget *m_imageViewWidget;
     SpectrumViewWidget *m_spectrumViewWidget;
+    CameraConfigDialog *m_configDialog = nullptr;
 
     int m_frameCount = 0;
     int m_autoSaveFrameCounter = 0;
