@@ -72,6 +72,7 @@ use `run_tests.bat` to test
 `qcustomplot` is an external module, do not modify it
 
 
-
 ## ICameraDriver spec
 
+- Implement state management
+- Implement async data fetching, do not block the main thread

@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug GUI (cppvsdbg)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/msvc-debug/bin/Debug/ezspeccam_gui.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/build/msvc-debug/bin/Debug",
+            "environment": [],
+            "console": "externalTerminal",
+            "MIMode": "msvc"
+        },
+        {
+            "name": "Debug CLI (cppvsdbg)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/msvc-debug/bin/Debug/ezspeccam_cli.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/build/msvc-debug/bin/Debug",
+            "environment": [],
+            "console": "externalTerminal",
+            "MIMode": "msvc"
+        }
+    ]
+}
