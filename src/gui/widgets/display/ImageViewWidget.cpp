@@ -470,17 +470,23 @@ bool ImageViewWidget::eventFilter(QObject *obj, QEvent *event)
         if (event->type() == QEvent::MouseButtonPress) {
             auto *me = static_cast<QMouseEvent *>(event);
             if (me->button() == Qt::LeftButton) {
-                QRect axisRect = m_plot->axisRect()->rect();
-                if (axisRect.contains(me->pos()) && m_interactionMode == InteractionMode::Zoom) {
-                    m_rubberBandOrigin = me->pos();
-                    m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, QSize()));
-                    m_rubberBand->show();
-                } else if (m_interactionMode == InteractionMode::Crosshair) {
+                if (me->modifiers() & Qt::ControlModifier) {
                     mousePressEvent(me);
+                } else {
+                    QRect axisRect = m_plot->axisRect()->rect();
+                    if (axisRect.contains(me->pos()) && m_interactionMode == InteractionMode::Zoom) {
+                        m_rubberBandOrigin = me->pos();
+                        m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, QSize()));
+                        m_rubberBand->show();
+                    } else if (m_interactionMode == InteractionMode::Crosshair) {
+                        mousePressEvent(me);
+                    }
                 }
                 return true;
             } else if (me->button() == Qt::RightButton) {
-                if (m_interactionMode == InteractionMode::Zoom) {
+                if (me->modifiers() & Qt::ControlModifier) {
+                    mousePressEvent(me);
+                } else if (m_interactionMode == InteractionMode::Zoom) {
                     resetZoomToFit();
                 } else if (m_interactionMode == InteractionMode::Crosshair) {
                     mousePressEvent(me);
