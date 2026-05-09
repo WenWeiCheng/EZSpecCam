@@ -4,7 +4,7 @@
         {
             "label": "Run GUI",
             "type": "process",
-            "command": "D:\\10_Projects\\2502-Sw-EZSpecCam-shadow\\build\\msvc-debug\\bin\\Debug\\ezspeccam_gui.exe",
+            "command": "${workspaceFolder}\\build\\msvc-debug\\bin\\Debug\\ezspeccam_gui.exe",
             "problemMatcher": [],
             "group": "test",
             "detail": "Run the ezspeccam GUI application"
@@ -12,7 +12,7 @@
         {
             "label": "Build",
             "type": "shell",
-            "command": "D:\\10_Projects\\2502-Sw-EZSpecCam-shadow\\build_preset.bat",
+            "command": "${workspaceFolder}\\build_preset.bat",
             "problemMatcher": [],
             "dependsOn": [],
             "group": "test",
@@ -21,7 +21,7 @@
         {
             "label": "Test",
             "type": "shell",
-            "command": "D:\\10_Projects\\2502-Sw-EZSpecCam-shadow\\run_tests.bat",
+            "command": "${workspaceFolder}\\run_tests.bat",
             "problemMatcher": [],
             "dependsOn": [],
             "group": "test",

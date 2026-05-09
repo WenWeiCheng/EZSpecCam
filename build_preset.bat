@@ -12,7 +12,7 @@ if errorlevel 1 (
 echo MSVC environment ready
 echo.
 
-set SOURCE_DIR=D:\10_Projects\2502-Sw-EZSpecCam-shadow
+set "SOURCE_DIR=%~dp0"
 
 :: Get build type from argument, default to debug
 set BUILD_TYPE=%1
@@ -41,8 +41,8 @@ if errorlevel 1 (
 )
 
 echo.
-echo Building with %PRESET% preset...
-cmake --build --preset %PRESET%
+echo Building with %PRESET% preset (4 cores)...
+cmake --build --preset %PRESET% -j 4
 
 if errorlevel 1 (
     echo ERROR: Build failed
