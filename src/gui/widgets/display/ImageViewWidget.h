@@ -8,6 +8,7 @@
 #include <QPair>
 #include <QPointF>
 #include <QTimer>
+#include <QRubberBand>
 
 class QCustomPlot;
 class QCPColorMap;
@@ -24,6 +25,12 @@ public:
         Fixed16Bit
     };
     Q_ENUM(ColorScaleMode)
+
+    enum class InteractionMode {
+        Crosshair,
+        Zoom
+    };
+    Q_ENUM(InteractionMode)
 
     explicit ImageViewWidget(QWidget *parent = nullptr);
     ~ImageViewWidget() override;
@@ -45,6 +52,9 @@ public:
 
     bool isDownsamplingEnabled() const;
     void setDownsamplingEnabled(bool enabled);
+
+    InteractionMode interactionMode() const { return m_interactionMode; }
+    void setInteractionMode(InteractionMode mode);
 
     int pixelValue(int x, int y) const;
 
@@ -73,6 +83,7 @@ private:
     void updateDisplayData();
     void calculateDownsampleFactors();
     QImage downsampleImage(const QImage &source, int factorX, int factorY);
+    void resetZoomToFit();
 
     QCustomPlot *m_plot;
     QCPColorMap *m_colorMap;
@@ -82,6 +93,7 @@ private:
     bool m_imageValid;
     ColorScaleMode m_colorScaleMode = ColorScaleMode::Auto;
     bool m_axesVisible = false;
+    InteractionMode m_interactionMode = InteractionMode::Zoom;
 
     QImage m_originalImage;
     QImage m_displayImage;
@@ -95,6 +107,9 @@ private:
 
     QTimer *m_resizeTimer;
     QSize m_lastViewportSize;
+
+    QRubberBand *m_rubberBand = nullptr;
+    QPoint m_rubberBandOrigin;
 };
 
 #endif // IMAGEVIEWWIDGET_H

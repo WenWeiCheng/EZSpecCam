@@ -13,8 +13,10 @@ ImageViewWidget::ImageViewWidget(QWidget *parent)
     , m_colorMap(nullptr)
     , m_imageValid(false)
     , m_resizeTimer(new QTimer(this))
+    , m_rubberBand(nullptr)
 {
     m_plot = new QCustomPlot(this);
+    m_rubberBand = new QRubberBand(QRubberBand::Rectangle, this);
 
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -177,6 +179,19 @@ void ImageViewWidget::setAxesVisible(bool visible)
     }
 
     m_plot->replot(QCustomPlot::rpQueuedReplot);
+}
+
+void ImageViewWidget::setInteractionMode(InteractionMode mode)
+{
+    if (m_interactionMode == mode) {
+        return;
+    }
+
+    m_interactionMode = mode;
+
+    if (m_rubberBand->isVisible()) {
+        m_rubberBand->hide();
+    }
 }
 
 QImage ImageViewWidget::image() const
@@ -391,11 +406,59 @@ bool ImageViewWidget::eventFilter(QObject *obj, QEvent *event)
 {
     if (obj == m_plot) {
         if (event->type() == QEvent::MouseButtonPress) {
-            mousePressEvent(static_cast<QMouseEvent *>(event));
-            return true;
+            auto *me = static_cast<QMouseEvent *>(event);
+            if (me->button() == Qt::LeftButton) {
+                QRect axisRect = m_plot->axisRect()->rect();
+                if (axisRect.contains(me->pos())) {
+                    if (m_interactionMode == InteractionMode::Zoom) {
+                        m_rubberBandOrigin = me->pos();
+                        m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, QSize()));
+                        m_rubberBand->show();
+                        return true;
+                    }
+                }
+                if (m_interactionMode == InteractionMode::Crosshair) {
+                    mousePressEvent(me);
+                }
+                return true;
+            } else if (me->button() == Qt::RightButton) {
+                if (m_interactionMode == InteractionMode::Zoom) {
+                    resetZoomToFit();
+                    return true;
+                }
+                if (m_interactionMode == InteractionMode::Crosshair) {
+                    mousePressEvent(me);
+                }
+                return true;
+            }
         } else if (event->type() == QEvent::MouseMove) {
-            mouseMoveEvent(static_cast<QMouseEvent *>(event));
+            auto *me = static_cast<QMouseEvent *>(event);
+            if (m_rubberBand->isVisible()) {
+                m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, me->pos()).normalized());
+                return true;
+            }
+            if (m_interactionMode == InteractionMode::Crosshair) {
+                mouseMoveEvent(me);
+            }
             return true;
+        } else if (event->type() == QEvent::MouseButtonRelease) {
+            auto *me = static_cast<QMouseEvent *>(event);
+            if (m_rubberBand->isVisible()) {
+                m_rubberBand->hide();
+                if (me->button() == Qt::LeftButton) {
+                    QRectF selectionRect = QRectF(m_rubberBandOrigin, me->pos()).normalized();
+                    double x1 = m_plot->xAxis->pixelToCoord(selectionRect.left());
+                    double x2 = m_plot->xAxis->pixelToCoord(selectionRect.right());
+                    double y1 = m_plot->yAxis->pixelToCoord(selectionRect.top());
+                    double y2 = m_plot->yAxis->pixelToCoord(selectionRect.bottom());
+                    if (qAbs(x2 - x1) > 0 && qAbs(y2 - y1) > 0) {
+                        m_plot->xAxis->setRange(x1, x2);
+                        m_plot->yAxis->setRange(y1, y2);
+                        m_plot->replot(QCustomPlot::rpQueuedReplot);
+                    }
+                }
+                return true;
+            }
         } else if (event->type() == QEvent::Leave) {
             leaveEvent(event);
             return true;
@@ -528,4 +591,15 @@ void ImageViewWidget::setDownsamplingEnabled(bool enabled)
     if (m_imageValid && !m_originalImage.isNull()) {
         updateDisplayData();
     }
+}
+
+void ImageViewWidget::resetZoomToFit()
+{
+    if (!m_imageValid || m_originalImage.isNull()) {
+        return;
+    }
+
+    m_plot->xAxis->setRange(0, m_originalImage.width());
+    m_plot->yAxis->setRange(0, m_originalImage.height());
+    m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
