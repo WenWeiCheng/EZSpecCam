@@ -55,6 +55,10 @@ public:
 
     QAction *menuActionShowAxes;
 
+    QAction *menuActionImageInteraction;
+    QAction *menuActionImageInteractionCrosshair;
+    QAction *menuActionImageInteractionZoom;
+
     QAction *menuActionStatistics;
     QAction *menuActionPostProcess;
     QAction *menuActionVerticalBinning;
