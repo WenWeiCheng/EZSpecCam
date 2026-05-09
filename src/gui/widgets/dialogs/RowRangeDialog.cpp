@@ -14,13 +14,13 @@ RowRangeDialog::RowRangeDialog(QWidget *parent)
     QFormLayout *formLayout = new QFormLayout(this);
 
     m_startSpinBox = new QSpinBox(this);
-    m_startSpinBox->setMinimum(0);
-    m_startSpinBox->setValue(0);
+    m_startSpinBox->setMinimum(1);
+    m_startSpinBox->setValue(1);
     formLayout->addRow("Start Row:", m_startSpinBox);
 
     m_endSpinBox = new QSpinBox(this);
-    m_endSpinBox->setMinimum(0);
-    m_endSpinBox->setValue(0);
+    m_endSpinBox->setMinimum(1);
+    m_endSpinBox->setValue(1);
     formLayout->addRow("End Row:", m_endSpinBox);
 
     QHBoxLayout *buttonLayout = new QHBoxLayout();
@@ -46,21 +46,21 @@ RowRangeDialog::~RowRangeDialog()
 void RowRangeDialog::setImageHeight(int height)
 {
     m_imageHeight = height;
-    int maxRow = qMax(0, height - 1);
 
-    m_startSpinBox->setMaximum(maxRow);
-    m_endSpinBox->setMaximum(maxRow);
+    m_startSpinBox->setMinimum(1);
+    m_startSpinBox->setMaximum(height);
+    m_endSpinBox->setMinimum(1);
+    m_endSpinBox->setMaximum(height);
 
     if (height > 0) {
-        m_endSpinBox->setValue(maxRow);
+        m_endSpinBox->setValue(height);
     }
 }
 
 void RowRangeDialog::setRange(int start, int end)
 {
-    int maxRow = qMax(0, m_imageHeight - 1);
-    m_startSpinBox->setValue(qBound(0, start, maxRow));
-    m_endSpinBox->setValue(qBound(0, end, maxRow));
+    m_startSpinBox->setValue(qBound(1, start + 1, m_imageHeight));
+    m_endSpinBox->setValue(qBound(1, end + 1, m_imageHeight));
 }
 
 int RowRangeDialog::startRow() const
