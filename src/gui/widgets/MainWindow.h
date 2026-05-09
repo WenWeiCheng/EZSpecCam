@@ -53,8 +53,6 @@ private slots:
     void on_spectrumRangeCustom_triggered();
 
     void on_showAxes_triggered(bool checked);
-    void on_imageInteractionCrosshair_triggered();
-    void on_imageInteractionZoom_triggered();
     void on_statistics_triggered();
     void on_verticalBinning_triggered();
     void on_rowRange_triggered();

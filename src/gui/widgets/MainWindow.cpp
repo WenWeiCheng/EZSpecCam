@@ -222,11 +222,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->menuActionShowAxes, &QAction::toggled,
             this, &MainWindow::on_showAxes_triggered);
 
-    connect(ui->menuActionImageInteractionCrosshair, &QAction::triggered,
-            this, &MainWindow::on_imageInteractionCrosshair_triggered);
-    connect(ui->menuActionImageInteractionZoom, &QAction::triggered,
-            this, &MainWindow::on_imageInteractionZoom_triggered);
-
     connect(ui->menuActionStatistics, &QAction::triggered,
             this, &MainWindow::on_statistics_triggered);
 
@@ -541,24 +536,6 @@ void MainWindow::on_showAxes_triggered(bool checked)
 {
     if (m_imageViewWidget) {
         m_imageViewWidget->setAxesVisible(checked);
-    }
-}
-
-void MainWindow::on_imageInteractionCrosshair_triggered()
-{
-    if (m_imageViewWidget) {
-        m_imageViewWidget->setInteractionMode(ImageViewWidget::InteractionMode::Crosshair);
-        ui->menuActionImageInteractionCrosshair->setChecked(true);
-        ui->menuActionImageInteractionZoom->setChecked(false);
-    }
-}
-
-void MainWindow::on_imageInteractionZoom_triggered()
-{
-    if (m_imageViewWidget) {
-        m_imageViewWidget->setInteractionMode(ImageViewWidget::InteractionMode::Zoom);
-        ui->menuActionImageInteractionCrosshair->setChecked(false);
-        ui->menuActionImageInteractionZoom->setChecked(true);
     }
 }
 
