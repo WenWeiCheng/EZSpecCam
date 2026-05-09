@@ -689,6 +689,19 @@ QVector<double> ImageViewWidget::extractRowAsVector(int y) const
     return data;
 }
 
+void ImageViewWidget::resetZoomToFit()
+{
+    if (!m_imageValid || m_originalImage.isNull()) {
+        return;
+    }
+
+    m_plot->xAxis->setRange(0, m_originalImage.width());
+    m_plot->yAxis->setRange(0, m_originalImage.height());
+    m_plot->replot(QCustomPlot::rpQueuedReplot);
+    updatePlotGeometry();
+    m_userHasZoomed = false;
+}
+
 QVector<double> ImageViewWidget::extractColumnAsVector(int x) const
 {
     QVector<double> data;
