@@ -7,6 +7,7 @@
 #include <QMouseEvent>
 #include <QShowEvent>
 #include <QString>
+#include <QRubberBand>
 
 #include "../../qcustomplot.h"
 
@@ -72,6 +73,7 @@ private:
     double widgetToDataX(int widgetX) const;
     QVector<double> extractRowData(const QImage &image) const;
     void applyXAxisRange();
+    void resetZoomToFit();
 
     QCustomPlot *m_plot;
     QCPGraph *m_graph;
@@ -85,6 +87,9 @@ private:
     XAxisRangeMode m_xAxisRangeMode = XAxisRangeMode::Auto;
     double m_customXMin = 0;
     double m_customXMax = 100;
+
+    QRubberBand *m_rubberBand = nullptr;
+    QPoint m_rubberBandOrigin;
 };
 
 #endif // SPECTRUMVIEWWIDGET_H

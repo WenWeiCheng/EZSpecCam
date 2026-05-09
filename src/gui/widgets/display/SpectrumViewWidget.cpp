@@ -3,6 +3,8 @@
 #include <QVBoxLayout>
 #include <QMouseEvent>
 #include <QDebug>
+#include <algorithm>
+#include <limits>
 #include "../../qcustomplot.h"
 
 SpectrumViewWidget::SpectrumViewWidget(QWidget *parent)
@@ -14,8 +16,10 @@ SpectrumViewWidget::SpectrumViewWidget(QWidget *parent)
     , m_dataValid(false)
     , m_xAxisLabel("X (pixels)")
     , m_yAxisLabel("Intensity")
+    , m_rubberBand(nullptr)
 {
     m_plot = new QCustomPlot(this);
+    m_rubberBand = new QRubberBand(QRubberBand::Rectangle, this);
 
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -294,9 +298,46 @@ void SpectrumViewWidget::showEvent(QShowEvent *event)
 bool SpectrumViewWidget::eventFilter(QObject *obj, QEvent *event)
 {
     if (obj == m_plot) {
-        if (event->type() == QEvent::MouseMove) {
-            mouseMoveEvent(static_cast<QMouseEvent *>(event));
+        if (event->type() == QEvent::MouseButtonPress) {
+            auto *me = static_cast<QMouseEvent *>(event);
+            if (me->button() == Qt::LeftButton) {
+                QRect axisRect = m_plot->axisRect()->rect();
+                if (axisRect.contains(me->pos())) {
+                    m_rubberBandOrigin = me->pos();
+                    m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, QSize()));
+                    m_rubberBand->show();
+                    return true;
+                }
+            } else if (me->button() == Qt::RightButton) {
+                resetZoomToFit();
+                return true;
+            }
+        } else if (event->type() == QEvent::MouseMove) {
+            auto *me = static_cast<QMouseEvent *>(event);
+            if (m_rubberBand->isVisible()) {
+                m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, me->pos()).normalized());
+                return true;
+            }
+            mouseMoveEvent(me);
             return true;
+        } else if (event->type() == QEvent::MouseButtonRelease) {
+            auto *me = static_cast<QMouseEvent *>(event);
+            if (m_rubberBand->isVisible()) {
+                m_rubberBand->hide();
+                if (me->button() == Qt::LeftButton) {
+                    QRectF selectionRect = QRectF(m_rubberBandOrigin, me->pos()).normalized();
+                    double x1 = m_plot->xAxis->pixelToCoord(selectionRect.left());
+                    double x2 = m_plot->xAxis->pixelToCoord(selectionRect.right());
+                    double y1 = m_plot->yAxis->pixelToCoord(selectionRect.top());
+                    double y2 = m_plot->yAxis->pixelToCoord(selectionRect.bottom());
+                    if (qAbs(x2 - x1) > 0 && qAbs(y2 - y1) > 0) {
+                        m_plot->xAxis->setRange(x1, x2);
+                        m_plot->yAxis->setRange(y1, y2);
+                        m_plot->replot(QCustomPlot::rpQueuedReplot);
+                    }
+                }
+                return true;
+            }
         } else if (event->type() == QEvent::Leave) {
             leaveEvent(event);
             return true;
@@ -382,4 +423,14 @@ QVector<double> SpectrumViewWidget::extractRowData(const QImage &image) const
     }
 
     return data;
+}
+
+void SpectrumViewWidget::resetZoomToFit()
+{
+    if (!m_dataValid || m_xData.isEmpty()) {
+        return;
+    }
+
+    applyXAxisRange();
+    m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
