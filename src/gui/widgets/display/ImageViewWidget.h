@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QImage>
 #include <QMouseEvent>
+#include <QShowEvent>
 #include <QList>
 #include <QPair>
 #include <QPointF>
@@ -70,6 +71,7 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
     void leaveEvent(QEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
+    void showEvent(QShowEvent *event) override;
     bool eventFilter(QObject *obj, QEvent *event) override;
 
 private slots:
@@ -84,6 +86,7 @@ private:
     void calculateDownsampleFactors();
     QImage downsampleImage(const QImage &source, int factorX, int factorY);
     void resetZoomToFit();
+    void updatePlotGeometry();
 
     QCustomPlot *m_plot;
     QCPColorMap *m_colorMap;
@@ -110,6 +113,7 @@ private:
 
     QRubberBand *m_rubberBand = nullptr;
     QPoint m_rubberBandOrigin;
+    bool m_userHasZoomed = false;
 };
 
 #endif // IMAGEVIEWWIDGET_H

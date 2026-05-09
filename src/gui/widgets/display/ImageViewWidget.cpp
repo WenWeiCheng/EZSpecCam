@@ -16,12 +16,9 @@ ImageViewWidget::ImageViewWidget(QWidget *parent)
     , m_rubberBand(nullptr)
 {
     m_plot = new QCustomPlot(this);
-    m_rubberBand = new QRubberBand(QRubberBand::Rectangle, this);
+    m_rubberBand = new QRubberBand(QRubberBand::Rectangle, m_plot);
 
-    QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->addWidget(m_plot);
-
+    m_plot->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
     m_plot->installEventFilter(this);
 
     connect(m_resizeTimer, &QTimer::timeout, this, &ImageViewWidget::onResizeTimeout);
@@ -36,11 +33,6 @@ void ImageViewWidget::setupPlot()
     m_colorMap = new QCPColorMap(m_plot->xAxis, m_plot->yAxis);
     m_colorMap->setInterpolate(false);
     m_colorMap->setTightBoundary(false);
-
-    QCPColorScale *colorScale = new QCPColorScale(m_plot);
-    m_plot->plotLayout()->addElement(0, 1, colorScale);
-    m_colorMap->setColorScale(colorScale);
-    colorScale->setLabel("Intensity");
 
     QCPColorGradient gradient;
     gradient.setLevelCount(256);
@@ -58,11 +50,6 @@ void ImageViewWidget::setupPlot()
     m_plot->setInteractions(QCP::iSelectItems | QCP::iSelectPlottables);
     m_plot->setMouseTracking(true);
     m_plot->axisRect()->setAutoMargins(QCP::msNone);
-    if (m_axesVisible) {
-        m_plot->axisRect()->setMargins(QMargins(80, 20, 20, 50));
-    } else {
-        m_plot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
-    }
 
     // m_plot->setOpenGl(true);
     m_plot->setNoAntialiasingOnDrag(true);
@@ -88,6 +75,8 @@ void ImageViewWidget::setImage(const QImage &image)
     m_displayImage = QImage();
 
     updateDisplayData();
+
+    updatePlotGeometry();
 }
 
 void ImageViewWidget::updateColorMap(const QImage &image)
@@ -128,9 +117,11 @@ void ImageViewWidget::updateColorMap(const QImage &image)
     m_colorMap->rescaleDataRange();
     applyColorScaleMode();
 
-    m_plot->xAxis->setRange(0, origWidth);
-    m_plot->yAxis->setRange(0, origHeight);
-    m_plot->replot(QCustomPlot::rpQueuedReplot);
+    if (!m_userHasZoomed) {
+        m_plot->xAxis->setRange(0, origWidth);
+        m_plot->yAxis->setRange(0, origHeight);
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
+    }
 }
 
 void ImageViewWidget::applyColorScaleMode()
@@ -271,6 +262,12 @@ void ImageViewWidget::mousePressEvent(QMouseEvent *event)
         return;
     }
 
+    // Only process crosshair if click is within m_plot bounds
+    if (!m_plot->geometry().contains(event->pos())) {
+        QWidget::mousePressEvent(event);
+        return;
+    }
+
     QPointF imageCoords = widgetToImageCoords(event->pos().x(), event->pos().y());
     int x = static_cast<int>(imageCoords.x());
     int y = static_cast<int>(imageCoords.y());
@@ -380,20 +377,85 @@ void ImageViewWidget::leaveEvent(QEvent *event)
 void ImageViewWidget::resizeEvent(QResizeEvent *event)
 {
     if (m_plot) {
-        m_plot->resize(size());
+        QTimer::singleShot(0, this, [this]() {
+            updatePlotGeometry();
+        });
     }
 
-    if (m_resizeTimer->isActive()) {
-        m_resizeTimer->stop();
+    if (event) {
+        if (m_resizeTimer->isActive()) {
+            m_resizeTimer->stop();
+        }
+        m_resizeTimer->setSingleShot(true);
+        m_resizeTimer->start(100);
     }
-    m_resizeTimer->setSingleShot(true);
-    m_resizeTimer->start(100);
 
     QWidget::resizeEvent(event);
 }
 
+void ImageViewWidget::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    QTimer::singleShot(0, this, [this]() {
+        updatePlotGeometry();
+        update();
+        m_plot->replot();
+        qApp->processEvents();
+        updateDisplayData();
+    });
+    m_resizeTimer->start(50);
+}
+
+void ImageViewWidget::updatePlotGeometry()
+{
+    if (!m_plot) {
+        return;
+    }
+
+    QSize availableSize = size();
+    if (availableSize.width() <= 0 || availableSize.height() <= 0) {
+        return;
+    }
+
+    int margin = 5;
+
+    double xRange = m_plot->xAxis->range().upper - m_plot->xAxis->range().lower;
+    double yRange = m_plot->yAxis->range().upper - m_plot->yAxis->range().lower;
+    double currentAspect = (yRange > 0) ? (xRange / yRange) : 1.0;
+
+    int availWidth = availableSize.width() - margin * 2;
+    int availHeight = availableSize.height() - margin * 2;
+
+    int plotWidth, plotHeight;
+    if (currentAspect > static_cast<double>(availWidth) / availHeight) {
+        plotWidth = availWidth;
+        plotHeight = static_cast<int>(availWidth / currentAspect);
+    } else {
+        plotHeight = availHeight;
+        plotWidth = static_cast<int>(availHeight * currentAspect);
+    }
+
+    if (plotWidth <= 0) plotWidth = 1;
+    if (plotHeight <= 0) plotHeight = 1;
+
+    int totalWidth = plotWidth + margin * 2;
+    int totalHeight = plotHeight + margin * 2;
+
+    int x = (availableSize.width() - totalWidth) / 2;
+    int y = (availableSize.height() - totalHeight) / 2;
+    m_plot->setGeometry(x, y, totalWidth, totalHeight);
+
+    m_plot->axisRect()->setMargins(QMargins(margin, margin, margin, margin));
+    m_plot->axisRect()->setMinimumSize(plotWidth, plotHeight);
+    m_plot->axisRect()->setMaximumSize(plotWidth, plotHeight);
+}
+
 void ImageViewWidget::onResizeTimeout()
 {
+    updatePlotGeometry();
+    update();
+    m_plot->replot();
+    qApp->processEvents();
     QSize currentSize = QSize(m_plot->axisRect()->width(), m_plot->axisRect()->height());
 
     if (currentSize != m_lastViewportSize) {
@@ -409,24 +471,18 @@ bool ImageViewWidget::eventFilter(QObject *obj, QEvent *event)
             auto *me = static_cast<QMouseEvent *>(event);
             if (me->button() == Qt::LeftButton) {
                 QRect axisRect = m_plot->axisRect()->rect();
-                if (axisRect.contains(me->pos())) {
-                    if (m_interactionMode == InteractionMode::Zoom) {
-                        m_rubberBandOrigin = me->pos();
-                        m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, QSize()));
-                        m_rubberBand->show();
-                        return true;
-                    }
-                }
-                if (m_interactionMode == InteractionMode::Crosshair) {
+                if (axisRect.contains(me->pos()) && m_interactionMode == InteractionMode::Zoom) {
+                    m_rubberBandOrigin = me->pos();
+                    m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, QSize()));
+                    m_rubberBand->show();
+                } else if (m_interactionMode == InteractionMode::Crosshair) {
                     mousePressEvent(me);
                 }
                 return true;
             } else if (me->button() == Qt::RightButton) {
                 if (m_interactionMode == InteractionMode::Zoom) {
                     resetZoomToFit();
-                    return true;
-                }
-                if (m_interactionMode == InteractionMode::Crosshair) {
+                } else if (m_interactionMode == InteractionMode::Crosshair) {
                     mousePressEvent(me);
                 }
                 return true;
@@ -446,15 +502,20 @@ bool ImageViewWidget::eventFilter(QObject *obj, QEvent *event)
             if (m_rubberBand->isVisible()) {
                 m_rubberBand->hide();
                 if (me->button() == Qt::LeftButton) {
-                    QRectF selectionRect = QRectF(m_rubberBandOrigin, me->pos()).normalized();
-                    double x1 = m_plot->xAxis->pixelToCoord(selectionRect.left());
-                    double x2 = m_plot->xAxis->pixelToCoord(selectionRect.right());
-                    double y1 = m_plot->yAxis->pixelToCoord(selectionRect.top());
-                    double y2 = m_plot->yAxis->pixelToCoord(selectionRect.bottom());
-                    if (qAbs(x2 - x1) > 0 && qAbs(y2 - y1) > 0) {
-                        m_plot->xAxis->setRange(x1, x2);
-                        m_plot->yAxis->setRange(y1, y2);
-                        m_plot->replot(QCustomPlot::rpQueuedReplot);
+                    if (m_imageValid && !m_originalImage.isNull()) {
+                        QRectF selectionRect = QRectF(m_rubberBandOrigin, me->pos()).normalized();
+
+                        double x1 = m_plot->xAxis->pixelToCoord(selectionRect.left());
+                        double x2 = m_plot->xAxis->pixelToCoord(selectionRect.right());
+                        double y1 = m_plot->yAxis->pixelToCoord(selectionRect.bottom());
+                        double y2 = m_plot->yAxis->pixelToCoord(selectionRect.top());
+                        if (qAbs(x2 - x1) > 0 && qAbs(y2 - y1) > 0) {
+                            m_plot->xAxis->setRange(x1, x2);
+                            m_plot->yAxis->setRange(y1, y2);
+                            m_plot->replot(QCustomPlot::rpQueuedReplot);
+                            updatePlotGeometry();
+                            m_userHasZoomed = true;
+                        }
                     }
                 }
                 return true;
@@ -602,4 +663,6 @@ void ImageViewWidget::resetZoomToFit()
     m_plot->xAxis->setRange(0, m_originalImage.width());
     m_plot->yAxis->setRange(0, m_originalImage.height());
     m_plot->replot(QCustomPlot::rpQueuedReplot);
+    updatePlotGeometry();
+    m_userHasZoomed = false;
 }
