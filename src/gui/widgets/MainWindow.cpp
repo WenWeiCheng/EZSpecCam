@@ -242,6 +242,12 @@ void MainWindow::on_actionSaveFrameAs_triggered()
         return;
     }
 
+    if (!m_currentFrame.image.save(filePath)) {
+        QMessageBox::critical(this, tr("Save Error"),
+            tr("Failed to save frame to:\n%1").arg(filePath));
+        return;
+    }
+
     showStatusMessage(tr("Frame saved: %1").arg(filePath), 3000);
 }
 
@@ -253,8 +259,26 @@ void MainWindow::on_actionSaveFrameAutoNumber_triggered()
         return;
     }
 
-    QString fileName = QString("img_%1.tiff").arg(0, 12, 10, QChar('0'));
-    showStatusMessage(tr("Frame saved: %1").arg(fileName), 3000);
+    QSettings settings;
+    QString saveDir = settings.value("data/autoSaveDirectory", "").toString();
+
+    if (saveDir.isEmpty()) {
+        QMessageBox::warning(this, tr("No Save Directory"),
+            tr("Please set an auto-save directory first."));
+        return;
+    }
+
+    QDateTime now = QDateTime::currentDateTime();
+    QString fileName = QString("img_%1.tiff").arg(now.toString("yyyyMMdd_hhmmss_zzz"));
+    QString filePath = saveDir + "/" + fileName;
+
+    if (!m_currentFrame.image.save(filePath)) {
+        QMessageBox::critical(this, tr("Save Error"),
+            tr("Failed to save frame to:\n%1").arg(filePath));
+        return;
+    }
+
+    showStatusMessage(tr("Frame saved: %1").arg(filePath), 3000);
 }
 
 void MainWindow::on_actionAutoSaveToggle_triggered(bool checked)
