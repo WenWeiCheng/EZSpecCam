@@ -77,6 +77,27 @@
                 "CMAKE_PREFIX_PATH": "$env{QT_DIR}",
                 "CMAKE_POLICY_VERSION_MINIMUM": "3.20"
             }
+        },
+        {
+            "name": "msvc-debug-gui",
+            "displayName": "MSVC Debug GUI",
+            "description": "Visual Studio 2022 with MSVC compiler, Debug configuration, GUI only",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/msvc-debug-gui",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_COMPILER": "cl",
+                "CMAKE_C_COMPILER": "cl",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_PREFIX_PATH": "C:/Qt/6.8.2/msvc2022_64;C:/Users/weichen/vcpkg/installed/x64-windows",
+                "Exiv2_DIR": "C:/Users/weichen/vcpkg/installed/x64-windows/share/exiv2",
+                "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDebugDLL",
+                "CMAKE_POLICY_VERSION_MINIMUM": "3.20",
+                "EZSPECCAM_BUILD_GUI": "ON",
+                "EZSPECCAM_BUILD_CLI": "OFF",
+                "EZSPECCAM_BUILD_PLUGINS": "ON",
+                "EZSPECCAM_BUILD_TESTS": "OFF"
+            }
         }
     ],
     "buildPresets": [
@@ -117,6 +138,12 @@
             "description": "Build and install GCC Release configuration",
             "configuration": "Release",
             "targets": ["install"]
+        },
+        {
+            "name": "msvc-debug-gui",
+            "configurePreset": "msvc-debug-gui",
+            "description": "Build MSVC Debug GUI configuration",
+            "configuration": "Debug"
         }
     ],
     "testPresets": [
