@@ -5,6 +5,7 @@
 #include "display/SpectrumViewWidget.h"
 #include "CameraTypes.h"
 #include "display/StatisticsDialog.h"
+#include "display/ProfileWindow.h"
 #include "dialogs/RowRangeDialog.h"
 #include "dialogs/CustomRangeDialog.h"
 #include "config/CameraConfigDialog.h"
@@ -179,6 +180,9 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::on_verticalBinning_triggered);
     connect(ui->menuActionRowRange, &QAction::triggered,
             this, &MainWindow::on_rowRange_triggered);
+
+    connect(ui->menuActionProfile, &QAction::triggered,
+            this, &MainWindow::on_profile_triggered);
 
     connect(ui->toolbarActionConfig, &QAction::triggered,
             this, &MainWindow::on_actionConfig_triggered);
@@ -655,6 +659,41 @@ void MainWindow::onCrosshairMoved(const QPointF &position, int value)
                             .arg(static_cast<int>(position.x()))
                             .arg(static_cast<int>(position.y()))
                             .arg(value));
+
+    if (m_profileWindow && m_imageViewWidget->hasImage()) {
+        int x = static_cast<int>(position.x());
+        int y = static_cast<int>(position.y());
+        QVector<double> rowData = m_imageViewWidget->extractRowAsVector(y);
+        QVector<double> colData = m_imageViewWidget->extractColumnAsVector(x);
+        m_profileWindow->updateProfile(x, y, rowData, colData);
+    }
+}
+
+void MainWindow::on_profile_triggered()
+{
+    if (!m_profileWindow) {
+        m_profileWindow = new ProfileWindow(this);
+        m_profileWindow->setAttribute(Qt::WA_DeleteOnClose);
+    }
+
+    if (m_imageViewWidget->hasImage()) {
+        QImage img = m_imageViewWidget->image();
+        m_profileWindow->setImageSize(img.width(), img.height());
+    }
+
+    m_profileWindow->show();
+
+    if (m_imageViewWidget->crosshairCount() > 0) {
+        QList<QPointF> positions = m_imageViewWidget->crosshairPositions();
+        if (!positions.isEmpty()) {
+            QPointF pos = positions.first();
+            int x = static_cast<int>(pos.x());
+            int y = static_cast<int>(pos.y());
+            QVector<double> rowData = m_imageViewWidget->extractRowAsVector(y);
+            QVector<double> colData = m_imageViewWidget->extractColumnAsVector(x);
+            m_profileWindow->updateProfile(x, y, rowData, colData);
+        }
+    }
 }
 
 void MainWindow::onLiveModeTriggered()

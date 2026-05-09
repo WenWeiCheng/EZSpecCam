@@ -48,6 +48,9 @@ public:
 
     int pixelValue(int x, int y) const;
 
+    QVector<double> extractRowAsVector(int y) const;
+    QVector<double> extractColumnAsVector(int x) const;
+
 signals:
     void crosshairAdded(const QPointF &position);
     void crosshairMoved(const QPointF &position, int value);

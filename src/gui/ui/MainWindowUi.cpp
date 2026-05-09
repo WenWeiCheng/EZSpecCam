@@ -39,6 +39,7 @@ MainWindowUi::MainWindowUi(QObject *parent)
     , menuActionSpectrumRangeZoomCenter(nullptr)
     , menuActionSpectrumRangeCustom(nullptr)
     , menuActionShowAxes(nullptr)
+    , menuActionProfile(nullptr)
     , menuActionStatistics(nullptr)
     , menuActionPostProcess(nullptr)
     , menuActionVerticalBinning(nullptr)
@@ -162,6 +163,11 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     menuActionShowAxes->setCheckable(true);
     menuActionShowAxes->setChecked(false);
     menuView->addAction(menuActionShowAxes);
+
+    menuActionProfile = new QAction("&Profile", mainWindow);
+    menuActionProfile->setShortcut(QKeySequence(Qt::Key_P));
+    menuActionProfile->setShortcutContext(Qt::ApplicationShortcut);
+    menuView->addAction(menuActionProfile);
 
     QMenu *menuPostProcess = menuBar->addMenu("&Post-Process");
     menuActionVerticalBinning = new QAction("Software Vertical Binning", mainWindow);
