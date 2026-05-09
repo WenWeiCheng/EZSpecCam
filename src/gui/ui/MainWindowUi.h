@@ -54,6 +54,7 @@ public:
     QAction *menuActionSpectrumRangeCustom;
 
     QAction *menuActionShowAxes;
+    QAction *menuActionProfile;
 
     QAction *menuActionImageInteraction;
     QAction *menuActionImageInteractionCrosshair;

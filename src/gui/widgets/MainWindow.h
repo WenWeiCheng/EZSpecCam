@@ -14,6 +14,7 @@ class CameraTab;
 class CameraConfigDialog;
 class ImageViewWidget;
 class SpectrumViewWidget;
+class ProfileWindow;
 struct ImageData;
 
 class MainWindow : public QMainWindow
@@ -57,6 +58,7 @@ private slots:
     void on_statistics_triggered();
     void on_verticalBinning_triggered();
     void on_rowRange_triggered();
+    void on_profile_triggered();
 
     void onCameraStateChanged(CameraState newState);
     void onCameraFrameReady(const ImageData &frame);
@@ -95,6 +97,7 @@ private:
     ImageViewWidget *m_imageViewWidget;
     SpectrumViewWidget *m_spectrumViewWidget;
     CameraConfigDialog *m_configDialog = nullptr;
+    ProfileWindow *m_profileWindow = nullptr;
 
     int m_frameCount = 0;
     int m_autoSaveFrameCounter = 0;

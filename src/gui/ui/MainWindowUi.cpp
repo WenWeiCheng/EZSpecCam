@@ -39,9 +39,7 @@ MainWindowUi::MainWindowUi(QObject *parent)
     , menuActionSpectrumRangeZoomCenter(nullptr)
     , menuActionSpectrumRangeCustom(nullptr)
     , menuActionShowAxes(nullptr)
-    , menuActionImageInteraction(nullptr)
-    , menuActionImageInteractionCrosshair(nullptr)
-    , menuActionImageInteractionZoom(nullptr)
+    , menuActionProfile(nullptr)
     , menuActionStatistics(nullptr)
     , menuActionPostProcess(nullptr)
     , menuActionVerticalBinning(nullptr)
@@ -166,20 +164,10 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     menuActionShowAxes->setChecked(false);
     menuView->addAction(menuActionShowAxes);
 
-    menuActionImageInteraction = new QAction("&Image Interaction", mainWindow);
-    QMenu *subMenuImageInteraction = new QMenu(mainWindow);
-
-    menuActionImageInteractionCrosshair = new QAction("&Crosshair", mainWindow);
-    menuActionImageInteractionCrosshair->setCheckable(true);
-    subMenuImageInteraction->addAction(menuActionImageInteractionCrosshair);
-
-    menuActionImageInteractionZoom = new QAction("&Zoom", mainWindow);
-    menuActionImageInteractionZoom->setCheckable(true);
-    menuActionImageInteractionZoom->setChecked(true);
-    subMenuImageInteraction->addAction(menuActionImageInteractionZoom);
-
-    menuActionImageInteraction->setMenu(subMenuImageInteraction);
-    menuView->addAction(menuActionImageInteraction);
+    menuActionProfile = new QAction("&Profile", mainWindow);
+    menuActionProfile->setShortcut(QKeySequence(Qt::Key_P));
+    menuActionProfile->setShortcutContext(Qt::ApplicationShortcut);
+    menuView->addAction(menuActionProfile);
 
     QMenu *menuPostProcess = menuBar->addMenu("&Post-Process");
     menuActionVerticalBinning = new QAction("Software Vertical Binning", mainWindow);

@@ -654,15 +654,72 @@ void ImageViewWidget::setDownsamplingEnabled(bool enabled)
     }
 }
 
-void ImageViewWidget::resetZoomToFit()
+QVector<double> ImageViewWidget::extractRowAsVector(int y) const
 {
+    QVector<double> data;
     if (!m_imageValid || m_originalImage.isNull()) {
-        return;
+        return data;
     }
 
-    m_plot->xAxis->setRange(0, m_originalImage.width());
-    m_plot->yAxis->setRange(0, m_originalImage.height());
-    m_plot->replot(QCustomPlot::rpQueuedReplot);
-    updatePlotGeometry();
-    m_userHasZoomed = false;
+    if (y < 0 || y >= m_originalImage.height()) {
+        return data;
+    }
+
+    int width = m_originalImage.width();
+    data.reserve(width);
+
+    if (m_originalImage.format() == QImage::Format_Grayscale16) {
+        const uchar *bits = m_originalImage.constBits();
+        const ushort *gray16 = reinterpret_cast<const ushort *>(bits + y * m_originalImage.bytesPerLine());
+        for (int x = 0; x < width; ++x) {
+            data.append(static_cast<double>(gray16[x]));
+        }
+    } else if (m_originalImage.format() == QImage::Format_Grayscale8) {
+        const uchar *gray8 = m_originalImage.constBits() + y * m_originalImage.bytesPerLine();
+        for (int x = 0; x < width; ++x) {
+            data.append(static_cast<double>(gray8[x]));
+        }
+    } else {
+        for (int x = 0; x < width; ++x) {
+            QRgb pixel = m_originalImage.pixel(x, y);
+            data.append(static_cast<double>(qGray(pixel)));
+        }
+    }
+
+    return data;
+}
+
+QVector<double> ImageViewWidget::extractColumnAsVector(int x) const
+{
+    QVector<double> data;
+    if (!m_imageValid || m_originalImage.isNull()) {
+        return data;
+    }
+
+    if (x < 0 || x >= m_originalImage.width()) {
+        return data;
+    }
+
+    int height = m_originalImage.height();
+    data.reserve(height);
+
+    if (m_originalImage.format() == QImage::Format_Grayscale16) {
+        const uchar *bits = m_originalImage.constBits();
+        const ushort *gray16 = reinterpret_cast<const ushort *>(bits);
+        for (int y = 0; y < height; ++y) {
+            data.append(static_cast<double>(gray16[y * m_originalImage.bytesPerLine() / 2 + x]));
+        }
+    } else if (m_originalImage.format() == QImage::Format_Grayscale8) {
+        const uchar *gray8 = m_originalImage.constBits();
+        for (int y = 0; y < height; ++y) {
+            data.append(static_cast<double>(gray8[y * m_originalImage.bytesPerLine() + x]));
+        }
+    } else {
+        for (int y = 0; y < height; ++y) {
+            QRgb pixel = m_originalImage.pixel(x, y);
+            data.append(static_cast<double>(qGray(pixel)));
+        }
+    }
+
+    return data;
 }
