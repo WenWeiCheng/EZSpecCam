@@ -5,8 +5,7 @@
 
 #include "CameraTypes.h"
 
-// FIXME: 这个测试类主要是为了 CameraTypes 中的 validate() 和 validateReason() 函数，没有 configuration manager 这个类——命名不妥当，包括测试文件名
-class TestConfigurationManager : public QObject
+class TestParameterValidation : public QObject
 {
     Q_OBJECT
 
@@ -29,24 +28,24 @@ private:
     QString m_testCameraId;
 };
 
-void TestConfigurationManager::initTestCase()
+void TestParameterValidation::initTestCase()
 {
     m_testCameraId = "test-camera-001";
 }
 
-void TestConfigurationManager::cleanupTestCase()
+void TestParameterValidation::cleanupTestCase()
 {
 }
 
-void TestConfigurationManager::init()
+void TestParameterValidation::init()
 {
 }
 
-void TestConfigurationManager::cleanup()
+void TestParameterValidation::cleanup()
 {
 }
 
-void TestConfigurationManager::testValidateFloatRange()
+void TestParameterValidation::testValidateFloatRange()
 {
     ParameterConstraint constraint;
     constraint.minValue = 0.0;
@@ -64,7 +63,7 @@ void TestConfigurationManager::testValidateFloatRange()
              "Value above range should be invalid");
 }
 
-void TestConfigurationManager::testValidateIntRange()
+void TestParameterValidation::testValidateIntRange()
 {
     ParameterConstraint constraint;
     constraint.minValue = 0;
@@ -82,7 +81,7 @@ void TestConfigurationManager::testValidateIntRange()
              "Value above range should be invalid");
 }
 
-void TestConfigurationManager::testValidateFloatCollection()
+void TestParameterValidation::testValidateFloatCollection()
 {
     ParameterConstraint constraint;
     constraint.validValues = {1.0, 2.0, 4.0, 8.0};
@@ -93,7 +92,7 @@ void TestConfigurationManager::testValidateFloatCollection()
              "Value not in collection should be invalid");
 }
 
-void TestConfigurationManager::testValidateIntCollection()
+void TestParameterValidation::testValidateIntCollection()
 {
     ParameterConstraint constraint;
     constraint.validValues = {1, 2, 4, 8};
@@ -104,7 +103,7 @@ void TestConfigurationManager::testValidateIntCollection()
              "Value not in collection should be invalid");
 }
 
-void TestConfigurationManager::testValidateStringCollection()
+void TestParameterValidation::testValidateStringCollection()
 {
     ParameterConstraint constraint;
     constraint.validValues = {"mode1", "mode2", "mode3"};
@@ -115,7 +114,7 @@ void TestConfigurationManager::testValidateStringCollection()
              "Value not in collection should be invalid");
 }
 
-void TestConfigurationManager::testValidateBoolean()
+void TestParameterValidation::testValidateBoolean()
 {
     ParameterConstraint constraint;
 
@@ -127,7 +126,7 @@ void TestConfigurationManager::testValidateBoolean()
              "Integer 1 should be convertible to boolean");
 }
 
-void TestConfigurationManager::testValidateReason()
+void TestParameterValidation::testValidateReason()
 {
     ParameterConstraint constraint;
     constraint.minValue = 0.0;
@@ -145,5 +144,5 @@ void TestConfigurationManager::testValidateReason()
     QVERIFY2(reason.isEmpty(), "Valid value should return empty reason");
 }
 
-QTEST_MAIN(TestConfigurationManager)
+QTEST_MAIN(TestParameterValidation)
 #include "test_configuration.moc"
