@@ -150,7 +150,7 @@ struct ParameterConstraint
     QStringList unit;
     QVector<double> unitRange;
 
-    bool hasUnitRange() const { return !unit.isEmpty() && unitRange.size() == unit.size() - 1; }
+    bool hasUnitRange() const { return !unit.isEmpty() && !unitRange.isEmpty() && unitRange.size() == unit.size() - 1; }
 
     int getUnitIndex(double rawValue) const
     {
@@ -164,8 +164,8 @@ struct ParameterConstraint
     double toDisplayValue(double rawValue, int unitIndex) const
     {
         if (unitIndex == 0 || unitRange.isEmpty()) return rawValue;
-        if (unitIndex > 0 && unitIndex <= unitRange.size()-1) {
-            return rawValue / unitRange[unitIndex];
+        if (unitIndex > 0 && unitIndex <= unitRange.size()) {
+            return rawValue / unitRange[unitIndex-1];
         }
         return rawValue;
     }
@@ -173,8 +173,8 @@ struct ParameterConstraint
     double toRawValue(double displayValue, int unitIndex) const
     {
         if (unitIndex == 0 || unitRange.isEmpty()) return displayValue;
-        if (unitIndex > 0 && unitIndex <= unitRange.size()-1) {
-            return displayValue * unitRange[unitIndex];
+        if (unitIndex > 0 && unitIndex <= unitRange.size()) {
+            return displayValue * unitRange[unitIndex-1];
         }
         return displayValue;
     }

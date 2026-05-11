@@ -358,7 +358,7 @@ void MockCameraDriver::initializeParameterDefinitions(const QString &cameraId)
     param.constraint.maxValue = maxExposure;
     param.constraint.step = 1.0;
     param.constraint.unit = {"ms", "s"};
-    param.constraint.unitRange = {1, 1000};  // 1s = 1000ms
+    param.constraint.unitRange = {1000};  // 1s = 1000ms
     param.defaultValue = 100.0;
     param.order = 1.0f;
     m_parameterDefinitions.insert("exposure", param);
