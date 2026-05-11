@@ -138,24 +138,6 @@ bool AppController::connectCamera(const QString &cameraId)
         return false;
     }
 
-    QStringList paramNames = m_driver->parameterNames();
-    for (const QString &name : paramNames) {
-        ParameterDefinition def = m_driver->parameter(name);
-        if (def.isValid()) {
-            m_parameters[name] = def.defaultValue;
-        }
-    }
-
-    QVariantMap savedParams = loadDynamicConfig(m_cameraId);
-    for (auto it = savedParams.constBegin(); it != savedParams.constEnd(); ++it) {
-        if (m_parameters.contains(it.key())) {
-            m_parameters[it.key()] = it.value();
-        }
-    }
-
-    setParameters(m_parameters);
-    commitParameters();
-
     enterConnectedState();
     return true;
 }
@@ -257,9 +239,7 @@ void AppController::enterConnectingState()
 
 void AppController::enterConnectedState()
 {
-    // FIXME: 注意到主里会发射 2 个信号：一个是 stateChanged(Connected)，另一个是 connectionChanged(true)，这可能会导致 UI 里有些槽被调用两次，应该优化一下。其它地方也有类似的问题，比如进入 Error 状态时会发射 stateChanged(Error) 和 errorOccurred(error) 两个信号。
     setState(CameraState::Connected);
-    emit connectionChanged(true);
 }
 
 void AppController::enterAcquiringState()
@@ -270,7 +250,6 @@ void AppController::enterAcquiringState()
 void AppController::enterDisconnectedState()
 {
     setState(CameraState::Disconnected);
-    emit connectionChanged(false);
 }
 
 void AppController::enterErrorState(const CameraError &error)
@@ -666,7 +645,25 @@ void AppController::onDriverCaptureStopped(const QString &cameraId)
 void AppController::onDriverConnectionChanged(bool connected, const QString &cameraId)
 {
     Q_UNUSED(cameraId);
-    if (connected) {
+    if (connected && m_state != CameraState::Connected) {
+        QStringList paramNames = m_driver->parameterNames();
+        for (const QString &name : paramNames) {
+            ParameterDefinition def = m_driver->parameter(name);
+            if (def.isValid()) {
+                m_parameters[name] = def.defaultValue;
+            }
+        }
+
+        QVariantMap savedParams = loadDynamicConfig(m_cameraId);
+        for (auto it = savedParams.constBegin(); it != savedParams.constEnd(); ++it) {
+            if (m_parameters.contains(it.key())) {
+                m_parameters[it.key()] = it.value();
+            }
+        }
+
+        setParameters(m_parameters);
+        commitParameters();
+
         setState(CameraState::Connected);
     } else {
         setState(CameraState::Disconnected);
