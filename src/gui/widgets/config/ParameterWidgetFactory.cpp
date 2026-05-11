@@ -320,7 +320,6 @@ QWidget *ParameterWidgetFactory::createFloatRangeWidget(const ParameterDefinitio
         return createFloatRangeWidgetWithUnit(def);
     }
 
-    // TODO: container 没有指定父对象，会不会有问题？它们什么时候销毁？每次打开 config dialog 会不会重复创建？
     QWidget *container = new QWidget();
     QHBoxLayout *layout = new QHBoxLayout(container);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -336,7 +335,6 @@ QWidget *ParameterWidgetFactory::createFloatRangeWidget(const ParameterDefinitio
     if (!def.description.isEmpty()) {
         spinBox->setToolTip(def.description);
     }
-    // FIXME: 实测发现并没有 block wheel event，鼠标在输入框上滚轮时数值会改变，导致体验很差，在浏览窗口的时候，容易误修改参数。其它的工厂组件也有相同的问题
     installWheelBlocker(spinBox);
     layout->addWidget(spinBox, 1);
 

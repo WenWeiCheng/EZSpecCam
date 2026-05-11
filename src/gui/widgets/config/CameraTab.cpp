@@ -1,4 +1,5 @@
 #include "CameraTab.h"
+#include "../../DebugMacros.h"
 #include "ParameterWidgetFactory.h"
 #include <QDebug>
 #include <QObject>
@@ -413,17 +414,14 @@ void CameraTab::buildDynamicParameterPanel()
             const QString &name = paramPair.first;
             const ParameterDefinition &def = paramPair.second;
 
-            QWidget *widget = nullptr;
-
-            ParameterDefinition defWithValue = def;
-            if (m_bufferedConfig.contains(name)) {
-                defWithValue.defaultValue = m_bufferedConfig.value(name);
-            }
-
-            widget = ParameterWidgetFactory::createWidget(defWithValue);
+            QWidget *widget = ParameterWidgetFactory::createWidget(def);
 
             if (widget) {
                 m_parameterWidgets.insert(name, widget);
+                if (m_bufferedConfig.contains(name)) {
+                    ParameterWidgetFactory::setWidgetValue(widget, m_bufferedConfig.value(name), def.type);
+                    CONFIG_DEBUG << "Set initial value for" << name << ":" << m_bufferedConfig.value(name);
+                }
                 paramFormLayout->addRow(def.displayName + ":", widget);
             }
         }
@@ -515,39 +513,11 @@ void CameraTab::updateBufferedConfigFromWidgets()
             continue;
         }
 
-        QVariant value;
-        ParameterType type = defIt.value().type;
-
-        // FIXME: ParameterType 不全，还有 IntCollection、FloatCollection 类型没有处理，应该补全这些类型的 UI 和数据获取逻辑
-        if (type == ParameterType::IntRange) {
-            QSpinBox *spinBox = qobject_cast<QSpinBox*>(widget);
-            if (spinBox) {
-                value = spinBox->value();
-            }
-        } else if (type == ParameterType::FloatRange) {
-            QDoubleSpinBox *spinBox = qobject_cast<QDoubleSpinBox*>(widget);
-            if (spinBox) {
-                value = spinBox->value();
-            }
-        } else if (type == ParameterType::IntCollection) {
-            QComboBox *comboBox = qobject_cast<QComboBox*>(widget);
-            if (comboBox) {
-                value = comboBox->currentData();
-            }
-        } else if (type == ParameterType::FloatCollection) {
-            QComboBox *comboBox = qobject_cast<QComboBox*>(widget);
-            if (comboBox) {
-                value = comboBox->currentData();
-            }
-        } else if (type == ParameterType::Boolean) {
-            QCheckBox *checkBox = qobject_cast<QCheckBox*>(widget);
-            if (checkBox) {
-                value = checkBox->isChecked();
-            }
-        }
-
+        QVariant value = ParameterWidgetFactory::getWidgetValue(widget, defIt.value().type);
         if (value.isValid()) {
             m_bufferedConfig.insert(paramName, value);
+        } else {
+            qWarning() << "Invalid value for parameter" << paramName;
         }
     }
 }

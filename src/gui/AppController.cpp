@@ -1,5 +1,6 @@
 #include "AppController.h"
 #include "DebugMacros.h"
+#include <QDebug>
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <QSettings>
@@ -7,7 +8,6 @@
 #include <QFile>
 #include <QDir>
 
-Q_LOGGING_CATEGORY(parameterCategory, "ParameterUpdate")
 
 AppController::AppController(QObject *parent)
     : QObject(parent)
@@ -19,6 +19,7 @@ AppController::~AppController()
 {
     if (m_driver) {
         disconnectCamera();
+        saveDynamicConfig(m_cameraId, m_parameters);
     }
     clearPlugins();
 }
@@ -151,6 +152,9 @@ bool AppController::connectCamera(const QString &cameraId)
             m_parameters[it.key()] = it.value();
         }
     }
+
+    setParameters(m_parameters);
+    commitParameters();
 
     enterConnectedState();
     return true;

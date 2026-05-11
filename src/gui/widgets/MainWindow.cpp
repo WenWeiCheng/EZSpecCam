@@ -22,6 +22,7 @@
 #include <QDateTime>
 #include <QDir>
 
+Q_LOGGING_CATEGORY(parameterCategory, "Parameter")
 Q_LOGGING_CATEGORY(cameraCategory, "Camera")
 Q_LOGGING_CATEGORY(configCategory, "Config")
 Q_LOGGING_CATEGORY(displayCategory, "Display")
