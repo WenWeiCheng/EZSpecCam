@@ -1,11 +1,13 @@
 #include "AppController.h"
+#include "DebugMacros.h"
 #include <QCoreApplication>
-#include <QDebug>
 #include <QFileInfo>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QFile>
 #include <QDir>
+
+Q_LOGGING_CATEGORY(parameterCategory, "ParameterUpdate")
 
 AppController::AppController(QObject *parent)
     : QObject(parent)
@@ -140,6 +142,13 @@ bool AppController::connectCamera(const QString &cameraId)
         ParameterDefinition def = m_driver->parameter(name);
         if (def.isValid()) {
             m_parameters[name] = def.defaultValue;
+        }
+    }
+
+    QVariantMap savedParams = loadDynamicConfig(m_cameraId);
+    for (auto it = savedParams.constBegin(); it != savedParams.constEnd(); ++it) {
+        if (m_parameters.contains(it.key())) {
+            m_parameters[it.key()] = it.value();
         }
     }
 
@@ -573,8 +582,13 @@ bool AppController::setParameter(const QString &name, const QVariant &value)
     if (!m_driver) {
         return false;
     }
+    QVariant oldValue = m_parameters.value(name);
+    if (oldValue == value) {
+        return true;
+    }
     if (m_driver->setParameter(name, value)) {
         m_parameters[name] = value;
+        PARAM_DEBUG << name << ":" << oldValue << "->" << value;
         return true;
     }
     return false;
@@ -603,7 +617,11 @@ bool AppController::commitParameters()
     if (!m_driver || !m_driver->isConnected()) {
         return false;
     }
-    return m_driver->commitParameters();
+    bool ok = m_driver->commitParameters();
+    if (ok) {
+        saveDynamicConfig(m_cameraId, m_parameters);
+    }
+    return ok;
 }
 
 // ——— Private Slots ———
