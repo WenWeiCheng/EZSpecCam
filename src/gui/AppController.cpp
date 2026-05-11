@@ -244,6 +244,7 @@ void AppController::enterConnectingState()
 
 void AppController::enterConnectedState()
 {
+    // FIXME: 注意到主里会发射 2 个信号：一个是 stateChanged(Connected)，另一个是 connectionChanged(true)，这可能会导致 UI 里有些槽被调用两次，应该优化一下。其它地方也有类似的问题，比如进入 Error 状态时会发射 stateChanged(Error) 和 errorOccurred(error) 两个信号。
     setState(CameraState::Connected);
     emit connectionChanged(true);
 }
@@ -378,6 +379,7 @@ QString AppController::getConfigPath(const QString &cameraId)
     return getConfigDirectory() + "/" + cameraId + ".ini";
 }
 
+// FIXME: saveDynamicConfig 和 loadDynamicConfig 从未被调用过，因此参数的持久化功能实际上并没有被测试过，应该在 UI 里调用这个函数来保存和加载参数。
 void AppController::saveDynamicConfig(const QString &cameraId, const QVariantMap &parameters)
 {
     QString path = getConfigPath(cameraId);

@@ -10,6 +10,8 @@
 #include <QHBoxLayout>
 #include <QPushButton>
 
+// TODO: UI 文件移动到 gui/ui 目录下
+
 CameraConfigDialogUi::CameraConfigDialogUi(QObject *parent)
     : m_parent(parent)
     , tabWidget(nullptr)

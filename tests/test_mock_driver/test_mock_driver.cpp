@@ -152,6 +152,7 @@ private slots:
         QVERIFY2(gain.toDouble() == 1.0, "Default gain should be 1.0");
     }
 
+    // FIXME: 测试设置的参数类型不够全面，mock camera 不只有 exposure
     void test_set_parameter()
     {
         m_driver->connectToCamera("mock-001");
@@ -189,6 +190,8 @@ private slots:
         QVERIFY2(m_driver->validateParameters() == true, "Should still validate since invalid params weren't stored");
     }
 
+    // FIXME: 测试的参数类型不够全面，mock camera 不只有 exposure 和 gain
+    // TODO: 另外不要检查一下测试的参数是否覆盖全了
     void test_commit_parameters()
     {
         m_driver->connectToCamera("mock-001");

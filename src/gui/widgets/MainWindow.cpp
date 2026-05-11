@@ -21,6 +21,9 @@
 #include <QDateTime>
 #include <QDir>
 
+// TODO: 这个文件太大了，应该拆分一下
+// TODO: 需要添加层次化的 Debug 输出，比如关于参数设置的调试信息应该输出终端，输出信息结构化方便检索和阅读。比如 "[Parameter Update][CameraTab.cpp +<line>] exposureTime: 100ms -> 150ms" 这样的格式，方便后续分析和排查问题。 
+
 namespace PostProcess {
 
 void verticalBinning(ImageData &frame, int startRow, int endRow)
@@ -686,6 +689,7 @@ void MainWindow::onErrorOccurred(const CameraError &error)
     QMessageBox::warning(this, tr("Camera Error"), message);
 }
 
+// FIXME: 如果 Live 或 burst 模式，frame count 只增加一次，应该是每来一帧增加一次
 void MainWindow::onCaptureStarted()
 {
     ui->frameCountLabel->setText(tr("Frames: %1").arg(++m_frameCount));

@@ -212,6 +212,7 @@ struct ParameterDefinition
     bool needReconnect = false;        // True if parameter change need to reconnect
     float order = 0.0f;
 
+    // TODO: supplement: checks if a default QVariant value is valid for this parameter definition, based on its type and constraint. 
     bool isValid() const { return !name.isEmpty() && constraint.isValid(); }
 
     bool operator==(const ParameterDefinition &other) const

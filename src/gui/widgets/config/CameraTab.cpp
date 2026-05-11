@@ -130,7 +130,7 @@ void CameraTab::setAppController(AppController *controller)
             setBufferedConfig(controller->allParameters());
             updateConnectionState();
             buildDynamicParameterPanel();
-            m_coolingTimer->start(1000);
+            m_coolingTimer->start(100);
         }
     }
 
@@ -264,7 +264,7 @@ void CameraTab::onCameraStateChanged(CameraState state)
         if (m_parameterWidgets.isEmpty()) {
             setBufferedConfig(m_appController->allParameters());
             buildDynamicParameterPanel();
-            m_coolingTimer->start(1000);
+            m_coolingTimer->start(100);
             if (parameterGroup) {
                 parameterGroup->setVisible(true);
             }
@@ -279,6 +279,7 @@ void CameraTab::onCameraStateChanged(CameraState state)
     updateConnectionState();
 }
 
+// TODO: UI 放在专门的文件里组织
 void CameraTab::setupUi()
 {
     formLayout = new QFormLayout(this);
@@ -560,6 +561,7 @@ void CameraTab::updateBufferedConfigFromWidgets()
         QVariant value;
         ParameterType type = defIt.value().type;
 
+        // FIXME: ParameterType 不全，还有 IntCollection、FloatCollection 类型没有处理，应该补全这些类型的 UI 和数据获取逻辑
         if (type == ParameterType::IntRange) {
             QSpinBox *spinBox = qobject_cast<QSpinBox*>(widget);
             if (spinBox) {
@@ -575,6 +577,7 @@ void CameraTab::updateBufferedConfigFromWidgets()
             if (checkBox) {
                 value = checkBox->isChecked();
             }
+        // FIXME: String 参数是展示的，不需要保存到 bufferedConfig 里，因此这里不应该获取它的值，或者说应该直接跳过 String 类型的参数，以免误操作导致它们被当做可修改的参数来处理。
         } else if (type == ParameterType::String) {
             QLabel *label = qobject_cast<QLabel*>(widget);
             if (label) {
@@ -648,7 +651,7 @@ void CameraTab::onParametersCommitted()
     QStringList paramNames = driver->parameterNames();
     for (const QString &paramName : paramNames) {
         ParameterDefinition def = driver->parameter(paramName);
-        if (def.isDynamic && def.category == ParameterCategory::Core) {
+        if (def.isDynamic) {
             QVariant value = driver->parameterValue(paramName);
             QWidget *widget = m_parameterWidgets.value(paramName);
             if (widget) {

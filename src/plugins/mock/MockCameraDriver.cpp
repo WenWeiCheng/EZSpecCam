@@ -26,6 +26,7 @@ QStringList MockCameraDriver::enumerate()
     return QStringList() << "mock-001" << "mock-002" << "mock-003";
 }
 
+// TODO: 连接加一点延时(2s)以模拟真实的连接过程
 bool MockCameraDriver::connectToCamera(const QString &cameraId)
 {
     QMutexLocker locker(&m_mutex);
@@ -163,6 +164,7 @@ bool MockCameraDriver::validateParameters()
     return true;
 }
 
+// TODO: 设置参数加一点延时(1s)以模拟真实的设置过程
 bool MockCameraDriver::commitParameters()
 {
     QMutexLocker locker(&m_mutex);
@@ -190,6 +192,7 @@ bool MockCameraDriver::commitParameters()
             return false;
         }
 
+        // FIXME: 将这两个参数纳入到 m_parameters 中统一管理
         if (name == "pattern_type") {
             m_patternType = value.toInt();
         } else if (name == "gain") {
@@ -345,7 +348,7 @@ void MockCameraDriver::initializeParameterDefinitions(const QString &cameraId)
     param.constraint.minValue = 1.0;
     param.constraint.maxValue = maxExposure;
     param.constraint.step = 1.0;
-    param.constraint.unit = {"ms"};
+    param.constraint.unit = {"ms"}; // FIXME: unit 只有 ms，需要一个更长的单位 "s"， 方便设置更长的曝光时间。需要同步添加 unitRange 来支持单位转换。查看 ParameterConstraint 中的 unit 和 unitRange 的设计
     param.defaultValue = 100.0;
     param.order = 1.0f;
     m_parameterDefinitions.insert("exposure", param);
@@ -519,6 +522,7 @@ void MockCameraDriver::initializeParameterDefinitions(const QString &cameraId)
         m_parameters.insert("cooling_heatsink_temp", param.defaultValue);
     }
 
+    // FIXME: Info 类型的 paramter type 应该定义为 string，它们是展示用的，不需要参与计算和验证
     param = ParameterDefinition();
     param.name = "sensor_width";
     param.displayName = "Sensor Width";
@@ -815,6 +819,7 @@ bool MockCameraDriver::validateValue(const QVariant &value, const ParameterDefin
     }
 }
 
+// FIXME: updateTemperatures 应该使用一个独立的计时器定时更新，而不是在 capture timer 中更新，这样可以更真实地模拟温度变化的过程，并且不会受到 capture timer 频率的影响。
 void MockCameraDriver::updateTemperatures()
 {
     bool coolingEnabled = m_parameters.value("cooling_enabled", false).toBool();

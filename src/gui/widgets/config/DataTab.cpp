@@ -24,6 +24,7 @@ DataTab::~DataTab()
 {
 }
 
+// TODO: UI 放在专门的文件里组织
 void DataTab::setupUi()
 {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);

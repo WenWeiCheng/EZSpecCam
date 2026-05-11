@@ -5,6 +5,7 @@
 
 #include "CameraTypes.h"
 
+// FIXME: 这个测试类主要是为了 CameraTypes 中的 validate() 和 validateReason() 函数，没有 configuration manager 这个类——命名不妥当，包括测试文件名
 class TestConfigurationManager : public QObject
 {
     Q_OBJECT
