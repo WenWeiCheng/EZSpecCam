@@ -252,12 +252,6 @@ private:
     /// Current frame number
     std::atomic<int> m_frameNumber{0};
 
-    /// Current gain value (for image generation)
-    double m_gain = 1.0;
-
-    /// Current pattern type (0=gradient, 1=noise, 2=interference, 3=fastfill)
-    int m_patternType = 0;
-
     /// Current sensor temperature
     double m_currentSensorTemp = 25.0;
 
@@ -272,6 +266,9 @@ private:
 
     /// Frame generation timer
     QTimer *m_captureTimer = nullptr;
+
+    /// Temperature update timer
+    QTimer *m_temperatureTimer = nullptr;
 
     /// Last error
     CameraError m_lastError;
