@@ -1,4 +1,5 @@
 #include "CameraTab.h"
+#include "ParameterWidgetFactory.h"
 #include <QDebug>
 #include <QObject>
 #include <QVBoxLayout>
@@ -414,56 +415,12 @@ void CameraTab::buildDynamicParameterPanel()
 
             QWidget *widget = nullptr;
 
-            switch (def.type) {
-            case ParameterType::IntRange: {
-                QSpinBox *spinBox = new QSpinBox(this);
-                spinBox->setRange(static_cast<int>(def.constraint.minValue),
-                                 static_cast<int>(def.constraint.maxValue));
-                spinBox->setSingleStep(def.constraint.step > 0 ? static_cast<int>(def.constraint.step) : 1);
-                if (m_bufferedConfig.contains(name)) {
-                    spinBox->setValue(m_bufferedConfig.value(name).toInt());
-                } else {
-                    spinBox->setValue(def.defaultValue.toInt());
-                }
-                widget = spinBox;
-                break;
+            ParameterDefinition defWithValue = def;
+            if (m_bufferedConfig.contains(name)) {
+                defWithValue.defaultValue = m_bufferedConfig.value(name);
             }
-            case ParameterType::FloatRange: {
-                QDoubleSpinBox *spinBox = new QDoubleSpinBox(this);
-                spinBox->setRange(def.constraint.minValue, def.constraint.maxValue);
-                spinBox->setDecimals(4);
-                spinBox->setSingleStep(def.constraint.step > 0 ? def.constraint.step : 0.1);
-                if (m_bufferedConfig.contains(name)) {
-                    spinBox->setValue(m_bufferedConfig.value(name).toDouble());
-                } else {
-                    spinBox->setValue(def.defaultValue.toDouble());
-                }
-                widget = spinBox;
-                break;
-            }
-            case ParameterType::String: {
-                QLabel *label = new QLabel(this);
-                if (m_bufferedConfig.contains(name)) {
-                    label->setText(m_bufferedConfig.value(name).toString());
-                } else {
-                    label->setText(def.defaultValue.toString());
-                }
-                widget = label;
-                break;
-            }
-            case ParameterType::Boolean: {
-                QCheckBox *checkBox = new QCheckBox(this);
-                if (m_bufferedConfig.contains(name)) {
-                    checkBox->setChecked(m_bufferedConfig.value(name).toBool());
-                } else {
-                    checkBox->setChecked(def.defaultValue.toBool());
-                }
-                widget = checkBox;
-                break;
-            }
-            default:
-                break;
-            }
+
+            widget = ParameterWidgetFactory::createWidget(defWithValue);
 
             if (widget) {
                 m_parameterWidgets.insert(name, widget);
@@ -572,16 +529,20 @@ void CameraTab::updateBufferedConfigFromWidgets()
             if (spinBox) {
                 value = spinBox->value();
             }
+        } else if (type == ParameterType::IntCollection) {
+            QComboBox *comboBox = qobject_cast<QComboBox*>(widget);
+            if (comboBox) {
+                value = comboBox->currentData();
+            }
+        } else if (type == ParameterType::FloatCollection) {
+            QComboBox *comboBox = qobject_cast<QComboBox*>(widget);
+            if (comboBox) {
+                value = comboBox->currentData();
+            }
         } else if (type == ParameterType::Boolean) {
             QCheckBox *checkBox = qobject_cast<QCheckBox*>(widget);
             if (checkBox) {
                 value = checkBox->isChecked();
-            }
-        // FIXME: String 参数是展示的，不需要保存到 bufferedConfig 里，因此这里不应该获取它的值，或者说应该直接跳过 String 类型的参数，以免误操作导致它们被当做可修改的参数来处理。
-        } else if (type == ParameterType::String) {
-            QLabel *label = qobject_cast<QLabel*>(widget);
-            if (label) {
-                value = label->text();
             }
         }
 

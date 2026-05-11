@@ -191,6 +191,27 @@ private slots:
                  "Should return empty map for nonexistent camera");
     }
 
+    void test_save_and_load_dynamic_config()
+    {
+        QString testCameraId = "test-camera-001";
+
+        QVariantMap originalParams;
+        originalParams["exposure"] = 42.5;
+        originalParams["gain"] = 100;
+        originalParams["testString"] = "hello world";
+        originalParams["enabled"] = true;
+
+        m_controller->saveDynamicConfig(testCameraId, originalParams);
+
+        QVariantMap loadedParams = m_controller->loadDynamicConfig(testCameraId);
+
+        QVERIFY2(!loadedParams.isEmpty(), "Loaded params should not be empty");
+        QCOMPARE(loadedParams["exposure"].toDouble(), 42.5);
+        QCOMPARE(loadedParams["gain"].toInt(), 100);
+        QCOMPARE(loadedParams["testString"].toString(), QString("hello world"));
+        QCOMPARE(loadedParams["enabled"].toBool(), true);
+    }
+
     void test_scan_plugins_loads_mock_driver()
     {
         QTemporaryDir tempDir;
