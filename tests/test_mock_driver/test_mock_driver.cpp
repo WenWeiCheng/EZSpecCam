@@ -152,16 +152,73 @@ private slots:
         QVERIFY2(gain.toDouble() == 1.0, "Default gain should be 1.0");
     }
 
-    // FIXME: 测试设置的参数类型不够全面，mock camera 不只有 exposure
     void test_set_parameter()
     {
         m_driver->connectToCamera("mock-001");
 
+        // Test FloatRange parameters
         bool result = m_driver->setParameter("exposure", 200.0);
         QVERIFY2(result == true, "Should set exposure successfully");
-
         QVariant value = m_driver->parameterValue("exposure");
         QVERIFY2(value.toDouble() == 200.0, "Exposure should be 200.0 after setParameter");
+
+        result = m_driver->setParameter("gain", 15.5);
+        QVERIFY2(result == true, "Should set gain successfully");
+        value = m_driver->parameterValue("gain");
+        QVERIFY2(value.toDouble() == 15.5, "Gain should be 15.5 after setParameter");
+
+        result = m_driver->setParameter("offset", 100.0);
+        QVERIFY2(result == true, "Should set offset successfully");
+        value = m_driver->parameterValue("offset");
+        QVERIFY2(value.toDouble() == 100.0, "Offset should be 100.0 after setParameter");
+
+        result = m_driver->setParameter("cooling_target_temp", -30.0);
+        QVERIFY2(result == true, "Should set cooling_target_temp successfully");
+        value = m_driver->parameterValue("cooling_target_temp");
+        QVERIFY2(value.toDouble() == -30.0, "cooling_target_temp should be -30.0 after setParameter");
+
+        // Test IntRange parameters
+        result = m_driver->setParameter("roi_x", 100);
+        QVERIFY2(result == true, "Should set roi_x successfully");
+        value = m_driver->parameterValue("roi_x");
+        QVERIFY2(value.toInt() == 100, "roi_x should be 100 after setParameter");
+
+        result = m_driver->setParameter("roi_y", 200);
+        QVERIFY2(result == true, "Should set roi_y successfully");
+        value = m_driver->parameterValue("roi_y");
+        QVERIFY2(value.toInt() == 200, "roi_y should be 200 after setParameter");
+
+        result = m_driver->setParameter("roi_width", 1024);
+        QVERIFY2(result == true, "Should set roi_width successfully");
+        value = m_driver->parameterValue("roi_width");
+        QVERIFY2(value.toInt() == 1024, "roi_width should be 1024 after setParameter");
+
+        result = m_driver->setParameter("roi_height", 768);
+        QVERIFY2(result == true, "Should set roi_height successfully");
+        value = m_driver->parameterValue("roi_height");
+        QVERIFY2(value.toInt() == 768, "roi_height should be 768 after setParameter");
+
+        result = m_driver->setParameter("pattern_type", 2);
+        QVERIFY2(result == true, "Should set pattern_type successfully");
+        value = m_driver->parameterValue("pattern_type");
+        QVERIFY2(value.toInt() == 2, "pattern_type should be 2 after setParameter");
+
+        // Test IntCollection parameter
+        result = m_driver->setParameter("binning", 2);
+        QVERIFY2(result == true, "Should set binning successfully");
+        value = m_driver->parameterValue("binning");
+        QVERIFY2(value.toInt() == 2, "binning should be 2 after setParameter");
+
+        // Test Boolean parameters
+        result = m_driver->setParameter("vertical_binning", true);
+        QVERIFY2(result == true, "Should set vertical_binning successfully");
+        value = m_driver->parameterValue("vertical_binning");
+        QVERIFY2(value.toBool() == true, "vertical_binning should be true after setParameter");
+
+        result = m_driver->setParameter("cooling_enabled", true);
+        QVERIFY2(result == true, "Should set cooling_enabled successfully");
+        value = m_driver->parameterValue("cooling_enabled");
+        QVERIFY2(value.toBool() == true, "cooling_enabled should be true after setParameter");
     }
 
     void test_set_invalid_parameter()
@@ -190,20 +247,30 @@ private slots:
         QVERIFY2(m_driver->validateParameters() == true, "Should still validate since invalid params weren't stored");
     }
 
-    // FIXME: 测试的参数类型不够全面，mock camera 不只有 exposure 和 gain
-    // TODO: 另外不要检查一下测试的参数是否覆盖全了
     void test_commit_parameters()
     {
         m_driver->connectToCamera("mock-001");
 
         m_driver->setParameter("exposure", 300.0);
         m_driver->setParameter("gain", 20.0);
+        m_driver->setParameter("offset", 15.5);
+        m_driver->setParameter("roi_x", 100);
+        m_driver->setParameter("cooling_enabled", true);
+        m_driver->setParameter("cooling_target_temp", -20.0);
         QVERIFY2(m_driver->commitParameters() == true, "Should commit successfully");
 
         QVariant exp = m_driver->parameterValue("exposure");
         QVariant g = m_driver->parameterValue("gain");
+        QVariant off = m_driver->parameterValue("offset");
+        QVariant roiX = m_driver->parameterValue("roi_x");
+        QVariant coolEn = m_driver->parameterValue("cooling_enabled");
+        QVariant coolTemp = m_driver->parameterValue("cooling_target_temp");
         QVERIFY2(exp.toDouble() == 300.0, "Exposure should be 300.0 after commit");
         QVERIFY2(g.toDouble() == 20.0, "Gain should be 20.0 after commit");
+        QVERIFY2(off.toDouble() == 15.5, "Offset should be 15.5 after commit");
+        QVERIFY2(roiX.toInt() == 100, "roi_x should be 100 after commit");
+        QVERIFY2(coolEn.toBool() == true, "cooling_enabled should be true after commit");
+        QVERIFY2(coolTemp.toDouble() == -20.0, "cooling_target_temp should be -20.0 after commit");
     }
 
     void test_read_only_parameter()

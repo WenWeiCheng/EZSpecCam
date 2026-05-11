@@ -13,12 +13,22 @@ MockCameraDriver::MockCameraDriver(QObject *parent)
     m_captureTimer = new QTimer(this);
     m_captureTimer->setSingleShot(false);
     connect(m_captureTimer, &QTimer::timeout, this, &MockCameraDriver::onCaptureTimer);
+
+    m_temperatureTimer = new QTimer(this);
+    m_temperatureTimer->setSingleShot(false);
+    m_temperatureTimer->setInterval(1000);
+    connect(m_temperatureTimer, &QTimer::timeout, this, &MockCameraDriver::updateTemperatures);
 }
 
 MockCameraDriver::~MockCameraDriver()
 {
     m_capturing.store(false);
     m_state.store(CameraState::Disconnected);
+
+    if (m_temperatureTimer) {
+        m_temperatureTimer->stop();
+        delete m_temperatureTimer;
+    }
 }
 
 QStringList MockCameraDriver::enumerate()
@@ -26,7 +36,6 @@ QStringList MockCameraDriver::enumerate()
     return QStringList() << "mock-001" << "mock-002" << "mock-003";
 }
 
-// TODO: 连接加一点延时(2s)以模拟真实的连接过程
 bool MockCameraDriver::connectToCamera(const QString &cameraId)
 {
     QMutexLocker locker(&m_mutex);
@@ -53,11 +62,15 @@ bool MockCameraDriver::connectToCamera(const QString &cameraId)
 
     initializeParameterDefinitions(cameraId);
 
+    QThread::msleep(500);  // Simulate real camera connection delay (500ms)
+
     m_state.store(CameraState::Connected);
     m_frameNumber.store(0);
     m_framesAcquired.store(0);
     m_currentSensorTemp = 25.0;
     m_currentHeatsinkTemp = 25.0;
+
+    m_temperatureTimer->start();
 
     emit connectionChanged(true, cameraId);
     return true;
@@ -72,6 +85,10 @@ void MockCameraDriver::disconnectCamera()
     }
 
     stopCapture(100);
+
+    if (m_temperatureTimer) {
+        m_temperatureTimer->stop();
+    }
 
     m_parameters.clear();
     m_parameterDefinitions.clear();
@@ -164,7 +181,6 @@ bool MockCameraDriver::validateParameters()
     return true;
 }
 
-// TODO: 设置参数加一点延时(1s)以模拟真实的设置过程
 bool MockCameraDriver::commitParameters()
 {
     QMutexLocker locker(&m_mutex);
@@ -192,16 +208,12 @@ bool MockCameraDriver::commitParameters()
             return false;
         }
 
-        // FIXME: 将这两个参数纳入到 m_parameters 中统一管理
-        if (name == "pattern_type") {
-            m_patternType = value.toInt();
-        } else if (name == "gain") {
-            m_gain = value.toDouble();
-        }
     }
 
     m_parameters.insert(m_pendingParameters);
     m_pendingParameters.clear();
+
+    QThread::msleep(100);  // Simulate real device parameter commit latency (100ms)
 
     return true;
 }
@@ -257,7 +269,6 @@ void MockCameraDriver::stopCapture(int timeoutMs)
     m_autoStop = false;
 
     if (!wasAutoStop) {
-        updateTemperatures();
         QImage image = generateFrame();
         int frameNum = ++m_frameNumber;
         quint64 timestamp = QDateTime::currentMSecsSinceEpoch() * 1000;
@@ -300,8 +311,6 @@ void MockCameraDriver::onCaptureTimer()
     }
 
     QMutexLocker locker(&m_mutex);
-
-    updateTemperatures();
 
     QImage image = generateFrame();
 
@@ -348,7 +357,8 @@ void MockCameraDriver::initializeParameterDefinitions(const QString &cameraId)
     param.constraint.minValue = 1.0;
     param.constraint.maxValue = maxExposure;
     param.constraint.step = 1.0;
-    param.constraint.unit = {"ms"}; // FIXME: unit 只有 ms，需要一个更长的单位 "s"， 方便设置更长的曝光时间。需要同步添加 unitRange 来支持单位转换。查看 ParameterConstraint 中的 unit 和 unitRange 的设计
+    param.constraint.unit = {"ms", "s"};
+    param.constraint.unitRange = {1, 1000};  // 1s = 1000ms
     param.defaultValue = 100.0;
     param.order = 1.0f;
     m_parameterDefinitions.insert("exposure", param);
@@ -522,34 +532,29 @@ void MockCameraDriver::initializeParameterDefinitions(const QString &cameraId)
         m_parameters.insert("cooling_heatsink_temp", param.defaultValue);
     }
 
-    // FIXME: Info 类型的 paramter type 应该定义为 string，它们是展示用的，不需要参与计算和验证
     param = ParameterDefinition();
     param.name = "sensor_width";
     param.displayName = "Sensor Width";
     param.description = "Total sensor width in pixels";
     param.category = ParameterCategory::Info;
-    param.type = ParameterType::IntRange;
-    param.constraint.minValue = 1;
-    param.constraint.maxValue = maxWidth;
+    param.type = ParameterType::String;
     param.isReadOnly = true;
     param.order = 1.0f;
-    param.defaultValue = maxWidth;
+    param.defaultValue = QString::number(maxWidth);
     m_parameterDefinitions.insert("sensor_width", param);
-    m_parameters.insert("sensor_width", maxWidth);
+    m_parameters.insert("sensor_width", param.defaultValue);
 
     param = ParameterDefinition();
     param.name = "sensor_height";
     param.displayName = "Sensor Height";
     param.description = "Total sensor height in pixels";
     param.category = ParameterCategory::Info;
-    param.type = ParameterType::IntRange;
-    param.constraint.minValue = 1;
-    param.constraint.maxValue = maxHeight;
+    param.type = ParameterType::String;
     param.isReadOnly = true;
     param.order = 2.0f;
-    param.defaultValue = maxHeight;
+    param.defaultValue = QString::number(maxHeight);
     m_parameterDefinitions.insert("sensor_height", param);
-    m_parameters.insert("sensor_height", maxHeight);
+    m_parameters.insert("sensor_height", param.defaultValue);
 
     param = ParameterDefinition();
     param.name = "bit_depth";
@@ -610,7 +615,7 @@ QImage MockCameraDriver::generateFrame()
     }
 
     QImage image;
-    switch (m_patternType) {
+    switch (m_parameters.value("pattern_type").toInt()) {
     case 1:
         image = generateNoiseImage(fullWidth, fullHeight);
         break;
@@ -646,7 +651,7 @@ QImage MockCameraDriver::generateGradientImage(int width, int height)
         return image;
     }
 
-    double gainFactor = 1.0 + m_gain / 20.0;
+    double gainFactor = 1.0 + m_parameters.value("gain").toDouble() / 20.0;
 
     quint16 *firstRow = reinterpret_cast<quint16*>(image.scanLine(0));
     for (int x = 0; x < width; ++x) {
@@ -670,7 +675,7 @@ QImage MockCameraDriver::generateNoiseImage(int width, int height)
         return image;
     }
 
-    double gainFactor = 1.0 + m_gain / 20.0;
+    double gainFactor = 1.0 + m_parameters.value("gain").toDouble() / 20.0;
 
     for (int y = 0; y < height; ++y) {
         quint16 *line = reinterpret_cast<quint16*>(image.scanLine(y));
@@ -692,7 +697,7 @@ QImage MockCameraDriver::generateDoubleSlitInterferenceImage(int width, int heig
         return image;
     }
 
-    const double gainFactor = 1.0 + m_gain / 20.0;
+    const double gainFactor = 1.0 + m_parameters.value("gain").toDouble() / 20.0;
     const double darkCurrent = 10.0;
     const double pixelSize = 10e-6;
     const double screenDistance = 50e-3;
@@ -755,7 +760,7 @@ QImage MockCameraDriver::generateFastFillImage(int width, int height)
         return image;
     }
 
-    double gainFactor = 1.0 + m_gain / 20.0;
+    double gainFactor = 1.0 + m_parameters.value("gain").toDouble() / 20.0;
 
     quint16 *firstRow = reinterpret_cast<quint16*>(image.scanLine(0));
     for (int x = 0; x < width; ++x) {
@@ -819,7 +824,6 @@ bool MockCameraDriver::validateValue(const QVariant &value, const ParameterDefin
     }
 }
 
-// FIXME: updateTemperatures 应该使用一个独立的计时器定时更新，而不是在 capture timer 中更新，这样可以更真实地模拟温度变化的过程，并且不会受到 capture timer 频率的影响。
 void MockCameraDriver::updateTemperatures()
 {
     bool coolingEnabled = m_parameters.value("cooling_enabled", false).toBool();
