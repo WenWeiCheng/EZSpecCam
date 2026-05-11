@@ -164,8 +164,8 @@ struct ParameterConstraint
     double toDisplayValue(double rawValue, int unitIndex) const
     {
         if (unitIndex == 0 || unitRange.isEmpty()) return rawValue;
-        if (unitIndex > 0 && unitIndex <= unitRange.size()) {
-            return rawValue / unitRange[unitIndex - 1];
+        if (unitIndex > 0 && unitIndex <= unitRange.size()-1) {
+            return rawValue / unitRange[unitIndex];
         }
         return rawValue;
     }
@@ -173,8 +173,8 @@ struct ParameterConstraint
     double toRawValue(double displayValue, int unitIndex) const
     {
         if (unitIndex == 0 || unitRange.isEmpty()) return displayValue;
-        if (unitIndex > 0 && unitIndex <= unitRange.size()) {
-            return displayValue * unitRange[unitIndex - 1];
+        if (unitIndex > 0 && unitIndex <= unitRange.size()-1) {
+            return displayValue * unitRange[unitIndex];
         }
         return displayValue;
     }
@@ -190,6 +190,9 @@ struct ParameterConstraint
 
     bool operator!=(const ParameterConstraint &other) const { return !(*this == other); }
 };
+
+// Forward declaration for validate function (defined later in file)
+bool validate(const QVariant &value, const ParameterConstraint &constraint, ParameterType type);
 
 /**
  * @brief Complete parameter definition for dynamic parameter system
@@ -212,8 +215,10 @@ struct ParameterDefinition
     bool needReconnect = false;        // True if parameter change need to reconnect
     float order = 0.0f;
 
-    // TODO: supplement: checks if a default QVariant value is valid for this parameter definition, based on its type and constraint. 
-    bool isValid() const { return !name.isEmpty() && constraint.isValid(); }
+    bool isValid() const {
+        if (name.isEmpty() || !constraint.isValid()) return false;
+        return validate(defaultValue, constraint, type);
+    }
 
     bool operator==(const ParameterDefinition &other) const
     {
