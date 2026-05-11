@@ -12,6 +12,7 @@
 #include <QSpinBox>
 #include <QTimer>
 #include <QMetaObject>
+#include <QSettings>
 
 CameraWorker::CameraWorker(AppController *controller, QObject *parent)
     : QObject(parent)
@@ -665,5 +666,58 @@ void CameraTab::onParametersCommitted()
                 }
             }
         }
+    }
+}
+
+void CameraTab::saveCameraMetadata()
+{
+    QSettings settings;
+
+    if (m_bufferedConfig.contains("exposure")) {
+        settings.setValue("camera/exposure", m_bufferedConfig.value("exposure"));
+    }
+    if (m_bufferedConfig.contains("gain")) {
+        settings.setValue("camera/gain", m_bufferedConfig.value("gain"));
+    }
+    if (m_bufferedConfig.contains("temperature")) {
+        settings.setValue("camera/temperature", m_bufferedConfig.value("temperature"));
+    }
+
+    QVariant roiVariant = m_bufferedConfig.value("roi");
+    if (roiVariant.isValid()) {
+        if (roiVariant.canConvert<QPoint>()) {
+            QPoint roiPos = roiVariant.toPoint();
+            settings.setValue("camera/roi/x", roiPos.x());
+            settings.setValue("camera/roi/y", roiPos.y());
+        }
+        if (roiVariant.canConvert<QSize>()) {
+            QSize roiSize = roiVariant.toSize();
+            settings.setValue("camera/roi/width", roiSize.width());
+            settings.setValue("camera/roi/height", roiSize.height());
+        }
+    }
+}
+
+void CameraTab::loadCameraMetadata()
+{
+    QSettings settings;
+
+    double exposure = settings.value("camera/exposure", 0.0).toDouble();
+    double gain = settings.value("camera/gain", 0.0).toDouble();
+    double temperature = settings.value("camera/temperature", 0.0).toDouble();
+    int roiX = settings.value("camera/roi/x", 0).toInt();
+    int roiY = settings.value("camera/roi/y", 0).toInt();
+    int roiWidth = settings.value("camera/roi/width", 0).toInt();
+    int roiHeight = settings.value("camera/roi/height", 0).toInt();
+
+    m_bufferedConfig.insert("exposure", exposure);
+    m_bufferedConfig.insert("gain", gain);
+    m_bufferedConfig.insert("temperature", temperature);
+
+    if (roiWidth > 0 && roiHeight > 0) {
+        m_bufferedConfig.insert("roi_x", roiX);
+        m_bufferedConfig.insert("roi_y", roiY);
+        m_bufferedConfig.insert("roi_width", roiWidth);
+        m_bufferedConfig.insert("roi_height", roiHeight);
     }
 }

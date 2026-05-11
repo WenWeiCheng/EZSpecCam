@@ -51,6 +51,7 @@ void CameraConfigDialog::showEvent(QShowEvent *event)
         if (ui->cameraTab->parameterGroup) {
             ui->cameraTab->parameterGroup->setVisible(true);
         }
+        ui->cameraTab->loadCameraMetadata();
     }
     QDialog::showEvent(event);
 }
@@ -95,6 +96,7 @@ void CameraConfigDialog::on_buttonBox_accepted()
     }
 
     ui->cameraTab->updateBufferedConfigFromWidgets();
+    ui->cameraTab->saveCameraMetadata();
     QVariantMap bufferedConfig = ui->cameraTab->getBufferedConfig();
 
     AppController *controller = ui->cameraTab->appController();
@@ -141,6 +143,7 @@ void CameraConfigDialog::on_buttonBox_clicked(QAbstractButton *button)
         }
 
         ui->cameraTab->updateBufferedConfigFromWidgets();
+        ui->cameraTab->saveCameraMetadata();
         QVariantMap bufferedConfig = ui->cameraTab->getBufferedConfig();
 
         AppController *controller = ui->cameraTab->appController();
