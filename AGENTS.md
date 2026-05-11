@@ -64,9 +64,8 @@ I'm a beginner, so if you find my code design and instructions not so great, you
 
 ## Build and Test
 
-use `build_preset.bat` script to build
-use `run_tests.bat` to test
-
+use `& ./build_preset.bat 2>&1` script to build
+use `& ./run_tests.bat 2>&1` to test
 
 
 ## Do not modify
