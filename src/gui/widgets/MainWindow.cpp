@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 #include "../ui/MainWindowUi.h"
+#include "../DebugMacros.h"
 #include "config/CameraTab.h"
 #include "display/ImageViewWidget.h"
 #include "display/SpectrumViewWidget.h"
@@ -21,8 +22,13 @@
 #include <QDateTime>
 #include <QDir>
 
+Q_LOGGING_CATEGORY(cameraCategory, "Camera")
+Q_LOGGING_CATEGORY(configCategory, "Config")
+Q_LOGGING_CATEGORY(displayCategory, "Display")
+Q_LOGGING_CATEGORY(captureCategory, "Capture")
+
 // TODO: 这个文件太大了，应该拆分一下
-// TODO: 需要添加层次化的 Debug 输出，比如关于参数设置的调试信息应该输出终端，输出信息结构化方便检索和阅读。比如 "[Parameter Update][CameraTab.cpp +<line>] exposureTime: 100ms -> 150ms" 这样的格式，方便后续分析和排查问题。 
+// TODO: 需要添加层次化的 Debug 输出，比如关于参数设置的调试信息应该输出终端，输出信息结构化方便检索和阅读。比如 "[Parameter Update][CameraTab.cpp +<line>] exposureTime: 100ms -> 150ms" 这样的格式，方便后续分析和排查问题。
 
 namespace PostProcess {
 
