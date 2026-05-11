@@ -21,7 +21,6 @@ protected:
     bool eventFilter(QObject *obj, QEvent *event) override
     {
         if (event->type() == QEvent::Wheel) {
-            event->ignore();
             return true;
         }
         return QObject::eventFilter(obj, event);
@@ -30,8 +29,13 @@ protected:
 
 void installWheelBlocker(QWidget *widget)
 {
-    if (widget) {
-        widget->installEventFilter(new WheelBlocker(widget));
+    if (!widget) {
+        return;
+    }
+    WheelBlocker *blocker = new WheelBlocker();
+    widget->installEventFilter(blocker);
+    for (auto child : widget->findChildren<QWidget*>()) {
+        child->installEventFilter(blocker);
     }
 }
 }
