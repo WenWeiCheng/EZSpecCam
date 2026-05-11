@@ -62,7 +62,7 @@ bool MockCameraDriver::connectToCamera(const QString &cameraId)
 
     initializeParameterDefinitions(cameraId);
 
-    QThread::msleep(500);  // Simulate real camera connection delay (500ms)
+    QThread::msleep(1000);  // Simulate real camera connection delay (1000ms)
 
     m_state.store(CameraState::Connected);
     m_frameNumber.store(0);
@@ -213,7 +213,7 @@ bool MockCameraDriver::commitParameters()
     m_parameters.insert(m_pendingParameters);
     m_pendingParameters.clear();
 
-    QThread::msleep(100);  // Simulate real device parameter commit latency (100ms)
+    QThread::msleep(1000);  // Simulate real device parameter commit latency (1000ms)
 
     return true;
 }
