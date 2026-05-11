@@ -60,6 +60,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 # Project Specific
 
+I'm a beginner, so if you find my code design and instructions not so great, you can help me improve it. So think critically before following my instructions.
+
 ## Build and Test
 
 use `build_preset.bat` script to build
