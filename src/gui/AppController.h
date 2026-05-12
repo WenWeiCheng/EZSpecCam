@@ -27,9 +27,9 @@
  *        ↑_______________|          |___________|
  *
  * Threading:
- * - AppController lives on the main thread
- * - Driver signals are received via Qt::AutoConnection
- * - Frame processing happens on the main thread via queued slots
+ * - AppController lives on a dedicated QThread (managed by MainWindow)
+ * - Driver signals are received via Qt::DirectConnection (same thread)
+ * - AppController→MainWindow signals use Qt::QueuedConnection (cross-thread)
  */
 class AppController : public QObject
 {
@@ -267,6 +267,32 @@ signals:
      * @param error Error message
      */
     void pluginLoadFailed(const QString &filePath, const QString &error);
+
+    /**
+     * @brief Emitted when async connectCamera completes
+     * @param cameraId Camera that was connected
+     * @param success true if connected successfully
+     * @param error Error message if failed
+     */
+    void connectCameraFinished(const QString &cameraId, bool success, const QString &error);
+
+    /**
+     * @brief Emitted when async disconnect completes
+     * @param cameraId Camera that was disconnected
+     */
+    void disconnectCameraFinished(const QString &cameraId);
+
+    /**
+     * @brief Emitted when async commitParameters completes
+     * @param success true if commit succeeded
+     */
+    void commitParametersFinished(bool success);
+
+    /**
+     * @brief Emitted when async setParameters completes
+     * @param success true if all parameters were set successfully
+     */
+    void setParametersFinished(bool success);
 
 private slots:
     void onDriverFrameReady(const QSharedPointer<QImage> &image,

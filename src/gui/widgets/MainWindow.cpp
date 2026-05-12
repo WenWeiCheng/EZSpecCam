@@ -169,8 +169,7 @@ MainWindow::MainWindow(QWidget *parent)
     auto *shortcutBurst = new QShortcut(QKeySequence(Qt::Key_B), this);
     connect(shortcutBurst, &QShortcut::activated, this, &MainWindow::onBurstModeTriggered);
 
-    m_appController = new AppController(this);
-    m_appController->scanPlugins();
+    m_appController = new AppController(nullptr);
 
     m_imageViewWidget = ui->imageViewWidget;
     m_spectrumViewWidget = ui->spectrumViewWidget;
@@ -194,6 +193,14 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::onCaptureStarted);
     connect(m_appController, &AppController::captureStopped,
             this, &MainWindow::onCaptureStopped);
+
+    // Move AppController to its own dedicated thread
+    m_controllerThread = new QThread(this);
+    m_appController->moveToThread(m_controllerThread);
+    m_controllerThread->start();
+
+    // Call scanPlugins on the controller thread (must be after moveToThread)
+    QMetaObject::invokeMethod(m_appController, &AppController::scanPlugins, Qt::QueuedConnection);
 
     connect(ui->menuActionSaveFrameAs, &QAction::triggered,
             this, &MainWindow::on_actionSaveFrameAs_triggered);
@@ -261,6 +268,13 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
+    // Clean up controller thread before destroying AppController
+    if (m_controllerThread) {
+        m_controllerThread->quit();
+        m_controllerThread->wait(2000);
+        delete m_controllerThread;
+        m_controllerThread = nullptr;
+    }
 }
 
 void MainWindow::on_actionSaveFrame_triggered()
@@ -872,5 +886,14 @@ void MainWindow::closeEvent(QCloseEvent *event)
         m_appController->disconnectCamera();
     }
     QCoreApplication::processEvents();
+
+    if (m_controllerThread) {
+        m_controllerThread->quit();
+        if (m_controllerThread->wait(2000)) {
+            delete m_controllerThread;
+            m_controllerThread = nullptr;
+        }
+    }
+
     event->accept();
 }

@@ -6,6 +6,7 @@
 #include <QTimer>
 #include <QShortcut>
 #include <QSettings>
+#include <QThread>
 
 #include "../AppController.h"
 
@@ -91,6 +92,7 @@ private:
 
     MainWindowUi *ui;
     AppController *m_appController;
+    QThread *m_controllerThread = nullptr;
     CameraTab *m_cameraTab;
     ImageViewWidget *m_imageViewWidget;
     SpectrumViewWidget *m_spectrumViewWidget;

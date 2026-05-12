@@ -80,6 +80,7 @@ bool AppController::connectCamera(const QString &cameraId)
         emit errorOccurred(CameraError::makeError(
             CameraError::Code::StateInvalid,
             "Cannot connect: Already connected or invalid state"));
+        emit connectCameraFinished(cameraId, false, QStringLiteral("Invalid state"));
         return false;
     }
 
@@ -87,6 +88,7 @@ bool AppController::connectCamera(const QString &cameraId)
         emit errorOccurred(CameraError::makeError(
             CameraError::Code::InvalidParameter,
             "Cannot connect: Empty camera ID"));
+        emit connectCameraFinished(cameraId, false, QStringLiteral("Empty camera ID"));
         return false;
     }
 
@@ -98,6 +100,7 @@ bool AppController::connectCamera(const QString &cameraId)
         enterErrorState(CameraError::makeError(
             CameraError::Code::PluginLoadFailed,
             "No plugin found for camera: " + cameraId));
+        emit connectCameraFinished(cameraId, false, QStringLiteral("No plugin found"));
         return false;
     }
 
@@ -110,35 +113,39 @@ bool AppController::connectCamera(const QString &cameraId)
             enterErrorState(CameraError::makeError(
                 CameraError::Code::PluginLoadFailed,
                 "Plugin does not implement ICameraDriver"));
+            emit connectCameraFinished(cameraId, false, QStringLiteral("Plugin does not implement ICameraDriver"));
             return false;
         }
     } else {
         enterErrorState(CameraError::makeError(
             CameraError::Code::PluginLoadFailed,
             "Failed to get driver instance"));
+        emit connectCameraFinished(cameraId, false, QStringLiteral("Failed to get driver instance"));
         return false;
     }
 
     connect(m_driver, &ICameraDriver::frameReady,
-            this, &AppController::onDriverFrameReady, Qt::AutoConnection);
+            this, &AppController::onDriverFrameReady, Qt::DirectConnection);
     connect(m_driver, &ICameraDriver::captureStarted,
-            this, &AppController::onDriverCaptureStarted, Qt::AutoConnection);
+            this, &AppController::onDriverCaptureStarted, Qt::DirectConnection);
     connect(m_driver, &ICameraDriver::captureStopped,
-            this, &AppController::onDriverCaptureStopped, Qt::AutoConnection);
+            this, &AppController::onDriverCaptureStopped, Qt::DirectConnection);
     connect(m_driver, &ICameraDriver::connectionChanged,
-            this, &AppController::onDriverConnectionChanged, Qt::AutoConnection);
+            this, &AppController::onDriverConnectionChanged, Qt::DirectConnection);
     connect(m_driver, &ICameraDriver::errorOccurred,
-            this, &AppController::onDriverError, Qt::AutoConnection);
+            this, &AppController::onDriverError, Qt::DirectConnection);
 
     if (!m_driver->connectToCamera(cameraId)) {
         qWarning() << "AppController: Driver failed to connect";
         enterErrorState(CameraError::makeError(
             CameraError::Code::ConnectionFailed,
             "Driver failed to connect"));
+        emit connectCameraFinished(cameraId, false, QStringLiteral("Driver failed to connect"));
         return false;
     }
 
     enterConnectedState();
+    emit connectCameraFinished(cameraId, true, QString());
     return true;
 }
 
@@ -580,9 +587,11 @@ bool AppController::setParameters(const QVariantMap &params)
 {
     for (auto it = params.constBegin(); it != params.constEnd(); ++it) {
         if (!setParameter(it.key(), it.value())) {
+            emit setParametersFinished(false);
             return false;
         }
     }
+    emit setParametersFinished(true);
     return true;
 }
 
@@ -597,12 +606,14 @@ bool AppController::validateParameters()
 bool AppController::commitParameters()
 {
     if (!m_driver || !m_driver->isConnected()) {
+        emit commitParametersFinished(false);
         return false;
     }
     bool ok = m_driver->commitParameters();
     if (ok) {
         saveDynamicConfig(m_cameraId, m_parameters);
     }
+    emit commitParametersFinished(ok);
     return ok;
 }
 
