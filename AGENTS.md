@@ -61,7 +61,8 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 - QHYCCD plugin is currently disabled in CMake (hardware-dependent)
 - **DO NOT** add absolute paths to sibling project directories in CMakeLists.txt 
 
-## COMMANDS
+## Build and Test
+
 ```bash
 # Configure + build (MSVC Debug)
 & ".\build_preset.bat" 2>&1
@@ -69,6 +70,7 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 # Run tests
 & ".\run_tests.bat" 2>&1
 ```
+> **Never use cmake to build directly without vcvars64.bat called. Otherwise the build will fail**. The best way to build is to use the provided build_preset.bat script or write a custom script in the same style as the provided build_preset.bat script.
 
 ## NOTES
 - `qcustomplot.cpp` is 32k lines — largest file; read-only
