@@ -10,7 +10,6 @@
 #include <QLineEdit>
 #include <QWheelEvent>
 
-// TODO: 为什么要放在一个无命名的 namespace 里？
 namespace {
 class WheelBlocker : public QObject
 {
