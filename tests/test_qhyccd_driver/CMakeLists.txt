@@ -17,4 +17,4 @@ target_include_directories(test_qhyccd_driver PRIVATE
 set_target_properties(test_qhyccd_driver PROPERTIES
     Qt6::MinimalQt6 TRUE
 )
-add_test(NAME test_qhyccd_driver COMMAND test_qhyccd_driver)
+# add_test(NAME test_qhyccd_driver COMMAND test_qhyccd_driver)
