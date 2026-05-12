@@ -371,7 +371,6 @@ QString AppController::getConfigPath(const QString &cameraId)
     return getConfigDirectory() + "/" + cameraId + ".ini";
 }
 
-// FIXME: saveDynamicConfig 和 loadDynamicConfig 从未被调用过，因此参数的持久化功能实际上并没有被测试过，应该在 UI 里调用这个函数来保存和加载参数。
 void AppController::saveDynamicConfig(const QString &cameraId, const QVariantMap &parameters)
 {
     QString path = getConfigPath(cameraId);

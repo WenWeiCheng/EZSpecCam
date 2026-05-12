@@ -461,7 +461,7 @@ QWidget *ParameterWidgetFactory::createFloatRangeWidgetWithUnit(const ParameterD
     return container;
 }
 
-// TODO: need a slider as well
+// TODO: ParameterWidgetFactory::createIntRangeWidget need a slider as well
 QWidget *ParameterWidgetFactory::createIntRangeWidget(const ParameterDefinition &def)
 {
     if (def.constraint.hasUnitRange()) {
