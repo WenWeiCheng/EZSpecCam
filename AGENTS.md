@@ -1,7 +1,7 @@
 # EZSpecCam Knowledge Base
 
 **Generated:** 2026-05-12
-**Commit:** b84df97
+**Commit:** fb78fec
 **Branch:** main
 
 ## OVERVIEW
@@ -59,6 +59,7 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 - **DO NOT** modify `src/gui/qcustomplot.*` — external library (bundled QCustomPlot 2.1.1)
 - **DO NOT** block the main thread in camera drivers — use async signals
 - QHYCCD plugin is currently disabled in CMake (hardware-dependent)
+- **DO NOT** add absolute paths to sibling project directories in CMakeLists.txt 
 
 ## COMMANDS
 ```bash
@@ -78,3 +79,7 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 - Some tests (`test_cli`, `test_qhyccd_driver`) are commented out in CMake
 - IDE: `.clangd` config present for LSP; `compile_commands.json` generated at build
 - `AGENTS_bak.md` is the old knowledge base — keep for reference, this file supersedes it
+
+## BUILD CONVENTIONS
+- Root CMakeLists.txt: Uses `file(MAKE_DIRECTORY ...)` after setting output dirs — redundant butharmless
+- Qt plugins use separate `.json` metadata files (not `Q_PLUGIN_METADATA` inline in source)

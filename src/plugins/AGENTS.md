@@ -1,5 +1,7 @@
 # src/plugins — Camera Driver Plugins
 
+**Generated:** 2026-05-12
+
 ## OVERVIEW
 Qt plugin-based camera drivers implementing `ICameraDriver`. Loaded at runtime via `QPluginLoader`. Each plugin has a `.json` metadata descriptor.
 
