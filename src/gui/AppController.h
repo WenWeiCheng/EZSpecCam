@@ -55,14 +55,6 @@ public:
 
 public:
     /**
-     * @brief Scan for available camera driver plugins
-     *
-     * Discovers .dll files in the plugins/drivers directory and
-     * loads valid ICameraDriver implementations.
-     */
-    void scanPlugins();
-
-    /**
      * @brief Set the plugin directory path (for testing)
      * @param path Directory path to scan for plugins
      */
@@ -157,6 +149,14 @@ public:
     bool validateParameters();
 
 public slots:
+    /**
+     * @brief Scan for available camera driver plugins
+     *
+     * Discovers .dll files in the plugins/drivers directory and
+     * loads valid ICameraDriver implementations.
+     */
+    void scanPlugins();
+
     /**
      * @brief Start capturing frames
      * @param captureCount Number of frames (0 = continuous)
