@@ -67,11 +67,6 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 
 # Run tests
 & ".\run_tests.bat" 2>&1
-
-# Manual CMake configure
-cmake --preset msvc-debug
-cmake --build build/msvc-debug
-ctest --test-dir build/msvc-debug -C Debug --output-on-failure
 ```
 
 ## NOTES

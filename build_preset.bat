@@ -13,6 +13,8 @@ echo MSVC environment ready
 echo.
 
 set "SOURCE_DIR=%~dp0"
+set "SOURCE_DIR=%SOURCE_DIR:~0,-1%"
+echo Source directory: %SOURCE_DIR%
 
 :: Get build type from argument, default to debug
 set BUILD_TYPE=%1
