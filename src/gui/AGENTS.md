@@ -47,6 +47,7 @@ gui/
 - UI construction separated into `ui/MainWindowUi` (not in MainWindow itself)
 - Camera state machine: Disconnected → Connecting → Connected → Acquiring → Error
 - Frame delivery via `frameReady(const ImageData &)` signal (not polling)
+- Functions defined with slots in `AppController` must be invoked via `QMetaObject::invokeMethod()`.
 
 ## ANTI-PATTERNS
 - **NEVER** modify `qcustomplot.cpp` or `qcustomplot.h` — external library
