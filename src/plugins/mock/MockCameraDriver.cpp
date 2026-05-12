@@ -1,4 +1,5 @@
 #include "MockCameraDriver.h"
+#include "gui/DebugMacros.h"
 
 #include <QDateTime>
 #include <QThread>
@@ -6,6 +7,13 @@
 #include <QDebug>
 #include <cmath>
 #include <cstring>
+
+Q_LOGGING_CATEGORY(parameterCategory, "Parameter")
+Q_LOGGING_CATEGORY(cameraCategory, "Camera")
+Q_LOGGING_CATEGORY(configCategory, "Config")
+Q_LOGGING_CATEGORY(displayCategory, "Display")
+Q_LOGGING_CATEGORY(captureCategory, "Capture")
+Q_LOGGING_CATEGORY(driverCategory, "Driver")
 
 MockCameraDriver::MockCameraDriver(QObject *parent)
     : ICameraDriver(parent)
@@ -242,9 +250,10 @@ bool MockCameraDriver::startCapture(int captureCount)
 
     double exposureMs = m_parameters.value("exposure", 100.0).toDouble();
     int intervalMs = static_cast<int>(exposureMs);
-    if (intervalMs < 10) {
-        intervalMs = 10;
+    if (intervalMs < 1) {
+        intervalMs = 1;
     }
+    DRIVER_DEBUG << "Starting capture with interval:" << intervalMs << "ms" << "and capture count:" << m_captureCount;
     m_captureTimer->start(intervalMs);
 
     emit captureStarted(m_connectedCameraId);

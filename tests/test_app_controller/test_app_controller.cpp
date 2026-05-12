@@ -14,12 +14,6 @@
 #include "core/CameraTypes.h"
 #include "plugins/mock/MockCameraDriver.h"
 
-Q_LOGGING_CATEGORY(parameterCategory, "Parameter")
-Q_LOGGING_CATEGORY(cameraCategory, "Camera")
-Q_LOGGING_CATEGORY(configCategory, "Config")
-Q_LOGGING_CATEGORY(displayCategory, "Display")
-Q_LOGGING_CATEGORY(captureCategory, "Capture")
-
 class TestAppController : public QObject
 {
     Q_OBJECT

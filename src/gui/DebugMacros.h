@@ -8,6 +8,7 @@ Q_DECLARE_LOGGING_CATEGORY(cameraCategory)
 Q_DECLARE_LOGGING_CATEGORY(configCategory)
 Q_DECLARE_LOGGING_CATEGORY(displayCategory)
 Q_DECLARE_LOGGING_CATEGORY(captureCategory)
+Q_DECLARE_LOGGING_CATEGORY(driverCategory)
 
 #define CATEGORY_DEBUG(category) qCDebug(category) << "[" << __FILE__ << " +" << __LINE__ << "] "
 
@@ -16,3 +17,4 @@ Q_DECLARE_LOGGING_CATEGORY(captureCategory)
 #define CONFIG_DEBUG CATEGORY_DEBUG(configCategory)
 #define DISPLAY_DEBUG CATEGORY_DEBUG(displayCategory)
 #define CAPTURE_DEBUG CATEGORY_DEBUG(captureCategory)
+#define DRIVER_DEBUG CATEGORY_DEBUG(driverCategory)
