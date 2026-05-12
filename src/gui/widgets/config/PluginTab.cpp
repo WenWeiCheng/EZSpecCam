@@ -52,7 +52,7 @@ void PluginTab::setAppController(AppController *controller)
                 this, &PluginTab::onPluginLoadFailed);
 
         if (!pluginDir.isEmpty() && QDir(pluginDir).exists()) {
-            controller->scanPlugins();
+            QMetaObject::invokeMethod(controller, &AppController::scanPlugins, Qt::QueuedConnection);
         }
     }
 }
