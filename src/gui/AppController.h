@@ -53,6 +53,7 @@ public:
 
     // ——— Plugin Discovery (from CameraPluginManager) ———
 
+public:
     /**
      * @brief Scan for available camera driver plugins
      *
@@ -79,24 +80,6 @@ public:
      */
     bool hasPlugins() const;
 
-    // ——— Connection Management ———
-
-    /**
-     * @brief Connect to a camera by ID
-     * @param cameraId Camera identifier from availableCameras()
-     * @return true if connection was initiated
-     *
-     * State transition: Disconnected/Error → Connecting → Connected
-     */
-    bool connectCamera(const QString &cameraId);
-
-    /**
-     * @brief Disconnect from the current camera
-     *
-     * State transition: Any → Disconnected
-     */
-    void disconnectCamera();
-
     /**
      * @brief Check if connected to a camera
      * @return true if connected and ready
@@ -114,27 +97,6 @@ public:
      * @return Camera ID string, or empty if not connected
      */
     QString currentCameraId() const;
-
-    // ——— Capture Control ———
-
-    /**
-     * @brief Start capturing frames
-     * @param captureCount Number of frames (0 = continuous)
-     * @return true if capture started successfully
-     *
-     * State transition: Connected → Acquiring
-     */
-    bool startCapture(int captureCount = 0);
-
-    /**
-     * @brief Stop capturing frames
-     * @param timeoutMs Maximum wait time in milliseconds
-     *
-     * State transition: Acquiring → Connected
-     */
-    void stopCapture(int timeoutMs = 5000);
-
-    // ——— Parameter Management ———
 
     /**
      * @brief Get list of available parameter names
@@ -157,24 +119,21 @@ public:
     QVariant parameterValue(const QString &name) const;
 
     /**
-     * @brief Set a parameter value
-     * @param name Parameter identifier
-     * @param value New value
-     * @return true if value was accepted
+     * @brief Start capturing frames
+     * @param captureCount Number of frames (0 = continuous)
+     * @return true if capture started successfully
+     *
+     * State transition: Connected → Acquiring
      */
-    bool setParameter(const QString &name, const QVariant &value);
+    bool startCapture(int captureCount = 0);
 
     /**
-     * @brief Validate all current parameters
-     * @return true if all parameters are valid
+     * @brief Stop capturing frames
+     * @param timeoutMs Maximum wait time in milliseconds
+     *
+     * State transition: Acquiring → Connected
      */
-    bool validateParameters();
-
-    /**
-     * @brief Commit all staged parameter changes
-     * @return true if commit succeeded
-     */
-    bool commitParameters();
+    void stopCapture(int timeoutMs = 5000);
 
     /**
      * @brief Save dynamic configuration to INI file
@@ -197,15 +156,6 @@ public:
     QVariantMap allParameters() const;
 
     /**
-     * @brief Apply multiple parameters at once
-     * @param params Map of parameters to apply
-     * @return true if all parameters applied successfully
-     */
-    bool setParameters(const QVariantMap &params);
-
-    // ——— State Access ———
-
-    /**
      * @brief Get current camera state
      * @return CameraState enum value
      */
@@ -216,6 +166,50 @@ public:
      * @return Pointer to ICameraDriver, or nullptr
      */
     ICameraDriver *driver() const { return m_driver; }
+
+    /**
+     * @brief Validate all current parameters
+     * @return true if all parameters are valid
+     */
+    bool validateParameters();
+
+public slots:
+    /**
+     * @brief Connect to a camera by ID
+     * @param cameraId Camera identifier from availableCameras()
+     * @return true if connection was initiated
+     *
+     * State transition: Disconnected/Error → Connecting → Connected
+     */
+    bool connectCamera(const QString &cameraId);
+
+    /**
+     * @brief Disconnect from the current camera
+     *
+     * State transition: Any → Disconnected
+     */
+    void disconnectCamera();
+
+    /**
+     * @brief Set a parameter value
+     * @param name Parameter identifier
+     * @param value New value
+     * @return true if value was accepted
+     */
+    bool setParameter(const QString &name, const QVariant &value);
+
+    /**
+     * @brief Apply multiple parameters at once
+     * @param params Map of parameters to apply
+     * @return true if all parameters applied successfully
+     */
+    bool setParameters(const QVariantMap &params);
+
+    /**
+     * @brief Commit all staged parameter changes
+     * @return true if commit succeeded
+     */
+    bool commitParameters();
 
 signals:
     /**
