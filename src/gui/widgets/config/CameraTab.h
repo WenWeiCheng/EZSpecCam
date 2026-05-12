@@ -46,11 +46,6 @@ public:
     // Returns: 0 for Live (continuous), 1 for Single, N for Burst
     int getCaptureCount() const;
 
-    // Save camera metadata (exposure, gain, temperature, ROI) to QSettings
-    void saveCameraMetadata();
-    // Load camera metadata from QSettings and populate buffered config
-    void loadCameraMetadata();
-
     QPushButton *connectButton;
     QPushButton *disconnectButton;
     QComboBox *cameraComboBox;
