@@ -14,6 +14,14 @@
 #include "ICameraDriver.h"
 #include "CameraTypes.h"
 
+// Plugin management
+struct PluginInfo {
+    QString filePath;
+    QStringList cameraIds;
+    QPluginLoader *loader = nullptr;
+    ICameraDriver *instance = nullptr;
+};
+
 /**
  * @class AppController
  * @brief Merged CameraManager + CameraPluginManager for EZSpecCam GUI
@@ -65,6 +73,14 @@ public:
      * @return List of camera identifiers
      */
     QStringList availableCameras() const;
+
+    /**
+     * @brief Get information about all loaded plugins
+     * @return List of PluginInfo structures containing plugin metadata
+     *
+     * @see hasLoadedPlugins() to check if any plugins are loaded
+     */
+    QList<PluginInfo> loadedPlugins() const;
 
     /**
      * @brief Check if any plugins are loaded
@@ -315,14 +331,6 @@ private:
 
     void disconnectFromDriver();
     void cleanupDriver();
-
-    // Plugin management
-    struct PluginInfo {
-        QString filePath;
-        QStringList cameraIds;
-        QPluginLoader *loader = nullptr;
-        ICameraDriver *instance = nullptr;
-    };
 
     const PluginInfo *findPluginForCamera(const QString &cameraId) const;
     bool loadPlugin(const QString &filePath);

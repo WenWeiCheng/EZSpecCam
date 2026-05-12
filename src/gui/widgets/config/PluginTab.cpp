@@ -160,26 +160,14 @@ void PluginTab::updatePluginsTable()
     if (!m_appController) {
         return;
     }
+    const QList<PluginInfo> plugins = m_appController->loadedPlugins();
+    pluginsTableWidget->setRowCount(plugins.size());
 
-    QStringList cameras = m_appController->availableCameras();
-    if (cameras.isEmpty()) {
-        return;
-    }
-
-    QMap<QString, QStringList> pluginCameras;
-    for (const QString &cameraId : cameras) {
-        int dashIndex = cameraId.lastIndexOf('-');
-        QString pluginName = (dashIndex > 0) ? cameraId.left(dashIndex) : cameraId;
-        pluginCameras[pluginName].append(cameraId);
-    }
-
-    int row = 0;
-    for (auto it = pluginCameras.constBegin(); it != pluginCameras.constEnd(); ++it) {
-        pluginsTableWidget->insertRow(row);
-        QTableWidgetItem *pluginItem = new QTableWidgetItem(it.key());
-        QTableWidgetItem *camerasItem = new QTableWidgetItem(it.value().join(", "));
-        pluginsTableWidget->setItem(row, 0, pluginItem);
-        pluginsTableWidget->setItem(row, 1, camerasItem);
-        ++row;
+    for (int i = 0; i < plugins.size(); ++i) {
+        const auto &info = plugins.at(i);
+        QTableWidgetItem *pathItem = new QTableWidgetItem(QFileInfo(info.filePath).fileName());
+        QTableWidgetItem *idItem = new QTableWidgetItem(info.cameraIds.join(", "));
+        pluginsTableWidget->setItem(i, 0, pathItem);
+        pluginsTableWidget->setItem(i, 1, idItem);
     }
 }

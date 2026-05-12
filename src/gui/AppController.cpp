@@ -69,6 +69,11 @@ QStringList AppController::availableCameras() const
     return cameras;
 }
 
+QList<PluginInfo> AppController::loadedPlugins() const
+{
+    return m_plugins;
+}
+
 bool AppController::hasPlugins() const
 {
     return !m_plugins.isEmpty();
@@ -290,7 +295,7 @@ void AppController::cleanupDriver()
     m_cameraId.clear();
 }
 
-const AppController::PluginInfo *AppController::findPluginForCamera(const QString &cameraId) const
+const PluginInfo *AppController::findPluginForCamera(const QString &cameraId) const
 {
     for (const PluginInfo &info : m_plugins) {
         if (info.cameraIds.contains(cameraId)) {
