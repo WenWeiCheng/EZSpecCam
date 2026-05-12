@@ -5,13 +5,12 @@
 #include <QTabWidget>
 #include <QShowEvent>
 #include <QAbstractButton>
-#include <QThread>
 #include <QHash>
 #include <QVariant>
+#include <QMetaObject>
 
 class CameraConfigDialogUi;
 class AppController;
-class CameraWorker;
 
 class CameraConfigDialog : public QDialog
 {
@@ -34,13 +33,12 @@ public slots:
     void on_buttonBox_rejected();
     void on_buttonBox_clicked(QAbstractButton *button);
     void on_restoreButton_clicked();
-    void onWorkerParametersCommitted(bool success, const QString &error);
+    void onSetParametersFinished(bool success);
+    void onCommitParametersFinished(bool success);
 
 private:
     CameraConfigDialogUi *ui;
-    QThread *m_workerThread = nullptr;
-    CameraWorker *m_worker = nullptr;
-    QHash<QString, QVariant> m_pendingConfig;
+    QVariantMap m_pendingConfig;
     bool m_acceptAfterCommit = false;
 };
 
