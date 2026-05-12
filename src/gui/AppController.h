@@ -351,6 +351,8 @@ private:
 
     // Capture tracking
     int m_captureCount = 0;
+    
+    bool m_fisrtSetParameter = true;
 };
 
 #endif // APPCONTROLLER_H

@@ -7,6 +7,7 @@
 #include <QStandardPaths>
 #include <QFile>
 #include <QDir>
+#include <qobject.h>
 
 
 AppController::AppController(QObject *parent)
@@ -161,6 +162,8 @@ void AppController::disconnectCamera()
 
     disconnectFromDriver();
     enterDisconnectedState();
+    
+    m_fisrtSetParameter = true;
 }
 
 bool AppController::isConnected() const
@@ -571,13 +574,19 @@ bool AppController::setParameter(const QString &name, const QVariant &value)
     if (!m_driver) {
         return false;
     }
+
     QVariant oldValue = m_parameters.value(name);
-    if (oldValue == value) {
+    if (!m_fisrtSetParameter && oldValue == value) {
         return true;
     }
+
     if (m_driver->setParameter(name, value)) {
         m_parameters[name] = value;
-        PARAM_DEBUG << name << ":" << oldValue << "->" << value;
+        if(m_fisrtSetParameter){
+            PARAM_DEBUG << "First set parameter:" << name << ":" << value;
+        } else {
+            PARAM_DEBUG << name << ":" << oldValue << "->" << value;
+        }
         return true;
     }
     return false;
@@ -592,6 +601,7 @@ bool AppController::setParameters(const QVariantMap &params)
         }
     }
     emit setParametersFinished(true);
+    m_fisrtSetParameter = false;
     return true;
 }
 
@@ -670,9 +680,6 @@ void AppController::onDriverConnectionChanged(bool connected, const QString &cam
                 m_parameters[it.key()] = it.value();
             }
         }
-
-        setParameters(m_parameters);
-        commitParameters();
 
         setState(CameraState::Connected);
     } else {
