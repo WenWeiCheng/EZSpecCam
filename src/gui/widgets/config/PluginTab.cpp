@@ -13,6 +13,7 @@
 #include <QSettings>
 #include <QHeaderView>
 #include <QAbstractItemView>
+#include <qobjectdefs.h>
 
 PluginTab::PluginTab(QWidget *parent)
     : QWidget(parent)
@@ -131,7 +132,7 @@ void PluginTab::onScanClicked()
         settings.setValue("plugins/pluginDirectory", pluginDir);
     }
 
-    m_appController->scanPlugins();
+    QMetaObject::invokeMethod(m_appController, &AppController::scanPlugins, Qt::QueuedConnection);
 }
 
 void PluginTab::onScanCompleted(int totalPlugins, int loadedPlugins)
