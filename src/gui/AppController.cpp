@@ -569,6 +569,30 @@ QVariantMap AppController::allParameters() const
     return m_parameters;
 }
 
+QStringList AppController::parameterNames() const
+{
+    if (!m_driver) {
+        return QStringList();
+    }
+    return m_driver->parameterNames();
+}
+
+ParameterDefinition AppController::parameter(const QString &name) const
+{
+    if (!m_driver) {
+        return ParameterDefinition();
+    }
+    return m_driver->parameter(name);
+}
+
+QVariant AppController::parameterValue(const QString &name) const
+{
+    if (!m_driver) {
+        return QVariant();
+    }
+    return m_driver->parameterValue(name);
+}
+
 bool AppController::setParameter(const QString &name, const QVariant &value)
 {
     if (!m_driver) {

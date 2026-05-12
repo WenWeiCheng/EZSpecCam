@@ -312,17 +312,12 @@ void CameraTab::buildDynamicParameterPanel()
 
     clearDynamicParameterPanel();
 
-    ICameraDriver *driver = m_appController->driver();
-    if (!driver) {
-        return;
-    }
-
-    QStringList paramNames = driver->parameterNames();
+    QStringList paramNames = m_appController->parameterNames();
 
     QMap<ParameterCategory, QVector<QPair<QString, ParameterDefinition>>> paramsByCategory;
 
     for (const QString &paramName : paramNames) {
-        ParameterDefinition def = driver->parameter(paramName);
+        ParameterDefinition def = m_appController->parameter(paramName);
         m_parameterDefinitions.insert(paramName, def);
         paramsByCategory[def.category].append({paramName, def});
     }
@@ -475,16 +470,11 @@ void CameraTab::onCoolingTimerTimeout()
         return;
     }
 
-    ICameraDriver *driver = m_appController->driver();
-    if (!driver) {
-        return;
-    }
-
-    QStringList paramNames = driver->parameterNames();
+    QStringList paramNames = m_appController->parameterNames();
     for (const QString &paramName : paramNames) {
-        ParameterDefinition def = driver->parameter(paramName);
+        ParameterDefinition def = m_appController->parameter(paramName);
         if (def.isDynamic && def.isExtrinsic && def.category == ParameterCategory::Cooling) {
-            QVariant value = driver->parameterValue(paramName);
+            QVariant value = m_appController->parameterValue(paramName);
             QWidget *widget = m_parameterWidgets.value(paramName);
             if (widget) {
                 if (def.type == ParameterType::String) {
@@ -516,16 +506,11 @@ void CameraTab::onParametersCommitted()
         return;
     }
 
-    ICameraDriver *driver = m_appController->driver();
-    if (!driver) {
-        return;
-    }
-
-    QStringList paramNames = driver->parameterNames();
+    QStringList paramNames = m_appController->parameterNames();
     for (const QString &paramName : paramNames) {
-        ParameterDefinition def = driver->parameter(paramName);
+        ParameterDefinition def = m_appController->parameter(paramName);
         if (def.isDynamic) {
-            QVariant value = driver->parameterValue(paramName);
+            QVariant value = m_appController->parameterValue(paramName);
             QWidget *widget = m_parameterWidgets.value(paramName);
             if (widget) {
                 if (def.type == ParameterType::IntRange) {
