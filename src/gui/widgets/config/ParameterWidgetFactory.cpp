@@ -460,16 +460,63 @@ QWidget *ParameterWidgetFactory::createFloatRangeWidgetWithUnit(const ParameterD
     return container;
 }
 
-// TODO: ParameterWidgetFactory::createIntRangeWidget need a slider as well
 QWidget *ParameterWidgetFactory::createIntRangeWidget(const ParameterDefinition &def)
 {
     if (def.constraint.hasUnitRange()) {
         return createIntRangeWidgetWithUnit(def);
     }
 
+    int minVal = static_cast<int>(def.constraint.minValue);
+    int maxVal = static_cast<int>(def.constraint.maxValue);
+    int span = maxVal - minVal;
+
+    if (span > 50) {
+        QWidget *container = new QWidget();
+        QHBoxLayout *layout = new QHBoxLayout(container);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(4);
+
+        QSpinBox *spinBox = new QSpinBox(container);
+        spinBox->setObjectName("spinBox");
+        spinBox->setRange(minVal, maxVal);
+        spinBox->setSingleStep(def.constraint.step > 0 ? static_cast<int>(def.constraint.step) : 1);
+        if (def.defaultValue.isValid()) {
+            spinBox->setValue(def.defaultValue.toInt());
+        }
+        if (!def.description.isEmpty()) {
+            spinBox->setToolTip(def.description);
+        }
+        installWheelBlocker(spinBox);
+        layout->addWidget(spinBox, 1);
+
+        QSlider *slider = new QSlider(Qt::Horizontal, container);
+        slider->setObjectName("slider");
+        slider->setRange(minVal, maxVal);
+        slider->setSingleStep(def.constraint.step > 0 ? static_cast<int>(def.constraint.step) : 1);
+        slider->setTickPosition(QSlider::TickPosition::TicksBelow);
+        if (!def.description.isEmpty()) {
+            slider->setToolTip(def.description);
+        }
+        installWheelBlocker(slider);
+        layout->addWidget(slider, 2);
+
+        container->setProperty("isIntRange", true);
+
+        QObject::connect(slider, &QSlider::valueChanged,
+            [=](int value) {
+                spinBox->setValue(value);
+            });
+
+        QObject::connect(spinBox, QOverload<int>::of(&QSpinBox::valueChanged),
+            [=](int value) {
+                slider->setValue(value);
+            });
+
+        return container;
+    }
+
     QSpinBox *spinBox = new QSpinBox();
-    spinBox->setRange(static_cast<int>(def.constraint.minValue),
-                     static_cast<int>(def.constraint.maxValue));
+    spinBox->setRange(minVal, maxVal);
     spinBox->setSingleStep(def.constraint.step > 0 ? static_cast<int>(def.constraint.step) : 1);
     if (def.defaultValue.isValid()) {
         spinBox->setValue(def.defaultValue.toInt());
