@@ -210,10 +210,11 @@ bool MockCameraDriver::commitParameters()
 
     }
 
-    m_parameters.insert(m_pendingParameters);
-    m_pendingParameters.clear();
-
-    QThread::msleep(1000);  // Simulate real device parameter commit latency (1000ms)
+    if(!m_pendingParameters.isEmpty()){
+        m_parameters.insert(m_pendingParameters);
+        m_pendingParameters.clear();
+        QThread::msleep(1000);  // Simulate real device parameter commit latency (1000ms)
+    }
 
     return true;
 }
