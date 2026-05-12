@@ -650,6 +650,7 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
 {
     m_currentFrame = frame;
 
+    ui->frameCountLabel->setText(tr("Frames: %1").arg(++m_frameCount));
     m_fpsFrameCount++;
 
     if (m_vBinEnabled) {
@@ -695,10 +696,8 @@ void MainWindow::onErrorOccurred(const CameraError &error)
     QMessageBox::warning(this, tr("Camera Error"), message);
 }
 
-// FIXME: 如果 Live 或 burst 模式，frame count 只增加一次，应该是每来一帧增加一次
 void MainWindow::onCaptureStarted()
 {
-    ui->frameCountLabel->setText(tr("Frames: %1").arg(++m_frameCount));
 }
 
 void MainWindow::onCaptureStopped()
