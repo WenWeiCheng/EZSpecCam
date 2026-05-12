@@ -130,6 +130,22 @@ QVariant ParameterWidgetFactory::getWidgetValue(QWidget *widget, ParameterType t
         if (spinBox) {
             return spinBox->value();
         }
+        QSlider *slider = qobject_cast<QSlider *>(widget);
+        if (slider) {
+            return static_cast<double>(slider->value());
+        }
+        // Handle container widget with layout
+        if (widget->layout()) {
+            for (int i = 0; i < widget->layout()->count(); ++i) {
+                QWidget *itemWidget = widget->layout()->itemAt(i)->widget();
+                if (itemWidget) {
+                    QVariant result = getWidgetValue(itemWidget, type);
+                    if (result.isValid()) {
+                        return result;
+                    }
+                }
+            }
+        }
         break;
     }
     case ParameterType::IntCollection:
@@ -493,7 +509,6 @@ QWidget *ParameterWidgetFactory::createIntRangeWidget(const ParameterDefinition 
         slider->setObjectName("slider");
         slider->setRange(minVal, maxVal);
         slider->setSingleStep(def.constraint.step > 0 ? static_cast<int>(def.constraint.step) : 1);
-        slider->setTickPosition(QSlider::TickPosition::TicksBelow);
         if (!def.description.isEmpty()) {
             slider->setToolTip(def.description);
         }

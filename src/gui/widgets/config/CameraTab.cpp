@@ -366,7 +366,7 @@ void CameraTab::updateBufferedConfigFromWidgets()
         if (value.isValid()) {
             m_bufferedConfig.insert(paramName, value);
         } else {
-            qWarning() << "Invalid value for parameter" << paramName;
+            CONFIG_DEBUG << "Invalid value for" << paramName << ":" << value;
         }
     }
 }
