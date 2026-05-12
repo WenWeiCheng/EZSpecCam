@@ -4,12 +4,12 @@ qt_add_plugin(qhyccd_camera_driver MODULE)
 target_link_libraries(qhyccd_camera_driver PRIVATE
     ezspeccam_core
     Qt6::Core Qt6::Widgets
-    "${CMAKE_SOURCE_DIR}/../2502-Sw-EZSpecCam/material/QHYCCD_API/sample/QtVS_Basic_Live/winlib/x64/qhyccd.lib"
+    "${CMAKE_SOURCE_DIR}/src/plugins/qhyccd/sdk/winlib/x64/qhyccd.lib"
 )
 
 target_include_directories(qhyccd_camera_driver PRIVATE
     ${CMAKE_SOURCE_DIR}/src
-    "${CMAKE_SOURCE_DIR}/../2502-Sw-EZSpecCam/material/QHYCCD_API/sample/QtVS_Basic_Live/include"
+    "${CMAKE_SOURCE_DIR}/src/plugins/qhyccd/sdk/include"
 )
 
 target_sources(qhyccd_camera_driver PRIVATE
