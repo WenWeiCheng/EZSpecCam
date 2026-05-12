@@ -1,38 +1,31 @@
 #include "CameraTab.h"
 #include "../../DebugMacros.h"
+#include "../../ui/CameraTabUi.h"
 #include "ParameterWidgetFactory.h"
 #include <QDebug>
 #include <QObject>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QFormLayout>
-#include <QGroupBox>
-#include <QLabel>
-#include <QComboBox>
-#include <QPushButton>
-#include <QDoubleSpinBox>
-#include <QSpinBox>
 #include <QTimer>
 #include <QMetaObject>
 #include <QSettings>
+#include <QComboBox>
+#include <QPushButton>
 
 CameraTab::CameraTab(QWidget *parent)
     : QWidget(parent)
-    , connectButton(nullptr)
-    , disconnectButton(nullptr)
-    , cameraComboBox(nullptr)
-    , captureModeComboBox(nullptr)
-    , captureCountSpinBox(nullptr)
-    , formLayout(nullptr)
-    , m_countRow(-1)
-    , parameterGroup(nullptr)
+    , ui(new CameraTabUi(this))
     , m_appController(nullptr)
-    , m_statusLabel(nullptr)
-    , m_dynamicParametersLayout(nullptr)
     , m_coolingTimer(new QTimer(this))
 {
-    setupUi();
+    ui->setupUi(this);
     connect(m_coolingTimer, &QTimer::timeout, this, &CameraTab::onCoolingTimerTimeout);
+    connect(ui->connectButton, &QPushButton::clicked,
+            this, &CameraTab::onConnectButtonClicked);
+    connect(ui->disconnectButton, &QPushButton::clicked,
+            this, &CameraTab::onDisconnectButtonClicked);
+    connect(ui->cameraComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &CameraTab::onCameraSelected);
+    connect(ui->captureModeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &CameraTab::onCaptureModeChanged);
 }
 
 CameraTab::~CameraTab()
@@ -45,14 +38,14 @@ void CameraTab::setAppController(AppController *controller)
 
     if (controller) {
         QStringList cameras = controller->availableCameras();
-        cameraComboBox->clear();
-        cameraComboBox->addItems(cameras);
+        ui->cameraComboBox->clear();
+        ui->cameraComboBox->addItems(cameras);
 
         if (controller->isConnected()) {
             QString currentId = controller->currentCameraId();
-            int index = cameraComboBox->findText(currentId);
+            int index = ui->cameraComboBox->findText(currentId);
             if (index >= 0) {
-                cameraComboBox->setCurrentIndex(index);
+                ui->cameraComboBox->setCurrentIndex(index);
             }
         }
 
@@ -77,34 +70,34 @@ void CameraTab::setAppController(AppController *controller)
 void CameraTab::updateConnectionState()
 {
     if (!m_appController) {
-        connectButton->setEnabled(false);
-        disconnectButton->setEnabled(false);
+        ui->connectButton->setEnabled(false);
+        ui->disconnectButton->setEnabled(false);
         return;
     }
 
     CameraState state = m_appController->state();
     bool camera_notConnected = (state == CameraState::Disconnected || state == CameraState::Error);
-    bool connected = !camera_notConnected && cameraComboBox->count() > 0;
-    connectButton->setEnabled(!connected);
-    disconnectButton->setEnabled(connected);
+    bool connected = !camera_notConnected && ui->cameraComboBox->count() > 0;
+    ui->connectButton->setEnabled(!connected);
+    ui->disconnectButton->setEnabled(connected);
 }
 
 void CameraTab::onConnectButtonClicked()
 {
-    if (!m_appController || cameraComboBox->count() == 0) {
+    if (!m_appController || ui->cameraComboBox->count() == 0) {
         return;
     }
 
-    QString selectedCamera = cameraComboBox->currentText();
+    QString selectedCamera = ui->cameraComboBox->currentText();
     if (!selectedCamera.isEmpty()) {
-        connectButton->setEnabled(false);
-        cameraComboBox->setEnabled(false);
-        if (m_loadingIndicator) {
-            m_loadingIndicator->setVisible(true);
-            m_loadingIndicator->startAnimation();
+        ui->connectButton->setEnabled(false);
+        ui->cameraComboBox->setEnabled(false);
+        if (ui->m_loadingIndicator) {
+            ui->m_loadingIndicator->setVisible(true);
+            ui->m_loadingIndicator->startAnimation();
         }
-        m_statusLabel->setText("Connecting...");
-        m_statusLabel->setVisible(true);
+        ui->m_statusLabel->setText("Connecting...");
+        ui->m_statusLabel->setVisible(true);
 
         QMetaObject::invokeMethod(m_appController, "connectCamera",
                                  Qt::QueuedConnection,
@@ -116,22 +109,22 @@ void CameraTab::onConnectCameraFinished(const QString &cameraId, bool success, c
 {
     Q_UNUSED(cameraId);
 
-    if (m_loadingIndicator) {
-        m_loadingIndicator->stopAnimation();
-        m_loadingIndicator->setVisible(false);
+    if (ui->m_loadingIndicator) {
+        ui->m_loadingIndicator->stopAnimation();
+        ui->m_loadingIndicator->setVisible(false);
     }
-    cameraComboBox->setEnabled(true);
+    ui->cameraComboBox->setEnabled(true);
 
     if (success) {
-        m_statusLabel->setText("Connected");
-        m_statusLabel->setVisible(true);
+        ui->m_statusLabel->setText("Connected");
+        ui->m_statusLabel->setVisible(true);
         QTimer::singleShot(2000, this, [this]() {
-            m_statusLabel->setVisible(false);
+            ui->m_statusLabel->setVisible(false);
         });
     } else {
-        m_statusLabel->setText(error.isEmpty() ? "Connection failed" : error);
-        m_statusLabel->setVisible(true);
-        connectButton->setEnabled(true);
+        ui->m_statusLabel->setText(error.isEmpty() ? "Connection failed" : error);
+        ui->m_statusLabel->setVisible(true);
+        ui->connectButton->setEnabled(true);
     }
 
     updateConnectionState();
@@ -156,24 +149,24 @@ void CameraTab::onDisconnectButtonClicked()
 void CameraTab::onCaptureModeChanged(int index)
 {
     Q_UNUSED(index);
-    if (captureModeComboBox && formLayout && m_countRow >= 0) {
-        bool isBurst = (captureModeComboBox->currentText() == "Burst");
-        formLayout->setRowVisible(m_countRow, isBurst);
+    if (ui->captureModeComboBox && ui->formLayout && ui->m_countRow >= 0) {
+        bool isBurst = (ui->captureModeComboBox->currentText() == "Burst");
+        ui->formLayout->setRowVisible(ui->m_countRow, isBurst);
     }
 }
 
 void CameraTab::applyCaptureMode()
 {
-    if (!m_appController || !captureModeComboBox) {
+    if (!m_appController || !ui->captureModeComboBox) {
         return;
     }
 
     int count = 1;
-    QString mode = captureModeComboBox->currentText();
+    QString mode = ui->captureModeComboBox->currentText();
     if (mode == "Live") {
         count = 0;
     } else if (mode == "Burst") {
-        count = captureCountSpinBox ? captureCountSpinBox->value() : 10;
+        count = ui->captureCountSpinBox ? ui->captureCountSpinBox->value() : 10;
     }
 
     QVariantMap params;
@@ -183,17 +176,17 @@ void CameraTab::applyCaptureMode()
 
 int CameraTab::getCaptureCount() const
 {
-    if (!captureModeComboBox) {
+    if (!ui->captureModeComboBox) {
         return 0;
     }
-    QString mode = captureModeComboBox->currentText();
+    QString mode = ui->captureModeComboBox->currentText();
     if (mode == QStringLiteral("Live")) {
         return 0;
     }
     if (mode == QStringLiteral("Single")) {
         return 1;
     }
-    return captureCountSpinBox ? captureCountSpinBox->value() : 10;
+    return ui->captureCountSpinBox ? ui->captureCountSpinBox->value() : 10;
 }
 
 void CameraTab::onCameraSelected(int index)
@@ -209,99 +202,18 @@ void CameraTab::onCameraStateChanged(CameraState state)
             setBufferedConfig(m_appController->allParameters());
             buildDynamicParameterPanel();
             m_coolingTimer->start(100);
-            if (parameterGroup) {
-                parameterGroup->setVisible(true);
+            if (ui->parameterGroup) {
+                ui->parameterGroup->setVisible(true);
             }
         }
     } else if (state == CameraState::Disconnected || state == CameraState::Error) {
         clearDynamicParameterPanel();
         m_coolingTimer->stop();
-        if (parameterGroup) {
-            parameterGroup->setVisible(false);
+        if (ui->parameterGroup) {
+            ui->parameterGroup->setVisible(false);
         }
     }
     updateConnectionState();
-}
-
-// TODO: UI 放在专门的文件里组织
-void CameraTab::setupUi()
-{
-    formLayout = new QFormLayout(this);
-    formLayout->setSpacing(6);
-    formLayout->setLabelAlignment(Qt::AlignRight);
-
-    cameraComboBox = new QComboBox(this);
-    cameraComboBox->setObjectName("cameraComboBox");
-    cameraComboBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    formLayout->addRow("Camera:", cameraComboBox);
-
-    connectButton = new QPushButton("Connect", this);
-    connectButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    disconnectButton = new QPushButton("Disconnect", this);
-    disconnectButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    disconnectButton->setEnabled(false);
-
-    m_statusLabel = new QLabel(this);
-    m_statusLabel->setVisible(false);
-
-    m_loadingIndicator = new LoadingIndicator(this);
-    m_loadingIndicator->setFixedSize(24, 24);
-    m_loadingIndicator->setVisible(false);
-
-    QHBoxLayout *buttonLayout = new QHBoxLayout();
-    buttonLayout->addWidget(connectButton);
-    buttonLayout->addWidget(disconnectButton);
-    buttonLayout->addStretch();
-    formLayout->addRow("", buttonLayout);
-
-    QHBoxLayout *statusLayout = new QHBoxLayout();
-    statusLayout->addWidget(m_loadingIndicator);
-    statusLayout->addWidget(m_statusLabel);
-    statusLayout->addStretch();
-    formLayout->addRow("", statusLayout);
-
-    connect(connectButton, &QPushButton::clicked,
-            this, &CameraTab::onConnectButtonClicked);
-    connect(disconnectButton, &QPushButton::clicked,
-            this, &CameraTab::onDisconnectButtonClicked);
-    connect(cameraComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &CameraTab::onCameraSelected);
-
-    captureModeComboBox = new QComboBox(this);
-    captureModeComboBox->addItems({"Single", "Burst", "Live"});
-    captureModeComboBox->setCurrentText("Single");
-    captureModeComboBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-
-    captureCountSpinBox = new QSpinBox(this);
-    captureCountSpinBox->setRange(2, 1000);
-    captureCountSpinBox->setValue(5);
-    captureCountSpinBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-
-    formLayout->addRow("Capture Mode:", captureModeComboBox);
-    m_countRow = formLayout->rowCount();
-    formLayout->addRow("Count:", captureCountSpinBox);
-    formLayout->setRowVisible(m_countRow, false);
-
-    connect(captureModeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &CameraTab::onCaptureModeChanged);
-
-    parameterGroup = new QGroupBox("Parameters", this);
-    m_dynamicParametersLayout = new QVBoxLayout();
-    parameterGroup->setLayout(m_dynamicParametersLayout);
-    parameterGroup->setVisible(false);
-
-    QWidget *scrollContent = new QWidget(this);
-    QVBoxLayout *scrollLayout = new QVBoxLayout(scrollContent);
-    scrollLayout->addWidget(parameterGroup);
-    scrollLayout->addStretch();
-
-    m_scrollArea = new QScrollArea(this);
-    m_scrollArea->setWidget(scrollContent);
-    m_scrollArea->setWidgetResizable(true);
-    m_scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    m_scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-
-    formLayout->addRow(m_scrollArea);
 }
 
 void CameraTab::buildDynamicParameterPanel()
@@ -365,17 +277,17 @@ void CameraTab::buildDynamicParameterPanel()
 
         categoryGroup->setLayout(paramFormLayout);
         m_categoryGroups.insert(category, categoryGroup);
-        m_dynamicParametersLayout->addWidget(categoryGroup);
+        ui->m_dynamicParametersLayout->addWidget(categoryGroup);
     }
 
-    m_statusLabel->setVisible(false);
+    ui->m_statusLabel->setVisible(false);
 }
 
 void CameraTab::clearDynamicParameterPanel()
 {
-    m_statusLabel->setVisible(false);
+    ui->m_statusLabel->setVisible(false);
 
-    while (QLayoutItem *item = m_dynamicParametersLayout->takeAt(0)) {
+    while (QLayoutItem *item = ui->m_dynamicParametersLayout->takeAt(0)) {
         if (item->widget()) {
             item->widget()->deleteLater();
         }
@@ -404,14 +316,14 @@ void CameraTab::refreshCameraList()
         return;
     }
     QStringList cameras = m_appController->availableCameras();
-    cameraComboBox->clear();
-    cameraComboBox->addItems(cameras);
+    ui->cameraComboBox->clear();
+    ui->cameraComboBox->addItems(cameras);
 
     if (m_appController->isConnected()) {
         QString currentId = m_appController->currentCameraId();
-        int index = cameraComboBox->findText(currentId);
+        int index = ui->cameraComboBox->findText(currentId);
         if (index >= 0) {
-            cameraComboBox->setCurrentIndex(index);
+            ui->cameraComboBox->setCurrentIndex(index);
         }
     }
 
@@ -425,12 +337,12 @@ void CameraTab::setBufferedConfig(const QVariantMap &config)
 
 void CameraTab::updateBufferedConfigFromWidgets()
 {
-    if (captureModeComboBox) {
-        m_bufferedConfig["captureMode"] = captureModeComboBox->currentText();
+    if (ui->captureModeComboBox) {
+        m_bufferedConfig["captureMode"] = ui->captureModeComboBox->currentText();
     }
-    if (captureCountSpinBox) {
-        m_bufferedConfig["captureCount"] = captureCountSpinBox->value();
-        QString captureMode = captureModeComboBox->currentText();
+    if (ui->captureCountSpinBox) {
+        m_bufferedConfig["captureCount"] = ui->captureCountSpinBox->value();
+        QString captureMode = ui->captureModeComboBox->currentText();
         if (captureMode == "Single") {
             m_bufferedConfig["captureCount"] = 1;
         } else if (captureMode == "Live") {
@@ -500,7 +412,7 @@ void CameraTab::onCoolingTimerTimeout()
 
 void CameraTab::onParametersCommitted()
 {
-    m_statusLabel->setVisible(false);
+    ui->m_statusLabel->setVisible(false);
 
     if (!m_appController || !m_appController->isConnected()) {
         return;

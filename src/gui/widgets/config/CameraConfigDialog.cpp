@@ -1,5 +1,5 @@
 #include "CameraConfigDialog.h"
-#include "CameraConfigDialogUi.h"
+#include "../../ui/CameraConfigDialogUi.h"
 #include "CameraTab.h"
 #include "PluginTab.h"
 #include "../../AppController.h"
@@ -40,8 +40,8 @@ CameraConfigDialog::~CameraConfigDialog()
 void CameraConfigDialog::showEvent(QShowEvent *event)
 {
     if (event->type() == QEvent::Show && ui && ui->cameraTab) {
-        if (ui->cameraTab->parameterGroup) {
-            ui->cameraTab->parameterGroup->setVisible(true);
+        if (ui->cameraTab->ui->parameterGroup) {
+            ui->cameraTab->ui->parameterGroup->setVisible(true);
         }
     }
     QDialog::showEvent(event);

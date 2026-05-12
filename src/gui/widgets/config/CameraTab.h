@@ -2,27 +2,19 @@
 #define CAMERATAB_H
 
 #include <QWidget>
-#include <QComboBox>
-#include <QGroupBox>
-#include <QPushButton>
-#include <QLabel>
 #include <QHash>
 #include <QMap>
-#include <QVBoxLayout>
-#include <QDoubleSpinBox>
-#include <QSpinBox>
-#include <QCheckBox>
-#include <QFormLayout>
-#include <QScrollArea>
 #include <QTimer>
 #include <QVariantMap>
 #include <QPointer>
 #include <QSettings>
 #include <QMetaObject>
+#include <QGroupBox>
 
 #include "../../AppController.h"
 #include "CameraTypes.h"
 #include "LoadingIndicator.h"
+#include "../../ui/CameraTabUi.h"
 
 class CameraTab : public QWidget
 {
@@ -42,20 +34,11 @@ public:
     void updateBufferedConfigFromWidgets();
     void buildDynamicParameterPanel();
 
-    // Get current capture count based on mode selection
-    // Returns: 0 for Live (continuous), 1 for Single, N for Burst
     int getCaptureCount() const;
 
-    QPushButton *connectButton;
-    QPushButton *disconnectButton;
-    QComboBox *cameraComboBox;
-    QComboBox *captureModeComboBox;
-    QSpinBox *captureCountSpinBox;
-    QFormLayout *formLayout;
-    int m_countRow;
-    QGroupBox *parameterGroup;
+    CameraTabUi *ui = nullptr;
 
-private slots:
+protected slots:
     void onConnectButtonClicked();
     void onDisconnectButtonClicked();
     void onCameraSelected(int index);
@@ -67,22 +50,17 @@ private slots:
     void onDisconnectCameraFinished(const QString &cameraId);
 
 private:
-    void setupUi();
     void updateConnectionState();
     void clearDynamicParameterPanel();
     void applyCaptureMode();
 
     QPointer<AppController> m_appController;
-    QLabel *m_statusLabel;
     QVariantMap m_bufferedConfig;
 
     QHash<QString, QWidget*> m_parameterWidgets;
     QMap<ParameterCategory, QGroupBox*> m_categoryGroups;
     QHash<QString, ParameterDefinition> m_parameterDefinitions;
-    QVBoxLayout *m_dynamicParametersLayout;
-    QScrollArea *m_scrollArea;
     QTimer *m_coolingTimer;
-    LoadingIndicator *m_loadingIndicator = nullptr;
 };
 
 #endif // CAMERATAB_H

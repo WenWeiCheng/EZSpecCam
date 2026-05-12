@@ -2,11 +2,7 @@
 #define DATATAB_H
 
 #include <QWidget>
-
-#include <QLineEdit>
-#include <QCheckBox>
-#include <QPushButton>
-#include <QComboBox>
+#include "../../ui/DataTabUi.h"
 
 class DataTab : public QWidget
 {
@@ -20,7 +16,7 @@ public:
     QString suffix() const;
     bool saveMetadata() const;
 
-private slots:
+protected slots:
     void onBrowseClicked();
     void onAutoSaveToggled(bool checked);
     void onImageFormatChanged(const QString &format);
@@ -30,18 +26,9 @@ private slots:
     void onSuffixChanged(const QString &suffix);
 
 private:
-    void setupUi();
-
-    QLineEdit *autoSaveDirectoryLineEdit;
-    QPushButton *browseDirectoryButton;
-    QCheckBox *autoSaveEnabledCheckBox;
-    QComboBox *imageFormatComboBox;
-    QCheckBox *saveOriginalDataCheckBox;
-    QCheckBox *saveMetadataCheckBox;
-    QLineEdit *prefixLineEdit;
-    QLineEdit *suffixLineEdit;
+    DataTabUi *ui;
     QString m_prefix;
     QString m_suffix;
 };
 
-#endif // DATATAB_H
+#endif
