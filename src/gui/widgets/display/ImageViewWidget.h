@@ -27,12 +27,6 @@ public:
     };
     Q_ENUM(ColorScaleMode)
 
-    enum class InteractionMode {
-        Crosshair,
-        Zoom
-    };
-    Q_ENUM(InteractionMode)
-
     explicit ImageViewWidget(QWidget *parent = nullptr);
     ~ImageViewWidget() override;
 
@@ -53,9 +47,6 @@ public:
 
     bool isDownsamplingEnabled() const;
     void setDownsamplingEnabled(bool enabled);
-
-    InteractionMode interactionMode() const { return m_interactionMode; }
-    void setInteractionMode(InteractionMode mode);
 
     int pixelValue(int x, int y) const;
 
@@ -99,7 +90,6 @@ private:
     bool m_imageValid;
     ColorScaleMode m_colorScaleMode = ColorScaleMode::Auto;
     bool m_axesVisible = false;
-    InteractionMode m_interactionMode = InteractionMode::Zoom;
 
     QImage m_originalImage;
     QImage m_displayImage;

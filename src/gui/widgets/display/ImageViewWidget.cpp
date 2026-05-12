@@ -1,10 +1,10 @@
 #include "ImageViewWidget.h"
-
 #include <QVBoxLayout>
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QDebug>
 #include <QTimer>
+#include <qpoint.h>
 #include "../../qcustomplot.h"
 
 ImageViewWidget::ImageViewWidget(QWidget *parent)
@@ -172,19 +172,6 @@ void ImageViewWidget::setAxesVisible(bool visible)
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
-void ImageViewWidget::setInteractionMode(InteractionMode mode)
-{
-    if (m_interactionMode == mode) {
-        return;
-    }
-
-    m_interactionMode = mode;
-
-    if (m_rubberBand->isVisible()) {
-        m_rubberBand->hide();
-    }
-}
-
 QImage ImageViewWidget::image() const
 {
     return m_currentImage;
@@ -257,31 +244,6 @@ void ImageViewWidget::addCrosshair(int x, int y)
 
 void ImageViewWidget::mousePressEvent(QMouseEvent *event)
 {
-    if (!m_imageValid || m_originalImage.isNull()) {
-        QWidget::mousePressEvent(event);
-        return;
-    }
-
-    // Only process crosshair if click is within m_plot bounds
-    if (!m_plot->geometry().contains(event->pos())) {
-        QWidget::mousePressEvent(event);
-        return;
-    }
-
-    QPointF imageCoords = widgetToImageCoords(event->pos().x(), event->pos().y());
-    int x = static_cast<int>(imageCoords.x());
-    int y = static_cast<int>(imageCoords.y());
-
-    if (x >= 0 && x < m_originalImage.width() &&
-        y >= 0 && y < m_originalImage.height()) {
-
-        if (event->button() == Qt::LeftButton) {
-            addCrosshair(x, y);
-        } else if (event->button() == Qt::RightButton) {
-            clearCrosshairs();
-        }
-    }
-
     QWidget::mousePressEvent(event);
 }
 
@@ -471,25 +433,22 @@ bool ImageViewWidget::eventFilter(QObject *obj, QEvent *event)
             auto *me = static_cast<QMouseEvent *>(event);
             if (me->button() == Qt::LeftButton) {
                 if (me->modifiers() & Qt::ControlModifier) {
-                    mousePressEvent(me);
+                    QPointF imageCoords = widgetToImageCoords(me->pos().x(), me->pos().y());
+                    addCrosshair(imageCoords.x(), imageCoords.y());
                 } else {
                     QRect axisRect = m_plot->axisRect()->rect();
-                    if (axisRect.contains(me->pos()) && m_interactionMode == InteractionMode::Zoom) {
+                    if (axisRect.contains(me->pos())) {
                         m_rubberBandOrigin = me->pos();
                         m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, QSize()));
                         m_rubberBand->show();
-                    } else if (m_interactionMode == InteractionMode::Crosshair) {
-                        mousePressEvent(me);
                     }
                 }
                 return true;
             } else if (me->button() == Qt::RightButton) {
                 if (me->modifiers() & Qt::ControlModifier) {
-                    mousePressEvent(me);
-                } else if (m_interactionMode == InteractionMode::Zoom) {
+                    clearCrosshairs();
+                } else {
                     resetZoomToFit();
-                } else if (m_interactionMode == InteractionMode::Crosshair) {
-                    mousePressEvent(me);
                 }
                 return true;
             }
@@ -498,9 +457,6 @@ bool ImageViewWidget::eventFilter(QObject *obj, QEvent *event)
             if (m_rubberBand->isVisible()) {
                 m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, me->pos()).normalized());
                 return true;
-            }
-            if (m_interactionMode == InteractionMode::Crosshair) {
-                mouseMoveEvent(me);
             }
             return true;
         } else if (event->type() == QEvent::MouseButtonRelease) {
