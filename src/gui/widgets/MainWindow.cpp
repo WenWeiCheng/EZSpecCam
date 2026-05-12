@@ -653,7 +653,9 @@ void MainWindow::on_actionStart_triggered()
     }
 
     int captureCount = m_configDialog ? m_configDialog->getCaptureCount() : 1;
-    m_appController->startCapture(captureCount);
+
+    QMetaObject::invokeMethod(m_appController, "startCapture", Qt::QueuedConnection,
+        Q_ARG(int, captureCount));
 }
 
 void MainWindow::on_actionStop_triggered()
@@ -662,7 +664,7 @@ void MainWindow::on_actionStop_triggered()
         return;
     }
 
-    m_appController->stopCapture();
+    QMetaObject::invokeMethod(m_appController, "stopCapture", Qt::QueuedConnection);
 }
 
 void MainWindow::on_colorScaleAuto_triggered()

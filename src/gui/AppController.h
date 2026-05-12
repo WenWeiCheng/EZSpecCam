@@ -119,23 +119,6 @@ public:
     QVariant parameterValue(const QString &name) const;
 
     /**
-     * @brief Start capturing frames
-     * @param captureCount Number of frames (0 = continuous)
-     * @return true if capture started successfully
-     *
-     * State transition: Connected → Acquiring
-     */
-    bool startCapture(int captureCount = 0);
-
-    /**
-     * @brief Stop capturing frames
-     * @param timeoutMs Maximum wait time in milliseconds
-     *
-     * State transition: Acquiring → Connected
-     */
-    void stopCapture(int timeoutMs = 5000);
-
-    /**
      * @brief Save dynamic configuration to INI file
      * @param cameraId Camera identifier
      * @param parameters Map of parameters to save
@@ -174,6 +157,23 @@ public:
     bool validateParameters();
 
 public slots:
+    /**
+     * @brief Start capturing frames
+     * @param captureCount Number of frames (0 = continuous)
+     * @return true if capture started successfully
+     *
+     * State transition: Connected → Acquiring
+     */
+    bool startCapture(int captureCount = 0);
+
+    /**
+     * @brief Stop capturing frames
+     * @param timeoutMs Maximum wait time in milliseconds
+     *
+     * State transition: Acquiring → Connected
+     */
+    void stopCapture(int timeoutMs = 5000);
+
     /**
      * @brief Connect to a camera by ID
      * @param cameraId Camera identifier from availableCameras()
