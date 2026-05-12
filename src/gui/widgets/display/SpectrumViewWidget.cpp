@@ -92,7 +92,9 @@ void SpectrumViewWidget::setData(const QVector<double> &x, const QVector<double>
 
     m_graph->setData(x, y);
 
-    applyXAxisRange();
+    if (!m_userHasZoomed) {
+        applyXAxisRange();
+    }
 
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
@@ -195,6 +197,7 @@ void SpectrumViewWidget::setXAxisRangeMode(XAxisRangeMode mode)
     }
 
     m_xAxisRangeMode = mode;
+    m_userHasZoomed = false;
 
     if (m_dataValid && !m_xData.isEmpty()) {
         applyXAxisRange();
@@ -334,6 +337,7 @@ bool SpectrumViewWidget::eventFilter(QObject *obj, QEvent *event)
                         m_plot->xAxis->setRange(x1, x2);
                         m_plot->yAxis->setRange(y1, y2);
                         m_plot->replot(QCustomPlot::rpQueuedReplot);
+                        m_userHasZoomed = true;
                     }
                 }
                 return true;
@@ -431,6 +435,7 @@ void SpectrumViewWidget::resetZoomToFit()
         return;
     }
 
+    m_userHasZoomed = false;
     applyXAxisRange();
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }

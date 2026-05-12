@@ -90,6 +90,7 @@ private:
 
     QRubberBand *m_rubberBand = nullptr;
     QPoint m_rubberBandOrigin;
+    bool m_userHasZoomed = false;
 };
 
 #endif // SPECTRUMVIEWWIDGET_H
