@@ -17,6 +17,7 @@
 #include <QTimer>
 #include <QVariantMap>
 #include <QPointer>
+#include <QSettings>
 #include <QMetaObject>
 
 #include "../../AppController.h"
@@ -44,6 +45,11 @@ public:
     // Get current capture count based on mode selection
     // Returns: 0 for Live (continuous), 1 for Single, N for Burst
     int getCaptureCount() const;
+
+    // Save camera metadata (exposure, gain, temperature, ROI) to QSettings
+    void saveCameraMetadata();
+    // Load camera metadata from QSettings and populate buffered config
+    void loadCameraMetadata();
 
     QPushButton *connectButton;
     QPushButton *disconnectButton;

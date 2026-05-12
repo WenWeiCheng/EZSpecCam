@@ -21,6 +21,10 @@
 #include <QStandardPaths>
 #include <QDateTime>
 #include <QDir>
+#include <QFile>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QFileInfo>
 
 Q_LOGGING_CATEGORY(parameterCategory, "Parameter")
 Q_LOGGING_CATEGORY(cameraCategory, "Camera")
@@ -149,6 +153,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_imageViewWidget(nullptr)
     , m_spectrumViewWidget(nullptr)
     , m_fpsTimer(new QTimer(this))
+    , m_launchTimestamp(QDateTime::currentDateTime())
 {
     ui->setupUi(this);
 
@@ -277,6 +282,326 @@ MainWindow::~MainWindow()
     }
 }
 
+bool MainWindow::exportSpectrumAsCsv(const QString &filePath, bool saveOriginal) const
+{
+    QVector<double> xData = m_spectrumViewWidget->xData();
+    QVector<double> yData = m_spectrumViewWidget->yData();
+
+    if (xData.isEmpty() || yData.isEmpty() || !m_spectrumViewWidget->hasData()) {
+        return false;
+    }
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return false;
+    }
+
+    QTextStream out(&file);
+    out << "Wavelength,Intensity\n";
+
+    int count = qMin(xData.size(), yData.size());
+    for (int i = 0; i < count; ++i) {
+        out << QString::number(xData[i], 'f', 6) << ","
+            << QString::number(yData[i], 'f', 6) << "\n";
+    }
+
+    if (saveOriginal && !m_currentFrame.originalImage.isNull()) {
+        QString origFilePath = filePath;
+        int dotIndex = origFilePath.lastIndexOf('.');
+        if (dotIndex > 0) {
+            origFilePath.insert(dotIndex, "_original");
+        } else {
+            origFilePath += "_original";
+        }
+
+        QFile origFile(origFilePath);
+        if (origFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream origOut(&origFile);
+            const QImage &origImg = m_currentFrame.originalImage;
+            const int height = origImg.height();
+            const int width = origImg.width();
+
+            if (origImg.format() == QImage::Format_Grayscale16) {
+                const ushort *bits = reinterpret_cast<const ushort *>(origImg.bits());
+                for (int y = 0; y < height; ++y) {
+                    QStringList rowValues;
+                    const ushort *row = bits + y * width;
+                    for (int x = 0; x < width; ++x) {
+                        rowValues << QString::number(row[x]);
+                    }
+                    origOut << rowValues.join(",") << "\n";
+                }
+            } else {
+                for (int y = 0; y < height; ++y) {
+                    QStringList rowValues;
+                    for (int x = 0; x < width; ++x) {
+                        QRgb pixel = origImg.pixel(x, y);
+                        int gray = qGray(pixel);
+                        rowValues << QString::number(gray);
+                    }
+                    origOut << rowValues.join(",") << "\n";
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
+bool MainWindow::exportImageAsCsv(const QString &filePath, const QImage &image, bool saveOriginal) const
+{
+    if (image.isNull()) {
+        return false;
+    }
+
+    auto saveImageToCsv = [](QTextStream &stream, const QImage &img) {
+        const int height = img.height();
+        const int width = img.width();
+
+        if (img.format() == QImage::Format_Grayscale16) {
+            const ushort *bits = reinterpret_cast<const ushort *>(img.bits());
+            for (int y = 0; y < height; ++y) {
+                QStringList rowValues;
+                const ushort *row = bits + y * width;
+                for (int x = 0; x < width; ++x) {
+                    rowValues << QString::number(row[x]);
+                }
+                stream << rowValues.join(",") << "\n";
+            }
+        } else {
+            for (int y = 0; y < height; ++y) {
+                QStringList rowValues;
+                for (int x = 0; x < width; ++x) {
+                    QRgb pixel = img.pixel(x, y);
+                    int gray = qGray(pixel);
+                    rowValues << QString::number(gray);
+                }
+                stream << rowValues.join(",") << "\n";
+            }
+        }
+    };
+
+    QFile mainFile(filePath);
+    if (!mainFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return false;
+    }
+    QTextStream mainOut(&mainFile);
+    saveImageToCsv(mainOut, image);
+
+    if (saveOriginal && !m_currentFrame.originalImage.isNull()) {
+        QString origFilePath = filePath;
+        int dotIndex = origFilePath.lastIndexOf('.');
+        if (dotIndex > 0) {
+            origFilePath.insert(dotIndex, "_original");
+        } else {
+            origFilePath += "_original";
+        }
+
+        QFile origFile(origFilePath);
+        if (origFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream origOut(&origFile);
+            saveImageToCsv(origOut, m_currentFrame.originalImage);
+        }
+    }
+
+    return true;
+}
+
+bool MainWindow::saveMetadataJson(const QString &imagePath, const ImageData &frame)
+{
+    QFileInfo fileInfo(imagePath);
+    QString metadataPath = fileInfo.absoluteDir().absolutePath() + "/" + fileInfo.baseName() + "_metadata.json";
+
+    QJsonObject root;
+    root["cameraId"] = frame.cameraId;
+    root["timestamp"] = static_cast<qint64>(frame.timestamp);
+    root["frameNumber"] = frame.frameNumber;
+
+    // Add all parameters from frame.parameters
+    QJsonObject paramsObj;
+    for (auto it = frame.parameters.constBegin(); it != frame.parameters.constEnd(); ++it) {
+        paramsObj[it.key()] = QJsonValue::fromVariant(it.value());
+    }
+    root["parameters"] = paramsObj;
+
+    // Add config if present
+    if (!frame.config.isEmpty()) {
+        QJsonObject configObj;
+        for (auto it = frame.config.constBegin(); it != frame.config.constEnd(); ++it) {
+            configObj[it.key()] = QJsonValue::fromVariant(it.value());
+        }
+        root["config"] = configObj;
+    }
+
+    QFile file(metadataPath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return false;
+    }
+
+    file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+    return true;
+}
+
+bool MainWindow::exportSpectrumAsCsv(const QString &filePath, bool saveOriginal) const
+{
+    QVector<double> xData = m_spectrumViewWidget->xData();
+    QVector<double> yData = m_spectrumViewWidget->yData();
+
+    if (xData.isEmpty() || yData.isEmpty() || !m_spectrumViewWidget->hasData()) {
+        return false;
+    }
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return false;
+    }
+
+    QTextStream out(&file);
+    out << "Wavelength,Intensity\n";
+
+    int count = qMin(xData.size(), yData.size());
+    for (int i = 0; i < count; ++i) {
+        out << QString::number(xData[i], 'f', 6) << ","
+            << QString::number(yData[i], 'f', 6) << "\n";
+    }
+
+    if (saveOriginal && !m_currentFrame.originalImage.isNull()) {
+        QString origFilePath = filePath;
+        int dotIndex = origFilePath.lastIndexOf('.');
+        if (dotIndex > 0) {
+            origFilePath.insert(dotIndex, "_original");
+        } else {
+            origFilePath += "_original";
+        }
+
+        QFile origFile(origFilePath);
+        if (origFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream origOut(&origFile);
+            const QImage &origImg = m_currentFrame.originalImage;
+            const int height = origImg.height();
+            const int width = origImg.width();
+
+            if (origImg.format() == QImage::Format_Grayscale16) {
+                const ushort *bits = reinterpret_cast<const ushort *>(origImg.bits());
+                for (int y = 0; y < height; ++y) {
+                    QStringList rowValues;
+                    const ushort *row = bits + y * width;
+                    for (int x = 0; x < width; ++x) {
+                        rowValues << QString::number(row[x]);
+                    }
+                    origOut << rowValues.join(",") << "\n";
+                }
+            } else {
+                for (int y = 0; y < height; ++y) {
+                    QStringList rowValues;
+                    for (int x = 0; x < width; ++x) {
+                        QRgb pixel = origImg.pixel(x, y);
+                        int gray = qGray(pixel);
+                        rowValues << QString::number(gray);
+                    }
+                    origOut << rowValues.join(",") << "\n";
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
+bool MainWindow::exportImageAsCsv(const QString &filePath, const QImage &image, bool saveOriginal) const
+{
+    if (image.isNull()) {
+        return false;
+    }
+
+    auto saveImageToCsv = [](QTextStream &stream, const QImage &img) {
+        const int height = img.height();
+        const int width = img.width();
+
+        if (img.format() == QImage::Format_Grayscale16) {
+            const ushort *bits = reinterpret_cast<const ushort *>(img.bits());
+            for (int y = 0; y < height; ++y) {
+                QStringList rowValues;
+                const ushort *row = bits + y * width;
+                for (int x = 0; x < width; ++x) {
+                    rowValues << QString::number(row[x]);
+                }
+                stream << rowValues.join(",") << "\n";
+            }
+        } else {
+            for (int y = 0; y < height; ++y) {
+                QStringList rowValues;
+                for (int x = 0; x < width; ++x) {
+                    QRgb pixel = img.pixel(x, y);
+                    int gray = qGray(pixel);
+                    rowValues << QString::number(gray);
+                }
+                stream << rowValues.join(",") << "\n";
+            }
+        }
+    };
+
+    QFile mainFile(filePath);
+    if (!mainFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return false;
+    }
+    QTextStream mainOut(&mainFile);
+    saveImageToCsv(mainOut, image);
+
+    if (saveOriginal && !m_currentFrame.originalImage.isNull()) {
+        QString origFilePath = filePath;
+        int dotIndex = origFilePath.lastIndexOf('.');
+        if (dotIndex > 0) {
+            origFilePath.insert(dotIndex, "_original");
+        } else {
+            origFilePath += "_original";
+        }
+
+        QFile origFile(origFilePath);
+        if (origFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream origOut(&origFile);
+            saveImageToCsv(origOut, m_currentFrame.originalImage);
+        }
+    }
+
+    return true;
+}
+
+bool MainWindow::saveMetadataJson(const QString &imagePath, const ImageData &frame)
+{
+    QFileInfo fileInfo(imagePath);
+    QString metadataPath = fileInfo.absoluteDir().absolutePath() + "/" + fileInfo.baseName() + "_metadata.json";
+
+    QJsonObject root;
+    root["cameraId"] = frame.cameraId;
+    root["timestamp"] = static_cast<qint64>(frame.timestamp);
+    root["frameNumber"] = frame.frameNumber;
+
+    // Add all parameters from frame.parameters
+    QJsonObject paramsObj;
+    for (auto it = frame.parameters.constBegin(); it != frame.parameters.constEnd(); ++it) {
+        paramsObj[it.key()] = QJsonValue::fromVariant(it.value());
+    }
+    root["parameters"] = paramsObj;
+
+    // Add config if present
+    if (!frame.config.isEmpty()) {
+        QJsonObject configObj;
+        for (auto it = frame.config.constBegin(); it != frame.config.constEnd(); ++it) {
+            configObj[it.key()] = QJsonValue::fromVariant(it.value());
+        }
+        root["config"] = configObj;
+    }
+
+    QFile file(metadataPath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return false;
+    }
+
+    file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+    return true;
+}
+
 void MainWindow::on_actionSaveFrame_triggered()
 {
     on_actionSaveFrameAutoNumber_triggered();
@@ -290,7 +615,11 @@ void MainWindow::on_actionSaveFrameAs_triggered()
         return;
     }
 
-    QString saveDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    QSettings settings;
+    QString saveDir = settings.value("data/lastSaveAsDirectory").toString();
+    if (saveDir.isEmpty() || !QDir(saveDir).exists()) {
+        saveDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    }
 
     QFileDialog dialog(this, tr("Save Frame As"), saveDir);
     dialog.setAcceptMode(QFileDialog::AcceptSave);
@@ -298,11 +627,22 @@ void MainWindow::on_actionSaveFrameAs_triggered()
 
     QStringList filters;
     filters << tr("TIFF Image (*.tiff *.tif)");
+    filters << tr("CSV File (*.csv)");
     dialog.setNameFilters(filters);
-    dialog.selectNameFilter(filters.first());
+
+    QString selectedFormat = settings.value("data/imageFormat", "TIFF").toString();
+    if (selectedFormat == "CSV") {
+        dialog.selectNameFilter(filters.last());
+    } else {
+        dialog.selectNameFilter(filters.first());
+    }
 
     QDateTime now = QDateTime::currentDateTime();
-    QString defaultName = QString("frame_%1.tiff").arg(now.toString("yyyyMMdd_hhmmss"));
+    QString ext = (selectedFormat == "CSV") ? "csv" : "tiff";
+    QString prefix = settings.value("data/filenamePrefix", "").toString();
+    QString suffix = settings.value("data/filenameSuffix", "").toString();
+    QString suffixStr = suffix.isEmpty() ? "" : "_" + suffix;
+    QString defaultName = QString("%1_frame_%2%3.%4").arg(prefix).arg(now.toString("yyyyMMdd_hhmmss")).arg(suffixStr).arg(ext);
     dialog.selectFile(defaultName);
 
     if (dialog.exec() != QDialog::Accepted) {
@@ -312,6 +652,42 @@ void MainWindow::on_actionSaveFrameAs_triggered()
     QString filePath = dialog.selectedFiles().first();
     if (filePath.isEmpty()) {
         return;
+    }
+
+    QFileInfo fileInfo(filePath);
+    settings.setValue("data/lastSaveAsDirectory", fileInfo.absoluteDir().absolutePath());
+
+    QString selectedFilter = dialog.selectedNameFilter();
+    bool isCsv = selectedFilter.contains("CSV");
+
+    if (isCsv) {
+        int height = m_currentFrame.image.height();
+        bool saveOriginal = settings.value("data/saveOriginalData", false).toBool();
+
+        bool success = false;
+        if (height == 1) {
+            success = exportSpectrumAsCsv(filePath, saveOriginal);
+        } else {
+            success = exportImageAsCsv(filePath, m_currentFrame.image, saveOriginal);
+        }
+
+        if (!success) {
+            QMessageBox::critical(this, tr("Save Error"),
+                tr("Failed to save CSV to:\n%1").arg(filePath));
+            return;
+        }
+        if (settings.value("data/saveMetadata", true).toBool()) {
+            saveMetadataJson(filePath, m_currentFrame);
+        }
+    } else {
+        if (!m_currentFrame.image.save(filePath)) {
+            QMessageBox::critical(this, tr("Save Error"),
+                tr("Failed to save frame to:\n%1").arg(filePath));
+            return;
+        }
+        if (settings.value("data/saveMetadata", true).toBool()) {
+            saveMetadataJson(filePath, m_currentFrame);
+        }
     }
 
     showStatusMessage(tr("Frame saved: %1").arg(filePath), 3000);
@@ -325,8 +701,57 @@ void MainWindow::on_actionSaveFrameAutoNumber_triggered()
         return;
     }
 
-    QString fileName = QString("img_%1.tiff").arg(0, 12, 10, QChar('0'));
-    showStatusMessage(tr("Frame saved: %1").arg(fileName), 3000);
+    QSettings settings;
+    QString saveDir = settings.value("data/autoSaveDirectory", "").toString();
+
+    if (saveDir.isEmpty()) {
+        QMessageBox::warning(this, tr("No Save Directory"),
+            tr("Please set an auto-save directory first."));
+        return;
+    }
+
+    QString imageFormat = settings.value("data/imageFormat", "TIFF").toString();
+    bool isCsv = (imageFormat == "CSV");
+
+    QDateTime now = QDateTime::currentDateTime();
+    QString ext = isCsv ? "csv" : "tiff";
+    QString prefix = settings.value("data/filenamePrefix", "").toString();
+    QString suffix = settings.value("data/filenameSuffix", "").toString();
+    QString suffixStr = suffix.isEmpty() ? "" : "_" + suffix;
+    QString fileName = QString("%1_img_%2%3.%4").arg(prefix).arg(now.toString("yyyyMMdd_hhmmss_zzz")).arg(suffixStr).arg(ext);
+    QString filePath = saveDir + "/" + fileName;
+
+    if (isCsv) {
+        int height = m_currentFrame.image.height();
+        bool saveOriginal = settings.value("data/saveOriginalData", false).toBool();
+
+        bool success = false;
+        if (height == 1) {
+            success = exportSpectrumAsCsv(filePath, saveOriginal);
+        } else {
+            success = exportImageAsCsv(filePath, m_currentFrame.image, saveOriginal);
+        }
+
+        if (!success) {
+            QMessageBox::critical(this, tr("Save Error"),
+                tr("Failed to save CSV to:\n%1").arg(filePath));
+            return;
+        }
+        if (settings.value("data/saveMetadata", true).toBool()) {
+            saveMetadataJson(filePath, m_currentFrame);
+        }
+    } else {
+        if (!m_currentFrame.image.save(filePath)) {
+            QMessageBox::critical(this, tr("Save Error"),
+                tr("Failed to save frame to:\n%1").arg(filePath));
+            return;
+        }
+        if (settings.value("data/saveMetadata", true).toBool()) {
+            saveMetadataJson(filePath, m_currentFrame);
+        }
+    }
+
+    showStatusMessage(tr("Frame saved: %1").arg(filePath), 3000);
 }
 
 void MainWindow::on_actionAutoSaveToggle_triggered(bool checked)
@@ -593,6 +1018,7 @@ void MainWindow::on_verticalBinning_triggered()
     } else if (frame.hasOriginal()) {
         frame.image = frame.originalImage;
     }
+    m_currentFrame = frame;
     updateDisplay(frame);
 }
 
@@ -621,6 +1047,7 @@ void MainWindow::on_rowRange_triggered()
                 frame.image = frame.originalImage;
             }
             PostProcess::verticalBinning(frame, m_vBinStartRow, m_vBinEndRow);
+            m_currentFrame = frame;
             updateDisplay(frame);
         }
     });
@@ -670,8 +1097,10 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
     if (m_vBinEnabled) {
         ImageData processed = frame;
         PostProcess::verticalBinning(processed, m_vBinStartRow, m_vBinEndRow);
+        m_currentFrame = processed;
         updateDisplay(processed);
     } else {
+        m_currentFrame = frame;
         updateDisplay(frame);
     }
     updateToolbarState();
@@ -682,15 +1111,25 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
             QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
             + "/EZSpecCamData").toString();
 
-        QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd-hh-mm-ss");
-        QString fullDir = saveDir + "/" + timestamp;
-        QDir().mkpath(fullDir);
+        if (m_autoSaveDir.isEmpty()) {
+            QString timestamp = m_launchTimestamp.toString("yyyy-MM-dd-hh-mm-ss");
+            m_autoSaveDir = saveDir + "/" + timestamp;
+            QDir().mkpath(m_autoSaveDir);
+        }
 
         int frameNum = ++m_autoSaveFrameCounter;
-        QString filePath = QString("%1/img_%2.tiff")
-            .arg(fullDir)
-            .arg(frameNum, 12, 10, QChar('0'));
+        QString prefix = settings.value("data/filenamePrefix", "").toString();
+        QString suffix = settings.value("data/filenameSuffix", "").toString();
+        QString suffixStr = suffix.isEmpty() ? "" : "_" + suffix;
+        QString filePath = QString("%1/%2_img_%3%4.tiff")
+            .arg(m_autoSaveDir)
+            .arg(prefix)
+            .arg(frameNum, 12, 10, QChar('0'))
+            .arg(suffixStr);
         if (frame.image.save(filePath, "TIFF")) {
+            if (settings.value("data/saveMetadata", true).toBool()) {
+                saveMetadataJson(filePath, frame);
+            }
             showStatusMessage(tr("Auto-saved frame %1").arg(frameNum), 2000);
         }
     }

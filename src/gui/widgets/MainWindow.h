@@ -80,6 +80,9 @@ private:
     void updateFpsDisplay();
     void onFpsTimerTimeout();
     void showStatusMessage(const QString &message, int timeoutMs = 3000);
+    bool exportSpectrumAsCsv(const QString &filePath, bool saveOriginal) const;
+    bool exportImageAsCsv(const QString &filePath, const QImage &image, bool saveOriginal) const;
+    bool saveMetadataJson(const QString &imagePath, const ImageData &frame);
 
     QElapsedTimer m_frameTimer;
     static constexpr int MIN_FRAME_INTERVAL_MS = 33;
@@ -101,6 +104,9 @@ private:
 
     int m_frameCount = 0;
     int m_autoSaveFrameCounter = 0;
+
+    QDateTime m_launchTimestamp;
+    QString m_autoSaveDir;
 
     bool m_vBinEnabled = false;
     int m_vBinStartRow = 0;

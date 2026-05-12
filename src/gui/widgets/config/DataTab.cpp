@@ -7,6 +7,8 @@
 #include <QLabel>
 #include <QFileDialog>
 #include <QSettings>
+#include <QRegularExpression>
+#include <QRegularExpressionValidator>
 
 DataTab::DataTab(QWidget *parent)
     : QWidget(parent)
@@ -14,8 +16,12 @@ DataTab::DataTab(QWidget *parent)
     , browseDirectoryButton(nullptr)
     , autoSaveEnabledCheckBox(nullptr)
     , imageFormatComboBox(nullptr)
-    , frameSaveFormatComboBox(nullptr)
     , saveOriginalDataCheckBox(nullptr)
+    , saveMetadataCheckBox(nullptr)
+    , prefixLineEdit(nullptr)
+    , suffixLineEdit(nullptr)
+    , m_prefix()
+    , m_suffix()
 {
     setupUi();
 }
@@ -45,15 +51,23 @@ void DataTab::setupUi()
     formLayout->addRow("Directory:", directoryLayout);
 
     imageFormatComboBox = new QComboBox(this);
-    imageFormatComboBox->addItems({"TIFF", "JPEG"});
+    imageFormatComboBox->addItems({"TIFF", "CSV"});
     formLayout->addRow("Image Format:", imageFormatComboBox);
-
-    frameSaveFormatComboBox = new QComboBox(this);
-    frameSaveFormatComboBox->addItems({"Separate", "Embedded"});
-    formLayout->addRow("Frame Save Format:", frameSaveFormatComboBox);
 
     saveOriginalDataCheckBox = new QCheckBox("Save original data (before post-processing)", this);
     formLayout->addRow("Save Original:", saveOriginalDataCheckBox);
+
+    saveMetadataCheckBox = new QCheckBox("Save metadata as JSON file alongside image", this);
+    formLayout->addRow("Save Metadata:", saveMetadataCheckBox);
+
+    prefixLineEdit = new QLineEdit(this);
+    QRegularExpression regex("^[a-zA-Z0-9_\u4e00-\u9fa5]*$");
+    prefixLineEdit->setValidator(new QRegularExpressionValidator(regex, this));
+    formLayout->addRow("Prefix:", prefixLineEdit);
+
+    suffixLineEdit = new QLineEdit(this);
+    suffixLineEdit->setValidator(new QRegularExpressionValidator(regex, this));
+    formLayout->addRow("Suffix:", suffixLineEdit);
 
     autoSaveGroup->setLayout(formLayout);
     mainLayout->addWidget(autoSaveGroup);
@@ -64,8 +78,12 @@ void DataTab::setupUi()
     autoSaveDirectoryLineEdit->setText(settings.value("data/autoSaveDirectory", "").toString());
     autoSaveEnabledCheckBox->setChecked(settings.value("data/autoSaveEnabled", false).toBool());
     imageFormatComboBox->setCurrentText(settings.value("data/imageFormat", "TIFF").toString());
-    frameSaveFormatComboBox->setCurrentText(settings.value("data/frameSaveFormat", "Separate").toString());
     saveOriginalDataCheckBox->setChecked(settings.value("data/saveOriginalData", false).toBool());
+    saveMetadataCheckBox->setChecked(settings.value("data/saveMetadata", true).toBool());
+    m_prefix = settings.value("data/filenamePrefix", "").toString();
+    m_suffix = settings.value("data/filenameSuffix", "").toString();
+    prefixLineEdit->setText(m_prefix);
+    suffixLineEdit->setText(m_suffix);
 
     connect(browseDirectoryButton, &QPushButton::clicked,
             this, &DataTab::onBrowseClicked);
@@ -73,10 +91,14 @@ void DataTab::setupUi()
             this, &DataTab::onAutoSaveToggled);
     connect(imageFormatComboBox, QOverload<const QString &>::of(&QComboBox::currentTextChanged),
             this, &DataTab::onImageFormatChanged);
-    connect(frameSaveFormatComboBox, QOverload<const QString &>::of(&QComboBox::currentTextChanged),
-            this, &DataTab::onFrameSaveFormatChanged);
     connect(saveOriginalDataCheckBox, &QCheckBox::toggled,
             this, &DataTab::onSaveOriginalToggled);
+    connect(saveMetadataCheckBox, &QCheckBox::toggled,
+            this, &DataTab::onSaveMetadataToggled);
+    connect(prefixLineEdit, &QLineEdit::textChanged,
+            this, &DataTab::onPrefixChanged);
+    connect(suffixLineEdit, &QLineEdit::textChanged,
+            this, &DataTab::onSuffixChanged);
 }
 
 void DataTab::onBrowseClicked()
@@ -103,15 +125,44 @@ void DataTab::onImageFormatChanged(const QString &format)
     settings.setValue("data/imageFormat", format);
 }
 
-void DataTab::onFrameSaveFormatChanged(const QString &format)
-{
-    Q_UNUSED(format);
-    QSettings settings;
-    settings.setValue("data/frameSaveFormat", format);
-}
-
 void DataTab::onSaveOriginalToggled(bool checked)
 {
     QSettings settings;
     settings.setValue("data/saveOriginalData", checked);
+}
+
+void DataTab::onSaveMetadataToggled(bool checked)
+{
+    QSettings settings;
+    settings.setValue("data/saveMetadata", checked);
+}
+
+void DataTab::onPrefixChanged(const QString &prefix)
+{
+    m_prefix = prefix;
+    QSettings settings;
+    settings.setValue("data/filenamePrefix", prefix);
+}
+
+void DataTab::onSuffixChanged(const QString &suffix)
+{
+    m_suffix = suffix;
+    QSettings settings;
+    settings.setValue("data/filenameSuffix", suffix);
+}
+
+QString DataTab::prefix() const
+{
+    return m_prefix;
+}
+
+QString DataTab::suffix() const
+{
+    return m_suffix;
+}
+
+bool DataTab::saveMetadata() const
+{
+    QSettings settings;
+    return settings.value("data/saveMetadata", true).toBool();
 }
