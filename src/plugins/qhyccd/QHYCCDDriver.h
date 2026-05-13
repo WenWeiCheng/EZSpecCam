@@ -20,6 +20,7 @@
 #include <QMap>
 #include <QVariantMap>
 #include <atomic>
+#include <qtypes.h>
 #include <vector>
 #include <cstdint>
 
@@ -197,11 +198,6 @@ private:
     void initializeParameterDefinitions();
 
     /**
-     * @brief Validate a parameter value against its definition
-     */
-    bool validateValue(const QVariant &value, const ParameterDefinition &def) const;
-
-    /**
      * @brief Convert raw buffer to QImage
      */
     QImage convertBufferToImage(uint32_t width, uint32_t height, uint32_t bpp, uint32_t channels);
@@ -271,11 +267,20 @@ private:
 
     /// Camera model name
     QString m_cameraModel;
+    QStringList m_readModeNames;
 
     /// Image dimensions
     uint32_t m_imageWidth = 0;
     uint32_t m_imageHeight = 0;
     uint32_t m_imageBytes = 0;
+    uint32_t m_effectiveStartX = 0;
+    uint32_t m_effectiveStartY = 0;
+    uint32_t m_effectiveWidth = 0;
+    uint32_t m_effectiveHeight = 0;
+    double m_chipWidth = 0;
+    double m_chipHeight = 0;
+    double m_pixelWidth = 0;
+    double m_pixelHeight = 0;
 
     // ——— Buffer ———
 
