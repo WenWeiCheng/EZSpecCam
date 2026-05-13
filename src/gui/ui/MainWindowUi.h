@@ -23,18 +23,16 @@ public:
 
     void setupUi(QMainWindow *mainWindow);
 
-    QAction *actionSaveFrame;
     QAction *actionConfig;
     QAction *actionAbout;
     QAction *actionStart;
     QAction *actionStop;
 
     QAction *menuActionSaveFrameAs;
-    QAction *menuActionSaveFrameAutoNumber;
+    QAction *menuActionSaveFrame;
     QAction *menuActionAutoSaveToggle;
     QAction *menuActionChangeAutoSaveDir;
 
-    QAction *menuActionSaveFrame;
     QAction *menuActionConfig;
     QAction *menuActionAbout;
     QAction *toolbarActionConfig;

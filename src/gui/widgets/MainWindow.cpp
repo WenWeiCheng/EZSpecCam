@@ -95,8 +95,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->menuActionSaveFrameAs, &QAction::triggered,
             this, &MainWindow::on_actionSaveFrameAs_triggered);
-    connect(ui->menuActionSaveFrameAutoNumber, &QAction::triggered,
-            this, &MainWindow::on_actionSaveFrameAutoNumber_triggered);
+    connect(ui->menuActionSaveFrame, &QAction::triggered,
+            this, &MainWindow::on_actionSaveFrame_triggered);
     connect(ui->menuActionAutoSaveToggle, &QAction::triggered,
             this, &MainWindow::on_actionAutoSaveToggle_triggered);
     connect(ui->menuActionChangeAutoSaveDir, &QAction::triggered,
@@ -328,9 +328,36 @@ bool MainWindow::saveMetadataJson(const QString &imagePath, const ImageData &fra
     return true;
 }
 
-void MainWindow::on_actionSaveFrame_triggered()
+void MainWindow::saveFrameToFile(const QString &filePath, bool isCsv)
 {
-    on_actionSaveFrameAutoNumber_triggered();
+    QSettings settings;
+    if (isCsv) {
+        int height = m_currentFrame.image.height();
+        bool saveOriginal = settings.value("data/saveOriginalData", false).toBool();
+
+        bool success = false;
+        if (height == 1) {
+            success = exportSpectrumAsCsv(filePath, saveOriginal);
+        } else {
+            success = exportImageAsCsv(filePath, m_currentFrame.image, saveOriginal);
+        }
+
+        if (!success) {
+            QMessageBox::critical(this, tr("Save Error"),
+                tr("Failed to save CSV to:\n%1").arg(filePath));
+            return;
+        }
+    } else {
+        if (!m_currentFrame.image.save(filePath)) {
+            QMessageBox::critical(this, tr("Save Error"),
+                tr("Failed to save frame to:\n%1").arg(filePath));
+            return;
+        }
+    }
+    if (settings.value("data/saveMetadata", true).toBool()) {
+        saveMetadataJson(filePath, m_currentFrame);
+    }
+    showStatusMessage(tr("Frame saved: %1").arg(filePath), 10000);
 }
 
 void MainWindow::on_actionSaveFrameAs_triggered()
@@ -367,8 +394,9 @@ void MainWindow::on_actionSaveFrameAs_triggered()
     QString ext = (selectedFormat == "CSV") ? "csv" : "tiff";
     QString prefix = settings.value("data/filenamePrefix", "").toString();
     QString suffix = settings.value("data/filenameSuffix", "").toString();
+    QString prefixStr = prefix.isEmpty() ? "" : prefix + "_";
     QString suffixStr = suffix.isEmpty() ? "" : "_" + suffix;
-    QString defaultName = QString("%1_frame_%2%3.%4").arg(prefix).arg(now.toString("yyyyMMdd_hhmmss")).arg(suffixStr).arg(ext);
+    QString defaultName = QString("%1img_%2%3.%4").arg(prefixStr).arg(now.toString("yyyyMMdd_hhmmss")).arg(suffixStr).arg(ext);
     dialog.selectFile(defaultName);
 
     if (dialog.exec() != QDialog::Accepted) {
@@ -386,40 +414,10 @@ void MainWindow::on_actionSaveFrameAs_triggered()
     QString selectedFilter = dialog.selectedNameFilter();
     bool isCsv = selectedFilter.contains("CSV");
 
-    if (isCsv) {
-        int height = m_currentFrame.image.height();
-        bool saveOriginal = settings.value("data/saveOriginalData", false).toBool();
-
-        bool success = false;
-        if (height == 1) {
-            success = exportSpectrumAsCsv(filePath, saveOriginal);
-        } else {
-            success = exportImageAsCsv(filePath, m_currentFrame.image, saveOriginal);
-        }
-
-        if (!success) {
-            QMessageBox::critical(this, tr("Save Error"),
-                tr("Failed to save CSV to:\n%1").arg(filePath));
-            return;
-        }
-        if (settings.value("data/saveMetadata", true).toBool()) {
-            saveMetadataJson(filePath, m_currentFrame);
-        }
-    } else {
-        if (!m_currentFrame.image.save(filePath)) {
-            QMessageBox::critical(this, tr("Save Error"),
-                tr("Failed to save frame to:\n%1").arg(filePath));
-            return;
-        }
-        if (settings.value("data/saveMetadata", true).toBool()) {
-            saveMetadataJson(filePath, m_currentFrame);
-        }
-    }
-
-    showStatusMessage(tr("Frame saved: %1").arg(filePath), 3000);
+    saveFrameToFile(filePath, isCsv);
 }
 
-void MainWindow::on_actionSaveFrameAutoNumber_triggered()
+void MainWindow::on_actionSaveFrame_triggered()
 {
     if (!m_currentFrame.isValid()) {
         QMessageBox::warning(this, tr("No Frame"),
@@ -443,41 +441,12 @@ void MainWindow::on_actionSaveFrameAutoNumber_triggered()
     QString ext = isCsv ? "csv" : "tiff";
     QString prefix = settings.value("data/filenamePrefix", "").toString();
     QString suffix = settings.value("data/filenameSuffix", "").toString();
+    QString prefixStr = prefix.isEmpty() ? "" : prefix + "_";
     QString suffixStr = suffix.isEmpty() ? "" : "_" + suffix;
-    QString fileName = QString("%1_img_%2%3.%4").arg(prefix).arg(now.toString("yyyyMMdd_hhmmss_zzz")).arg(suffixStr).arg(ext);
+    QString fileName = QString("%1img_%2%3.%4").arg(prefixStr).arg(now.toString("yyyyMMdd_hhmmss_zzz")).arg(suffixStr).arg(ext);
     QString filePath = saveDir + "/" + fileName;
 
-    if (isCsv) {
-        int height = m_currentFrame.image.height();
-        bool saveOriginal = settings.value("data/saveOriginalData", false).toBool();
-
-        bool success = false;
-        if (height == 1) {
-            success = exportSpectrumAsCsv(filePath, saveOriginal);
-        } else {
-            success = exportImageAsCsv(filePath, m_currentFrame.image, saveOriginal);
-        }
-
-        if (!success) {
-            QMessageBox::critical(this, tr("Save Error"),
-                tr("Failed to save CSV to:\n%1").arg(filePath));
-            return;
-        }
-        if (settings.value("data/saveMetadata", true).toBool()) {
-            saveMetadataJson(filePath, m_currentFrame);
-        }
-    } else {
-        if (!m_currentFrame.image.save(filePath)) {
-            QMessageBox::critical(this, tr("Save Error"),
-                tr("Failed to save frame to:\n%1").arg(filePath));
-            return;
-        }
-        if (settings.value("data/saveMetadata", true).toBool()) {
-            saveMetadataJson(filePath, m_currentFrame);
-        }
-    }
-
-    showStatusMessage(tr("Frame saved: %1").arg(filePath), 3000);
+    saveFrameToFile(filePath, isCsv);
 }
 
 void MainWindow::on_actionAutoSaveToggle_triggered(bool checked)

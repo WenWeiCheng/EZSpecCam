@@ -32,9 +32,8 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 private slots:
-    void on_actionSaveFrame_triggered();
     void on_actionSaveFrameAs_triggered();
-    void on_actionSaveFrameAutoNumber_triggered();
+    void on_actionSaveFrame_triggered();
     void on_actionAutoSaveToggle_triggered(bool checked);
     void on_actionChangeAutoSaveDir_triggered();
     void on_actionConfig_triggered();
@@ -83,6 +82,7 @@ private:
     bool exportSpectrumAsCsv(const QString &filePath, bool saveOriginal) const;
     bool exportImageAsCsv(const QString &filePath, const QImage &image, bool saveOriginal) const;
     bool saveMetadataJson(const QString &imagePath, const ImageData &frame);
+    void saveFrameToFile(const QString &filePath, bool isCsv);
 
     QElapsedTimer m_frameTimer;
     static constexpr int MIN_FRAME_INTERVAL_MS = 33;

@@ -10,7 +10,6 @@
 
 MainWindowUi::MainWindowUi(QObject *parent)
     : m_parent(parent)
-    , actionSaveFrame(nullptr)
     , actionConfig(nullptr)
     , actionAbout(nullptr)
     , actionStart(nullptr)
@@ -45,7 +44,6 @@ MainWindowUi::MainWindowUi(QObject *parent)
     , menuActionVerticalBinning(nullptr)
     , menuActionRowRange(nullptr)
     , menuActionSaveFrameAs(nullptr)
-    , menuActionSaveFrameAutoNumber(nullptr)
     , menuActionAutoSaveToggle(nullptr)
     , menuActionChangeAutoSaveDir(nullptr)
 {
@@ -80,9 +78,9 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     menuActionSaveFrameAs->setShortcut(QKeySequence(Qt::ALT | Qt::Key_S));
     menuFile->addAction(menuActionSaveFrameAs);
 
-    menuActionSaveFrameAutoNumber = new QAction("Save Frame (Auto Number)", mainWindow);
-    menuActionSaveFrameAutoNumber->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_S));
-    menuFile->addAction(menuActionSaveFrameAutoNumber);
+    menuActionSaveFrame = new QAction("Save Frame", mainWindow);
+    menuActionSaveFrame->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_S));
+    menuFile->addAction(menuActionSaveFrame);
 
     menuFile->addSeparator();
 
@@ -95,8 +93,7 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
 
     menuFile->addSeparator();
 
-    menuActionSaveFrame = menuActionSaveFrameAutoNumber;
-    actionSaveFrame = menuActionSaveFrameAutoNumber;
+    menuActionSaveFrame = menuActionSaveFrame;
 
     QMenu *menuCamera = menuBar->addMenu("&Camera");
     menuActionConfig = new QAction("&Config", mainWindow);
