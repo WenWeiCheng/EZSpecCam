@@ -70,7 +70,9 @@ bool MockCameraDriver::connectToCamera(const QString &cameraId)
 
     initializeParameterDefinitions(cameraId);
 
+#ifndef EZSPECCAM_MOCK_TESTING
     QThread::msleep(1000);  // Simulate real camera connection delay (1000ms)
+#endif
 
     m_state.store(CameraState::Connected);
     m_frameNumber.store(0);
@@ -221,7 +223,9 @@ bool MockCameraDriver::commitParameters()
     if(!m_pendingParameters.isEmpty()){
         m_parameters.insert(m_pendingParameters);
         m_pendingParameters.clear();
+#ifndef EZSPECCAM_MOCK_TESTING
         QThread::msleep(1000);  // Simulate real device parameter commit latency (1000ms)
+#endif
     }
 
     return true;

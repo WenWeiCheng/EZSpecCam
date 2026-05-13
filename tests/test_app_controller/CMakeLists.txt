@@ -5,6 +5,7 @@ target_sources(test_app_controller PRIVATE
     ${CMAKE_SOURCE_DIR}/src/plugins/mock/MockCameraDriver.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/AppController.cpp
 )
+target_compile_definitions(test_app_controller PRIVATE EZSPECCAM_MOCK_TESTING)
 target_link_libraries(test_app_controller PRIVATE
     ezspeccam_core
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test
