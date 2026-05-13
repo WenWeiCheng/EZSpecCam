@@ -678,7 +678,7 @@ void AppController::onDriverFrameReady(const QSharedPointer<QImage> &image,
     frame.timestamp = timestamp;
     frame.frameNumber = frameNumber;
     frame.cameraId = cameraId;
-    frame.parameters = mergedParameters();
+    frame.parameters = m_parameters;
 
     emit frameReady(frame);
 }
