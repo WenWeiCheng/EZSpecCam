@@ -356,6 +356,7 @@ private:
 
     // Parameters cache
     QVariantMap m_parameters;
+    QVariantMap m_pendingParameters;
 
     // Capture tracking
     int m_captureCount = 0;

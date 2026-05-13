@@ -605,12 +605,12 @@ bool AppController::setParameter(const QString &name, const QVariant &value)
     }
 
     QVariant oldValue = m_parameters.value(name);
-    if (!m_fisrtSetParameter && oldValue == value) {
+    if (!m_fisrtSetParameter && oldValue == value && !m_pendingParameters.contains(name)) {
         return true;
     }
 
     if (m_driver->setParameter(name, value)) {
-        m_parameters[name] = value;
+        m_pendingParameters[name] = value;
         if(m_fisrtSetParameter){
             PARAM_DEBUG << "First set parameter:" << name << ":" << value;
         } else {
@@ -650,7 +650,13 @@ bool AppController::commitParameters()
     }
     bool ok = m_driver->commitParameters();
     if (ok) {
+        for (auto it = m_pendingParameters.constBegin(); it != m_pendingParameters.constEnd(); ++it) {
+            m_parameters[it.key()] = it.value();
+        }
+        m_pendingParameters.clear();
         saveDynamicConfig(m_cameraId, m_parameters);
+    } else {
+        m_pendingParameters.clear();
     }
     emit commitParametersFinished(ok);
     return ok;
@@ -672,7 +678,7 @@ void AppController::onDriverFrameReady(const QSharedPointer<QImage> &image,
     frame.timestamp = timestamp;
     frame.frameNumber = frameNumber;
     frame.cameraId = cameraId;
-    frame.parameters = m_parameters;
+    frame.parameters = mergedParameters();
 
     emit frameReady(frame);
 }
