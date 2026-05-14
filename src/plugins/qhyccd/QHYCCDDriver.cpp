@@ -92,25 +92,8 @@ bool QHYCCDDriver::connectToCamera(const QString &cameraId)
     // Initialize parameters from camera
     initializeParameterDefinitions();
     
-    // set single mode
-    uint32_t ret = SetQHYCCDStreamMode(m_cameraHandle, 0);
-    if(ret != QHYCCD_SUCCESS){
-        DRIVER_DEBUG << "Failed to set stream mode: " << ret;
-        emit errorOccurred(CameraError::makeError(
-            CameraError::Code::DriverError,
-            QString("Failed to set stream mode: %1").arg(ret)));
-        return false;
-    }
-
-    // Set debayer off for RAW mode (must be after InitQHYCCD)
-    ret = SetQHYCCDDebayerOnOff(m_cameraHandle, false);
-    if (ret != QHYCCD_SUCCESS) {
-        DRIVER_DEBUG << "Failed to set debayer off: " << ret;
-        emit errorOccurred(CameraError::makeError(
-            CameraError::Code::DriverError,
-            QString("Failed to set debayer off")));
-        return false;
-    }
+    // set read mode, this will force to initialize camera when first set params.
+    m_pendingParameters.insert("read_mode", m_parameters["read_mode"]);
 
     emit connectionChanged(true, cameraId);
     return true;
@@ -158,6 +141,7 @@ QVariant QHYCCDDriver::parameterValue(const QString &name) const
 {
     QMutexLocker locker(&m_mutex);
     if (m_parameters.contains(name)) {
+        // FIXME: 像 current_temperature, humidity, press 这种随外界环境变化而改变的参数(isExtrinsic=true)，需要使用相机 SDK 获取
         return m_parameters.value(name);
     }
     return QVariant();
@@ -381,6 +365,7 @@ bool QHYCCDDriver::commitParameters()
             int traffic = value.toInt();
             ret = SetQHYCCDParam(m_cameraHandle, CONTROL_USBTRAFFIC, traffic);
         } else if (name == "binning") {
+            // FIXME: 更改 binning 时，roi 的值范围需要更新，并设置到默认最大可能范围
             int binFactor = value.toInt();
             // Set binning via SDK - both wbin and hbin
             ret = SetQHYCCDBinMode(m_cameraHandle, binFactor, binFactor);
@@ -1020,15 +1005,14 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.isDynamic = true;
         param.isExtrinsic = true;
         param.order = 12.0f;
-        param.defaultValue = 25;
+        param.defaultValue = "-";
         m_parameterDefinitions.insert("current_temperature", param);
-        m_parameters.insert("current_temperature", 0.0);
+        m_parameters.insert("current_temperature", "-");
     }
 
     // Humidity - check availability
     ret = IsQHYCCDControlAvailable(m_cameraHandle, CAM_HUMIDITY);
     if (ret == QHYCCD_SUCCESS) {
-        double humidityValue = GetQHYCCDParam(m_cameraHandle, CAM_HUMIDITY);
         param = ParameterDefinition();
         param.name = "humidity";
         param.displayName = "Humidity";
@@ -1039,15 +1023,14 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.isDynamic = true;
         param.isExtrinsic = true;
         param.order = 13.0f;
-        param.defaultValue = humidityValue;
+        param.defaultValue = "-";
         m_parameterDefinitions.insert("humidity", param);
-        m_parameters.insert("humidity", humidityValue);
+        m_parameters.insert("humidity", "-");
     }
     
     // Pressure - check availability
     ret = IsQHYCCDControlAvailable(m_cameraHandle, CAM_PRESSURE);
     if (ret == QHYCCD_SUCCESS) {
-        double pressureValue = GetQHYCCDParam(m_cameraHandle, CAM_PRESSURE);
         param = ParameterDefinition();
         param.name = "pressure";
         param.displayName = "Pressure";
@@ -1058,9 +1041,9 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.isDynamic = true;
         param.isExtrinsic = true;
         param.order = 14.0f;
-        param.defaultValue = pressureValue;
+        param.defaultValue = "-";
         m_parameterDefinitions.insert("pressure", param);
-        m_parameters.insert("pressure", pressureValue);
+        m_parameters.insert("pressure", "-");
     }
 
     // Check effective area
