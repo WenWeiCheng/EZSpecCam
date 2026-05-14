@@ -385,7 +385,7 @@ void CameraTab::onCoolingTimerTimeout()
     QStringList paramNames = m_appController->parameterNames();
     for (const QString &paramName : paramNames) {
         ParameterDefinition def = m_appController->parameter(paramName);
-        if (def.isDynamic && def.isExtrinsic && def.category == ParameterCategory::Cooling) {
+        if (def.isDynamic && def.isExtrinsic) {
             QVariant value = m_appController->parameterValue(paramName);
             QWidget *widget = m_parameterWidgets.value(paramName);
             if (widget) {
