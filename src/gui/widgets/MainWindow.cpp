@@ -11,6 +11,7 @@
 #include "dialogs/CustomRangeDialog.h"
 #include "config/CameraConfigDialog.h"
 #include "PostProcess.h"
+#include "../workers/FileSaverWorker.h"
 
 #include <QMessageBox>
 #include <QCloseEvent>
@@ -26,6 +27,7 @@
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QFileInfo>
+#include <qobject.h>
 
 Q_LOGGING_CATEGORY(parameterCategory, "Parameter")
 Q_LOGGING_CATEGORY(cameraCategory, "Camera")
@@ -93,6 +95,17 @@ MainWindow::MainWindow(QWidget *parent)
     // Call scanPlugins on the controller thread (must be after moveToThread)
     QMetaObject::invokeMethod(m_appController, &AppController::scanPlugins, Qt::QueuedConnection);
 
+    // Set up FileSaverWorker on its own thread
+    m_fileSaverThread = new QThread(this);
+    m_fileSaverWorker = new FileSaverWorker();
+    m_fileSaverWorker->moveToThread(m_fileSaverThread);
+    m_fileSaverThread->start();
+
+    connect(m_fileSaverWorker, &FileSaverWorker::completed,
+            this, &MainWindow::onFileSaveCompleted, Qt::QueuedConnection);
+    connect(m_fileSaverWorker, &FileSaverWorker::failed,
+            this, &MainWindow::onFileSaveFailed, Qt::QueuedConnection);
+
     connect(ui->menuActionSaveFrameAs, &QAction::triggered,
             this, &MainWindow::on_actionSaveFrameAs_triggered);
     connect(ui->menuActionSaveFrame, &QAction::triggered,
@@ -159,7 +172,13 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    // Clean up controller thread before destroying AppController
+    if (m_fileSaverThread) {
+        m_fileSaverThread->quit();
+        m_fileSaverThread->wait(2000);
+        delete m_fileSaverThread;
+        m_fileSaverThread = nullptr;
+    }
+
     if (m_controllerThread) {
         m_controllerThread->quit();
         m_controllerThread->wait(2000);
@@ -177,59 +196,27 @@ bool MainWindow::exportSpectrumAsCsv(const QString &filePath, bool saveOriginal)
         return false;
     }
 
-    QFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        return false;
-    }
-
-    QTextStream out(&file);
-    out << "Wavelength,Intensity\n";
-
-    int count = qMin(xData.size(), yData.size());
-    for (int i = 0; i < count; ++i) {
-        out << QString::number(xData[i], 'f', 6) << ","
-            << QString::number(yData[i], 'f', 6) << "\n";
-    }
+    QVector<double> xCopy = xData;
+    QVector<double> yCopy = yData;
+    QImage origImageCopy;
 
     if (saveOriginal && !m_currentFrame.originalImage.isNull()) {
-        QString origFilePath = filePath;
-        int dotIndex = origFilePath.lastIndexOf('.');
-        if (dotIndex > 0) {
-            origFilePath.insert(dotIndex, "_original");
-        } else {
-            origFilePath += "_original";
-        }
-
-        QFile origFile(origFilePath);
-        if (origFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            QTextStream origOut(&origFile);
-            const QImage &origImg = m_currentFrame.originalImage;
-            const int height = origImg.height();
-            const int width = origImg.width();
-
-            if (origImg.format() == QImage::Format_Grayscale16) {
-                const ushort *bits = reinterpret_cast<const ushort *>(origImg.bits());
-                for (int y = 0; y < height; ++y) {
-                    QStringList rowValues;
-                    const ushort *row = bits + y * width;
-                    for (int x = 0; x < width; ++x) {
-                        rowValues << QString::number(row[x]);
-                    }
-                    origOut << rowValues.join(",") << "\n";
-                }
-            } else {
-                for (int y = 0; y < height; ++y) {
-                    QStringList rowValues;
-                    for (int x = 0; x < width; ++x) {
-                        QRgb pixel = origImg.pixel(x, y);
-                        int gray = qGray(pixel);
-                        rowValues << QString::number(gray);
-                    }
-                    origOut << rowValues.join(",") << "\n";
-                }
-            }
-        }
+        origImageCopy = m_currentFrame.originalImage;
     }
+
+    QMetaObject::invokeMethod(m_fileSaverWorker, [this, filePath, xCopy, yCopy, origImageCopy, saveOriginal]() {
+        m_fileSaverWorker->exportSpectrumCsv(xCopy, yCopy, filePath);
+        if (saveOriginal && !origImageCopy.isNull()) {
+            QString origFilePath = filePath;
+            int dotIndex = origFilePath.lastIndexOf('.');
+            if (dotIndex > 0) {
+                origFilePath.insert(dotIndex, "_original");
+            } else {
+                origFilePath += "_original";
+            }
+            m_fileSaverWorker->exportImageCsv(origImageCopy, origFilePath);
+        }
+    }, Qt::QueuedConnection);
 
     return true;
 }
@@ -240,91 +227,27 @@ bool MainWindow::exportImageAsCsv(const QString &filePath, const QImage &image, 
         return false;
     }
 
-    auto saveImageToCsv = [](QTextStream &stream, const QImage &img) {
-        const int height = img.height();
-        const int width = img.width();
-
-        if (img.format() == QImage::Format_Grayscale16) {
-            const ushort *bits = reinterpret_cast<const ushort *>(img.bits());
-            for (int y = 0; y < height; ++y) {
-                QStringList rowValues;
-                const ushort *row = bits + y * width;
-                for (int x = 0; x < width; ++x) {
-                    rowValues << QString::number(row[x]);
-                }
-                stream << rowValues.join(",") << "\n";
-            }
-        } else {
-            for (int y = 0; y < height; ++y) {
-                QStringList rowValues;
-                for (int x = 0; x < width; ++x) {
-                    QRgb pixel = img.pixel(x, y);
-                    int gray = qGray(pixel);
-                    rowValues << QString::number(gray);
-                }
-                stream << rowValues.join(",") << "\n";
-            }
-        }
-    };
-
-    QFile mainFile(filePath);
-    if (!mainFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        return false;
-    }
-    QTextStream mainOut(&mainFile);
-    saveImageToCsv(mainOut, image);
+    QImage imageCopy = image;
+    QImage origImageCopy;
 
     if (saveOriginal && !m_currentFrame.originalImage.isNull()) {
-        QString origFilePath = filePath;
-        int dotIndex = origFilePath.lastIndexOf('.');
-        if (dotIndex > 0) {
-            origFilePath.insert(dotIndex, "_original");
-        } else {
-            origFilePath += "_original";
+        origImageCopy = m_currentFrame.originalImage;
+    }
+
+    QMetaObject::invokeMethod(m_fileSaverWorker, [this, filePath, imageCopy, origImageCopy, saveOriginal]() {
+        m_fileSaverWorker->exportImageCsv(imageCopy, filePath);
+        if (saveOriginal && !origImageCopy.isNull()) {
+            QString origFilePath = filePath;
+            int dotIndex = origFilePath.lastIndexOf('.');
+            if (dotIndex > 0) {
+                origFilePath.insert(dotIndex, "_original");
+            } else {
+                origFilePath += "_original";
+            }
+            m_fileSaverWorker->exportImageCsv(origImageCopy, origFilePath);
         }
+    }, Qt::QueuedConnection);
 
-        QFile origFile(origFilePath);
-        if (origFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            QTextStream origOut(&origFile);
-            saveImageToCsv(origOut, m_currentFrame.originalImage);
-        }
-    }
-
-    return true;
-}
-
-bool MainWindow::saveMetadataJson(const QString &imagePath, const ImageData &frame)
-{
-    QFileInfo fileInfo(imagePath);
-    QString metadataPath = fileInfo.absoluteDir().absolutePath() + "/" + fileInfo.baseName() + "_metadata.json";
-
-    QJsonObject root;
-    root["cameraId"] = frame.cameraId;
-    root["timestamp"] = static_cast<qint64>(frame.timestamp);
-    root["frameNumber"] = frame.frameNumber;
-
-    // Add all parameters from frame.parameters
-    QJsonObject paramsObj;
-    for (auto it = frame.parameters.constBegin(); it != frame.parameters.constEnd(); ++it) {
-        paramsObj[it.key()] = QJsonValue::fromVariant(it.value());
-    }
-    root["parameters"] = paramsObj;
-
-    // Add config if present
-    if (!frame.config.isEmpty()) {
-        QJsonObject configObj;
-        for (auto it = frame.config.constBegin(); it != frame.config.constEnd(); ++it) {
-            configObj[it.key()] = QJsonValue::fromVariant(it.value());
-        }
-        root["config"] = configObj;
-    }
-
-    QFile file(metadataPath);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        return false;
-    }
-
-    file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
     return true;
 }
 
@@ -348,16 +271,12 @@ void MainWindow::saveFrameToFile(const QString &filePath, bool isCsv)
             return;
         }
     } else {
-        if (!m_currentFrame.image.save(filePath)) {
-            QMessageBox::critical(this, tr("Save Error"),
-                tr("Failed to save frame to:\n%1").arg(filePath));
-            return;
-        }
+        ImageData frameCopy = m_currentFrame;
+        bool saveMetadata = settings.value("data/saveMetadata", true).toBool();
+        QMetaObject::invokeMethod(m_fileSaverWorker, [this, filePath, frameCopy, saveMetadata]() {
+            m_fileSaverWorker->saveFrame(frameCopy, filePath, saveMetadata);
+        }, Qt::QueuedConnection);
     }
-    if (settings.value("data/saveMetadata", true).toBool()) {
-        saveMetadataJson(filePath, m_currentFrame);
-    }
-    showStatusMessage(tr("Frame saved: %1").arg(filePath), 10000);
 }
 
 void MainWindow::on_actionSaveFrameAs_triggered()
@@ -804,31 +723,7 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
 
     QSettings settings;
     if (settings.value("data/autoSaveEnabled", false).toBool()) {
-        QString saveDir = settings.value("data/autoSaveDirectory",
-            QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
-            + "/EZSpecCamData").toString();
-
-        if (m_autoSaveDir.isEmpty()) {
-            QString timestamp = m_launchTimestamp.toString("yyyy-MM-dd-hh-mm-ss");
-            m_autoSaveDir = saveDir + "/" + timestamp;
-            QDir().mkpath(m_autoSaveDir);
-        }
-
-        int frameNum = ++m_autoSaveFrameCounter;
-        QString prefix = settings.value("data/filenamePrefix", "").toString();
-        QString suffix = settings.value("data/filenameSuffix", "").toString();
-        QString suffixStr = suffix.isEmpty() ? "" : "_" + suffix;
-        QString filePath = QString("%1/%2_img_%3%4.tiff")
-            .arg(m_autoSaveDir)
-            .arg(prefix)
-            .arg(frameNum, 12, 10, QChar('0'))
-            .arg(suffixStr);
-        if (frame.image.save(filePath, "TIFF")) {
-            if (settings.value("data/saveMetadata", true).toBool()) {
-                saveMetadataJson(filePath, frame);
-            }
-            showStatusMessage(tr("Auto-saved frame %1").arg(frameNum), 2000);
-        }
+        on_actionSaveFrame_triggered();
     }
 }
 
@@ -1022,6 +917,13 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
     QCoreApplication::processEvents();
 
+    if (m_fileSaverThread) {
+        m_fileSaverThread->quit();
+        m_fileSaverThread->wait(2000);
+        delete m_fileSaverThread;
+        m_fileSaverThread = nullptr;
+    }
+
     if (m_controllerThread) {
         m_controllerThread->quit();
         if (m_controllerThread->wait(2000)) {
@@ -1031,4 +933,14 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
 
     event->accept();
+}
+
+void MainWindow::onFileSaveCompleted(const QString &path)
+{
+    showStatusMessage(tr("Saved: %1").arg(path), 10000);
+}
+
+void MainWindow::onFileSaveFailed(const QString &error)
+{
+    QMessageBox::critical(this, tr("Save Error"), error);
 }

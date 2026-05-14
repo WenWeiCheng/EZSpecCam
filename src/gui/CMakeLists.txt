@@ -31,4 +31,5 @@ target_sources(ezspeccam_gui PRIVATE
     widgets/display/ProfileWindow.h widgets/display/ProfileWindow.cpp
     widgets/dialogs/CustomRangeDialog.h widgets/dialogs/CustomRangeDialog.cpp
     widgets/dialogs/RowRangeDialog.h widgets/dialogs/RowRangeDialog.cpp
+    workers/FileSaverWorker.h workers/FileSaverWorker.cpp
 )
