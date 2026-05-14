@@ -544,7 +544,96 @@ private slots:
                                 .arg(bin).arg(height1 / bin).arg(image->height())));
         }
         
-        // TODO: 测试 binning 更改后，检查 roi 的定义的有效范围、默认值是否变化
+    }
+
+    void test_binning_roi_ranges()
+    {
+        // Get binning parameter to check available values
+        QStringList names = m_driver->parameterNames();
+        QVERIFY2(names.contains("binning"), "binning parameter should exist");
+
+        ParameterDefinition binningParam = m_driver->parameter("binning");
+        QVector<QVariant> validBinnings = binningParam.constraint.validValues;
+
+        // Find a binning value > 1
+        int testBinning = 1;
+        for (const QVariant &vb : validBinnings) {
+            if (vb.toInt() > 1) {
+                testBinning = vb.toInt();
+                break;
+            }
+        }
+
+        if (testBinning <= 1) {
+            QSKIP("Binning > 1 not available");
+        }
+
+        // Set binning to 1 and commit
+        m_driver->setParameter("binning", 1);
+        m_driver->commitParameters();
+
+        // Get initial ROI parameter definitions at binning=1
+        ParameterDefinition roiWidth = m_driver->parameter("roi_width");
+        ParameterDefinition roiHeight = m_driver->parameter("roi_height");
+        ParameterDefinition roiX = m_driver->parameter("roi_x");
+        ParameterDefinition roiY = m_driver->parameter("roi_y");
+
+        double initialWidthMax = roiWidth.constraint.maxValue;
+        double initialHeightMax = roiHeight.constraint.maxValue;
+        double initialXMax = roiX.constraint.maxValue;
+        double initialYMax = roiY.constraint.maxValue;
+
+        qDebug() << "Binning 1 - roi_width maxValue:" << initialWidthMax
+                 << "roi_height maxValue:" << initialHeightMax;
+        qDebug() << "Binning 1 - roi_x maxValue:" << initialXMax
+                 << "roi_y maxValue:" << initialYMax;
+
+        // Change binning to testBinning and commit
+        m_driver->setParameter("binning", testBinning);
+        m_driver->commitParameters();
+
+        // Get ROI parameter definitions again after binning change
+        ParameterDefinition newRoiWidth = m_driver->parameter("roi_width");
+        ParameterDefinition newRoiHeight = m_driver->parameter("roi_height");
+        ParameterDefinition newRoiX = m_driver->parameter("roi_x");
+        ParameterDefinition newRoiY = m_driver->parameter("roi_y");
+
+        double newWidthMax = newRoiWidth.constraint.maxValue;
+        double newHeightMax = newRoiHeight.constraint.maxValue;
+        double newXMax = newRoiX.constraint.maxValue;
+        double newYMax = newRoiY.constraint.maxValue;
+
+        qDebug() << "Binning" << testBinning << "- roi_width maxValue:" << newWidthMax
+                 << "roi_height maxValue:" << newHeightMax;
+        qDebug() << "Binning" << testBinning << "- roi_x maxValue:" << newXMax
+                 << "roi_y maxValue:" << newYMax;
+
+        // Verify maxValue constraints are scaled by binning factor
+        double expectedWidthMax = initialWidthMax / testBinning;
+        double expectedHeightMax = initialHeightMax / testBinning;
+
+        QVERIFY2(qAbs(newWidthMax - expectedWidthMax) < 1e-6,
+                 qPrintable(QString("roi_width maxValue should be %1 but got %2 at binning %3")
+                            .arg(expectedWidthMax).arg(newWidthMax).arg(testBinning)));
+        QVERIFY2(qAbs(newHeightMax - expectedHeightMax) < 1e-6,
+                 qPrintable(QString("roi_height maxValue should be %1 but got %2 at binning %3")
+                            .arg(expectedHeightMax).arg(newHeightMax).arg(testBinning)));
+
+        // roi_x and roi_y maxValues should also be scaled (they represent max offset which scales with binning)
+        QVERIFY2(qAbs(newXMax - initialXMax / testBinning) < 1e-6,
+                 qPrintable(QString("roi_x maxValue should be %1 but got %2 at binning %3")
+                            .arg(initialXMax / testBinning).arg(newXMax).arg(testBinning)));
+        QVERIFY2(qAbs(newYMax - initialYMax / testBinning) < 1e-6,
+                 qPrintable(QString("roi_y maxValue should be %1 but got %2 at binning %3")
+                            .arg(initialYMax / testBinning).arg(newYMax).arg(testBinning)));
+
+        // Verify defaultValue of roi_width/roi_height match the new max values
+        QVERIFY2(qAbs(newRoiWidth.defaultValue.toDouble() - newWidthMax) < 1e-6,
+                 qPrintable(QString("roi_width defaultValue should be %1 but got %2 at binning %3")
+                            .arg(newWidthMax).arg(newRoiWidth.defaultValue.toDouble()).arg(testBinning)));
+        QVERIFY2(qAbs(newRoiHeight.defaultValue.toDouble() - newHeightMax) < 1e-6,
+                 qPrintable(QString("roi_height defaultValue should be %1 but got %2 at binning %3")
+                            .arg(newHeightMax).arg(newRoiHeight.defaultValue.toDouble()).arg(testBinning)));
     }
 
     //==========================================================================

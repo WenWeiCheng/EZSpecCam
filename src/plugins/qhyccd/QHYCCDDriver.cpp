@@ -1,4 +1,5 @@
 #include "QHYCCDDriver.h"
+#include "CameraTypes.h"
 #include "gui/DebugMacros.h"
 #include "plugins/qhyccd/QHYCCDDriver.h"
 #include <QDateTime>
@@ -141,7 +142,21 @@ QVariant QHYCCDDriver::parameterValue(const QString &name) const
 {
     QMutexLocker locker(&m_mutex);
     if (m_parameters.contains(name)) {
-        // FIXME: 像 current_temperature, humidity, press 这种随外界环境变化而改变的参数(isExtrinsic=true)，需要使用相机 SDK 获取
+        if(m_state == CameraState::Connected && name == "current_temperature"){
+            double temp = GetQHYCCDParam(m_cameraHandle, CONTROL_CURTEMP);
+            m_parameters.insert("current_temperature", temp);
+            return temp;
+        }
+        else if(m_state == CameraState::Connected && name == "humidity"){
+            double humidity = GetQHYCCDParam(m_cameraHandle, CAM_HUMIDITY);
+            m_parameters.insert("humidity", humidity);
+            return humidity;
+        }
+        else if(m_state == CameraState::Connected && name == "press"){
+            double press = GetQHYCCDParam(m_cameraHandle, CAM_PRESSURE);
+            m_parameters.insert("press", press);
+            return press;
+        }
         return m_parameters.value(name);
     }
     return QVariant();
@@ -365,10 +380,27 @@ bool QHYCCDDriver::commitParameters()
             int traffic = value.toInt();
             ret = SetQHYCCDParam(m_cameraHandle, CONTROL_USBTRAFFIC, traffic);
         } else if (name == "binning") {
-            // FIXME: 更改 binning 时，roi 的值范围需要更新，并设置到默认最大可能范围
             int binFactor = value.toInt();
+            // update roi
+            int roiX = 0;
+            int roiY = 0;
+            int roiW = m_imageWidth / binFactor;
+            int roiH = m_imageHeight / binFactor;
+            m_parameters.insert("roi_x", roiX);
+            m_parameters.insert("roi_y", roiY);
+            m_parameters.insert("roi_width", roiW);
+            m_parameters.insert("roi_height", roiH);
+            m_parameterDefinitions["roi_x"].defaultValue = roiX;
+            m_parameterDefinitions["roi_x"].constraint.maxValue = roiX - 1;
+            m_parameterDefinitions["roi_y"].defaultValue = roiY;
+            m_parameterDefinitions["roi_y"].constraint.maxValue = roiY - 1;
+            m_parameterDefinitions["roi_width"].defaultValue = roiW;
+            m_parameterDefinitions["roi_width"].constraint.maxValue = roiW;
+            m_parameterDefinitions["roi_height"].defaultValue = roiH;
+            m_parameterDefinitions["roi_height"].constraint.maxValue = roiH;
             // Set binning via SDK - both wbin and hbin
             ret = SetQHYCCDBinMode(m_cameraHandle, binFactor, binFactor);
+            ret |= SetQHYCCDResolution(m_cameraHandle , roiX, roiY, roiW, roiH);
         }
 
         if (ret != QHYCCD_SUCCESS) {
@@ -998,7 +1030,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param = ParameterDefinition();
         param.name = "current_temperature";
         param.displayName = "Current Temperature";
-        param.description = "Current sensor temperature in Celsius";
+        param.description = "Current sensor temperature in Celsius. When capturing, this value update will stop.";
         param.category = ParameterCategory::Cooling;
         param.type = ParameterType::String;
         param.isReadOnly = true;
@@ -1016,7 +1048,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param = ParameterDefinition();
         param.name = "humidity";
         param.displayName = "Humidity";
-        param.description = "Humidity in percent";
+        param.description = "Humidity in percent. When capturing, this value update will stop.";
         param.category = ParameterCategory::Info;
         param.type = ParameterType::String;
         param.isReadOnly = true;
@@ -1034,7 +1066,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param = ParameterDefinition();
         param.name = "pressure";
         param.displayName = "Pressure";
-        param.description = "Pressure in mbar";
+        param.description = "Pressure in mbar. When capturing, this value update will stop.";
         param.category = ParameterCategory::Info;
         param.type = ParameterType::String;
         param.isReadOnly = true;

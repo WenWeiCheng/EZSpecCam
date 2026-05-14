@@ -252,8 +252,8 @@ private:
     /// Parameter definitions
     QMap<QString, ParameterDefinition> m_parameterDefinitions;
 
-    /// Current parameter values
-    QVariantMap m_parameters;
+    /// Current parameter values (mutable for caching in const methods)
+    mutable QVariantMap m_parameters;
 
     /// Pending parameters (staged before commit)
     QVariantMap m_pendingParameters;
