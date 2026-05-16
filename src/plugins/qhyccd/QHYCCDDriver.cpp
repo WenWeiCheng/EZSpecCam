@@ -6,6 +6,7 @@
 #include <QDebug>
 #include <cstdint>
 #include <cstring>
+#include <qobjectdefs.h>
 #include <qtmetamacros.h>
 #include <qtypes.h>
 #include <qvariant.h>
@@ -96,6 +97,7 @@ bool QHYCCDDriver::connectToCamera(const QString &cameraId)
     // set read mode, this will force to initialize camera when first set params.
     m_pendingParameters.insert("read_mode", m_parameters["read_mode"]);
 
+    m_connected.store(true);
     emit connectionChanged(true, cameraId);
     return true;
 }
@@ -268,11 +270,20 @@ bool QHYCCDDriver::commitParameters()
             return false;
         }
         
+        m_pendingParameters.remove("read_mode");
+        
         // reinit parameters
         for(auto it = m_parameterDefinitions.constBegin(); it != m_parameterDefinitions.constEnd(); ++it){
             const QString &name = it.key();
             const ParameterDefinition &def = it.value();
-            if(name == "read_mode" || name == "stream_mode") continue; // already set above
+
+            // pending parameters are already in
+            if(m_pendingParameters.contains(name)){
+                continue;
+            }
+
+            // already set above
+            if(name == "read_mode") continue; 
 
             if(def.isReadOnly) continue;
 
@@ -323,7 +334,7 @@ bool QHYCCDDriver::commitParameters()
             CameraError::makeError(
                 CameraError::Code::InvalidParameter,
                 "roi parameters is invalid");
-            DRIVER_DEBUG << "QHYCCDEZHAL: ROI validation failed - x:" << roiX << "y:" << roiY 
+            DRIVER_DEBUG << "ROI validation failed - x:" << roiX << "y:" << roiY 
                        << "w:" << roiW << "h:" << roiH << "image:" << imageWidth << "x" << imageHeight;
             return false;
         }
@@ -365,6 +376,7 @@ bool QHYCCDDriver::commitParameters()
                     ? m_pendingParameters.value("target_temperature").toDouble()
                     : m_parameters.value("target_temperature", -10.0).toDouble();
                 ret = ControlQHYCCDTemp(m_cameraHandle, targetTemp);
+                m_pendingParameters.remove("target_temperature");
             } else {
                 ret = SetQHYCCDParam(m_cameraHandle, CONTROL_MANULPWM, 0.0);
             }
@@ -391,9 +403,9 @@ bool QHYCCDDriver::commitParameters()
             m_parameters.insert("roi_width", roiW);
             m_parameters.insert("roi_height", roiH);
             m_parameterDefinitions["roi_x"].defaultValue = roiX;
-            m_parameterDefinitions["roi_x"].constraint.maxValue = roiX - 1;
+            m_parameterDefinitions["roi_x"].constraint.maxValue = roiW - 1;
             m_parameterDefinitions["roi_y"].defaultValue = roiY;
-            m_parameterDefinitions["roi_y"].constraint.maxValue = roiY - 1;
+            m_parameterDefinitions["roi_y"].constraint.maxValue = roiH - 1;
             m_parameterDefinitions["roi_width"].defaultValue = roiW;
             m_parameterDefinitions["roi_width"].constraint.maxValue = roiW;
             m_parameterDefinitions["roi_height"].defaultValue = roiH;
@@ -410,6 +422,7 @@ bool QHYCCDDriver::commitParameters()
             m_pendingParameters.clear();
             return false;
         }
+        
     }
 
     // Move pending to actual
@@ -464,7 +477,7 @@ void QHYCCDDriver::stopCapture(int timeoutMs)
         m_captureThread->quit();
         m_captureThread->wait(timeoutMs);
         CancelQHYCCDExposingAndReadout(m_cameraHandle);
-        delete m_captureThread;
+        m_captureThread->deleteLater();
         m_captureThread = nullptr;
     }
 
@@ -535,6 +548,10 @@ void QHYCCDDriver::initializeParameterDefinitions()
 
     ParameterDefinition param;
 
+    m_parameterDefinitions.clear();
+    m_parameters.clear();
+    m_pendingParameters.clear();
+
     // cameraId
     param = ParameterDefinition();
     param.name = "serial_number";
@@ -547,10 +564,6 @@ void QHYCCDDriver::initializeParameterDefinitions()
     param.defaultValue = m_connectedCameraId;
     m_parameterDefinitions.insert("serial_number", param);
     m_parameters.insert("serial_number", m_connectedCameraId);
-
-    m_parameterDefinitions.clear();
-    m_parameters.clear();
-    m_pendingParameters.clear();
 
     // Get camera chip information
     char model[64] = {0};
@@ -673,7 +686,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
 
     uint32_t numReadModes = 0;
     ret = GetQHYCCDNumberOfReadModes(m_cameraHandle, &numReadModes);
-    qDebug() << "QHYCCDEZHAL: Number of read modes:" << numReadModes;
+    DRIVER_DEBUG << "Number of read modes:" << numReadModes;
 
     m_readModeNames.clear();
     if (ret == QHYCCD_SUCCESS && numReadModes > 0) {
@@ -683,7 +696,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
             ret = GetQHYCCDReadModeName(m_cameraHandle, i, modeName);
             if (ret == QHYCCD_SUCCESS) {
                 m_readModeNames.append(QString::fromLatin1(modeName));
-                qDebug() << "QHYCCDEZHAL: Read mode" << i << ":" << modeName;
+                DRIVER_DEBUG << "Read mode" << i << ":" << modeName;
             } else {
                 emit errorOccurred(CameraError::makeError(
                     CameraError::Code::DriverError,
@@ -715,7 +728,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
             param.constraint.minValue = minExp;
             param.constraint.maxValue = maxExp;
             param.constraint.step = stepExp;
-            qDebug() << "QHYCCDEZHAL: Exposure range from camera:" << minExp << "-" << maxExp << "step:" << stepExp;
+            DRIVER_DEBUG << "Exposure range from camera:" << minExp << "-" << maxExp << "step:" << stepExp;
         } else {
             emit errorOccurred(CameraError::makeError(
                 CameraError::Code::DriverError,
@@ -754,7 +767,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
             param.constraint.minValue = minGain;
             param.constraint.maxValue = maxGain;
             param.constraint.step = stepGain;
-            qDebug() << "QHYCCDEZHAL: Gain range from camera:" << minGain << "-" << maxGain << "step:" << stepGain;
+            DRIVER_DEBUG << "Gain range from camera:" << minGain << "-" << maxGain << "step:" << stepGain;
         } else {
             emit errorOccurred(CameraError::makeError(
                 CameraError::Code::DriverError,
@@ -785,7 +798,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
             param.constraint.minValue = minOffset;
             param.constraint.maxValue = maxOffset;
             param.constraint.step = stepOffset;
-            qDebug() << "QHYCCDEZHAL: Offset range from camera:" << minOffset << "-" << maxOffset << "step:" << stepOffset;
+            DRIVER_DEBUG << "Offset range from camera:" << minOffset << "-" << maxOffset << "step:" << stepOffset;
         } else {
             emit errorOccurred(CameraError::makeError(
                 CameraError::Code::DriverError,
@@ -913,7 +926,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
             param.constraint.minValue = minTraffic;
             param.constraint.maxValue = maxTraffic;
             param.constraint.step = stepTraffic > 0 ? stepTraffic : 1;
-            qDebug() << "QHYCCDEZHAL: USB Traffic range from camera:" << minTraffic << "-" << maxTraffic << "step:" << stepTraffic;
+            DRIVER_DEBUG << "USB Traffic range from camera:" << minTraffic << "-" << maxTraffic << "step:" << stepTraffic;
         } else {
             emit errorOccurred(CameraError::makeError(
                 CameraError::Code::DriverError,
@@ -960,8 +973,8 @@ void QHYCCDDriver::initializeParameterDefinitions()
             param.constraint.validValues.clear();
             for (int b = static_cast<int>(minBits); b <= static_cast<int>(maxBits); b += static_cast<int>(stepBits > 0 ? stepBits : 1)) {
                 param.constraint.validValues.append(b);
-            }
-            qDebug() << "QHYCCDEZHAL: Transfer bit depths from camera:" << param.constraint.validValues;
+                }
+            DRIVER_DEBUG << "Transfer bit depths from camera:" << param.constraint.validValues;
         } else {
             emit errorOccurred(CameraError::makeError(
                 CameraError::Code::DriverError,
@@ -991,10 +1004,10 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.description = "Enable camera cooler";
         param.category = ParameterCategory::Cooling;
         param.type = ParameterType::Boolean;
-        param.defaultValue = false;
+        param.defaultValue = true;
         param.order = 10.0f;
         m_parameterDefinitions.insert("cooler_enabled", param);
-        m_parameters.insert("cooler_enabled", false);
+        m_parameters.insert("cooler_enabled", true);
 
         param = ParameterDefinition();
         param.name = "target_temperature";
@@ -1010,7 +1023,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
             param.constraint.minValue = minTemp;
             param.constraint.maxValue = maxTemp;
             param.constraint.step = stepTemp > 0 ? stepTemp : 1.0;
-            qDebug() << "QHYCCDEZHAL: Temperature range from camera:" << minTemp << "-" << maxTemp << "step:" << stepTemp;
+            DRIVER_DEBUG << "Temperature range from camera:" << minTemp << "-" << maxTemp << "step:" << stepTemp;
         } else {
             emit errorOccurred(CameraError::makeError(
                 CameraError::Code::DriverError,
@@ -1049,7 +1062,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.name = "humidity";
         param.displayName = "Humidity";
         param.description = "Humidity in percent. When capturing, this value update will stop.";
-        param.category = ParameterCategory::Info;
+        param.category = ParameterCategory::Cooling;
         param.type = ParameterType::String;
         param.isReadOnly = true;
         param.isDynamic = true;
@@ -1067,7 +1080,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.name = "pressure";
         param.displayName = "Pressure";
         param.description = "Pressure in mbar. When capturing, this value update will stop.";
-        param.category = ParameterCategory::Info;
+        param.category = ParameterCategory::Cooling;
         param.type = ParameterType::String;
         param.isReadOnly = true;
         param.isDynamic = true;
@@ -1163,7 +1176,13 @@ void QHYCCDDriver::captureLoop()
         }
     }
     
-    CancelQHYCCDExposingAndReadout(m_cameraHandle);
+    // stopCapture();
+    QMetaObject::invokeMethod(this, "onCaptureCompleted", Qt::QueuedConnection);
+}
+
+void QHYCCDDriver::onCaptureCompleted()
+{
+    stopCapture();
 }
 
 QImage QHYCCDDriver::convertBufferToImage(uint32_t w, uint32_t h, uint32_t bpp, uint32_t channels)
@@ -1172,12 +1191,16 @@ QImage QHYCCDDriver::convertBufferToImage(uint32_t w, uint32_t h, uint32_t bpp, 
 
     if (bpp == 8 && channels == 1) {
         image = QImage(static_cast<const uchar*>(m_frameBuffer.data()), w, h, w, QImage::Format_Grayscale8);
+        DRIVER_DEBUG << "Converted to 8-bit grayscale";
     } else if (bpp == 16 && channels == 1) {
         image = QImage(static_cast<const uchar*>(m_frameBuffer.data()), w, h, w * 2, QImage::Format_Grayscale16);
+        DRIVER_DEBUG << "Converted to 16-bit grayscale";
     } else if (bpp == 24 && channels == 3) {
         image = QImage(static_cast<const uchar*>(m_frameBuffer.data()), w, h, w * 3, QImage::Format_RGB888);
+        DRIVER_DEBUG << "Converted to RGB";
     } else if (bpp == 32 && channels == 4) {
         image = QImage(static_cast<const uchar*>(m_frameBuffer.data()), w, h, w * 4, QImage::Format_ARGB32);
+        DRIVER_DEBUG << "Converted to ARGB32";
     } else {
         // Fallback: try to create a grayscale 16-bit image
         image = QImage(static_cast<const uchar*>(m_frameBuffer.data()), w, h, w * 2, QImage::Format_Grayscale16);

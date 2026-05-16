@@ -175,6 +175,12 @@ public:
      * @return Camera ID string, or empty if not connected
      */
     QString cameraId() const override;
+    
+private slots:
+    /**
+     * @brief Internal slot to handle capture completion
+     */
+    void onCaptureCompleted();
 
 private:
     //==========================================================================

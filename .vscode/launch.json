@@ -9,7 +9,6 @@
             "args": [],
             "cwd": "${workspaceFolder}/build/msvc-debug/bin/Debug",
             "environment": [],
-            "console": "externalTerminal",
         },
         {
             "name": "Debug CLI (cppvsdbg)",
@@ -19,17 +18,15 @@
             "args": [],
             "cwd": "${workspaceFolder}/build/msvc-debug/bin/Debug",
             "environment": [],
-            "console": "externalTerminal",
         }, 
         {
-            "name": "Debug test_view_widgets_perf (cppvsdbg)",
+            "name": "Debug test_qhyccd_driver (cppvsdbg)",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/msvc-debug/bin/Debug/test_view_widgets_perf.exe",
-            "args": [],
+            "program": "${workspaceFolder}/build/msvc-debug/bin/Debug/test_qhyccd_driver.exe",
+            "args": [""],
             "cwd": "${workspaceFolder}/build/msvc-debug/bin/Debug",
             "environment": [],
-            "console": "externalTerminal",
         } 
     ]
 }

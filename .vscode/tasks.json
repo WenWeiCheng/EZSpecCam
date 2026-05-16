@@ -26,6 +26,19 @@
             "dependsOn": [],
             "group": "test",
             "detail": "Run the tests"
+        },
+        {
+            "label": "Test QHYCCDDriver",
+            "type": "shell",
+            "command": [
+             "${workspaceFolder}\\build\\msvc-debug\\bin\\Debug\\test_qhyccd_driver.exe",               
+             "-v2",
+             "test_param_gain"
+            ],
+            "problemMatcher": [],
+            "dependsOn": [],
+            "group": "test",
+            "detail": "Run the QHYCCDDriver unit test"
         }
     ]
 }
