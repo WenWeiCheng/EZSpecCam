@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstring>
 #include <qobjectdefs.h>
+#include <qthread.h>
 #include <qtmetamacros.h>
 #include <qtypes.h>
 #include <qvariant.h>
@@ -96,6 +97,7 @@ bool QHYCCDDriver::connectToCamera(const QString &cameraId)
     
     // set read mode, this will force to initialize camera when first set params.
     m_pendingParameters.insert("read_mode", m_parameters["read_mode"]);
+    m_pendingParameters.insert("stream_mode", m_parameters["stream_mode"]);
 
     m_connected.store(true);
     emit connectionChanged(true, cameraId);
@@ -231,17 +233,23 @@ bool QHYCCDDriver::commitParameters()
     // Apply parameters to camera
     uint32_t ret = QHYCCD_ERROR;
     bool readModeChanged = m_pendingParameters.contains("read_mode");
+    bool streamModeChanged = m_pendingParameters.contains("stream_mode");
     
-    // If read mode changed, we need to reinit camera and reset all parameters.
-    if(readModeChanged){
-        QString modeName = m_pendingParameters.value("read_mode").toString();
-        int modeIndex = m_readModeNames.indexOf(modeName);
-        if(modeIndex < 0) modeIndex = 0;
+    // If read mode or stream mode changed, we need to reinit camera and reset all parameters.
+    if(readModeChanged || streamModeChanged){
+        QString readModeName = m_pendingParameters.value("read_mode", m_parameters["read_mode"]).toString();
+        int readModeIndex = m_readModeNames.indexOf(readModeName);
+        if(readModeIndex < 0) readModeIndex = 0;
 
-        m_parameters.insert("read_mode", modeName);
+        QString streamModeName = m_pendingParameters.value("stream_mode").toString();
+        int streamModeIndex = m_streamModeNames.indexOf(streamModeName);
+        if(streamModeIndex < 0) streamModeIndex = 0;
+
+        m_parameters.insert("read_mode", readModeName);
+        m_parameters.insert("stream_mode", streamModeName);
 
         // set read mode
-        ret = SetQHYCCDReadMode(m_cameraHandle, modeIndex);
+        ret = SetQHYCCDReadMode(m_cameraHandle, readModeIndex);
         if(ret != QHYCCD_SUCCESS){
             DRIVER_DEBUG << "Failed to set read mode: " << ret;
             emit errorOccurred(CameraError::makeError(
@@ -251,7 +259,7 @@ bool QHYCCDDriver::commitParameters()
         }
 
         // set stream mode
-        uint32_t ret = SetQHYCCDStreamMode(m_cameraHandle, 0);
+        uint32_t ret = SetQHYCCDStreamMode(m_cameraHandle, streamModeIndex);
         if(ret != QHYCCD_SUCCESS){
             DRIVER_DEBUG << "Failed to set stream mode: " << ret;
             emit errorOccurred(CameraError::makeError(
@@ -271,6 +279,7 @@ bool QHYCCDDriver::commitParameters()
         }
         
         m_pendingParameters.remove("read_mode");
+        m_pendingParameters.remove("stream_mode");
         
         // reinit parameters
         for(auto it = m_parameterDefinitions.constBegin(); it != m_parameterDefinitions.constEnd(); ++it){
@@ -283,7 +292,7 @@ bool QHYCCDDriver::commitParameters()
             }
 
             // already set above
-            if(name == "read_mode") continue; 
+            if(name == "read_mode" || name == "stream_mode") continue; 
 
             if(def.isReadOnly) continue;
 
@@ -476,9 +485,16 @@ void QHYCCDDriver::stopCapture(int timeoutMs)
     if (m_captureThread) {
         m_captureThread->quit();
         m_captureThread->wait(timeoutMs);
-        CancelQHYCCDExposingAndReadout(m_cameraHandle);
         m_captureThread->deleteLater();
         m_captureThread = nullptr;
+    }
+    if(m_parameters["stream_mode"] == "Single Frame"){
+        DRIVER_DEBUG << "Cancelling single exposure";
+        CancelQHYCCDExposingAndReadout(m_cameraHandle);
+    }
+    if(m_parameters["stream_mode"] == "Live Video"){
+        DRIVER_DEBUG << "Stopping live video";
+        StopQHYCCDLive(m_cameraHandle);
     }
 
     if (m_state.load() == CameraState::Acquiring) {
@@ -711,6 +727,43 @@ void QHYCCDDriver::initializeParameterDefinitions()
         return;
     }
 
+    // read mode
+    param = ParameterDefinition();
+    param.name = "read_mode";
+    param.displayName = "Read Mode";
+    param.description = "Camera readout mode (affects speed/quality). When read mode is changed, need to re-init camera and re-commit parameters. So this takes a while.";
+    param.category = ParameterCategory::Core;
+    param.type = ParameterType::StringCollection;
+    for (const QString &name : m_readModeNames) {
+        param.constraint.validValues.append(name);
+    }
+    param.defaultValue = m_readModeNames.isEmpty() ? "Default" : m_readModeNames.first();
+    param.order = 0.1f;
+    m_parameterDefinitions.insert("read_mode", param);
+    m_parameters.insert("read_mode", param.defaultValue);
+    
+    // stream mode
+    param = ParameterDefinition();
+    param.name = "stream_mode";
+    param.displayName = "Stream Mode";
+    param.description = "Camera stream mode (Single Frame or Live Video). When stream mode is changed, need to re-init camera and re-commit parameters. So this takes a while.";
+    param.category = ParameterCategory::Core;
+    param.type = ParameterType::StringCollection;
+    ret = IsQHYCCDControlAvailable(m_cameraHandle, CAM_SINGLEFRAMEMODE);
+    if(ret == QHYCCD_SUCCESS){
+        m_streamModeNames.append("Single Frame");
+        param.constraint.validValues.append("Single Frame");   
+        param.defaultValue = "Single Frame";
+    }
+    ret = IsQHYCCDControlAvailable(m_cameraHandle, CAM_LIVEVIDEOMODE);
+    if(ret == QHYCCD_SUCCESS){
+        m_streamModeNames.append("Live Video");
+        param.constraint.validValues.append("Live Video");   
+    }
+    param.order = 0.2f;
+    m_parameterDefinitions.insert("stream_mode", param);
+    m_parameters.insert("stream_mode", param.defaultValue);
+
     // Exposure
     ret = IsQHYCCDControlAvailable(m_cameraHandle, CONTROL_EXPOSURE);
     if (ret == QHYCCD_SUCCESS) {
@@ -940,22 +993,6 @@ void QHYCCDDriver::initializeParameterDefinitions()
         m_parameters.insert("usb_traffic", param.defaultValue.toInt());
     }
 
-    // read mode
-    param = ParameterDefinition();
-    param.name = "read_mode";
-    param.displayName = "Read Mode";
-    param.description = "Camera readout mode (affects speed/quality)";
-    param.category = ParameterCategory::Core;
-    param.type = ParameterType::StringCollection;
-    for (const QString &name : m_readModeNames) {
-        param.constraint.validValues.append(name);
-    }
-    param.defaultValue = m_readModeNames.isEmpty() ? "Default" : m_readModeNames.first();
-    param.order = 5.0f;
-    param.needReconnect = true;
-    m_parameterDefinitions.insert("read_mode", param);
-    m_parameters.insert("read_mode", param.defaultValue);
-
     // Transfer bit depth - check availability
     ret = IsQHYCCDControlAvailable(m_cameraHandle, CONTROL_TRANSFERBIT);
     if (ret == QHYCCD_SUCCESS) {
@@ -1148,16 +1185,36 @@ void QHYCCDDriver::captureLoop()
     uint32_t width = 0, height = 0, bpp = 0, channels = 0;
     uint32_t ret = QHYCCD_ERROR;
 
-    while (m_captureRunning.load()) {
-        ExpQHYCCDSingleFrame(m_cameraHandle);
-        ret = GetQHYCCDSingleFrame(m_cameraHandle, &width, &height, &bpp, &channels, m_frameBuffer.data());
-
-        if (ret != QHYCCD_SUCCESS) {
-            DRIVER_DEBUG << "Failed to get frame (" << m_framesAcquired << "): " << ret;
+    
+    if(m_parameters["stream_mode"] == "Live Video"){
+        ret = BeginQHYCCDLive(m_cameraHandle);
+        if(ret != QHYCCD_SUCCESS){
+            DRIVER_DEBUG << "Failed to begin live mode: " << ret;
             emit errorOccurred(CameraError::makeError(
-                CameraError::Code::CaptureFailed,
-                QString("Failed to get frame").arg(ret)));
-            break;
+                CameraError::Code::DriverError,
+                QString("Failed to begin live mode").arg(ret)));
+        }
+    }
+
+    while (m_captureRunning.load()) {
+        if(m_parameters["stream_mode"] == "Single Frame"){
+            ret = GetQHYCCDLiveFrame(m_cameraHandle, &width, &height, &bpp, &channels, m_frameBuffer.data());
+            if(ret != QHYCCD_SUCCESS){
+                QThread::msleep(1);
+                continue;
+            }
+        }
+        if(m_parameters["stream_mode"] == "Live Video"){
+            ExpQHYCCDSingleFrame(m_cameraHandle);
+            ret = GetQHYCCDSingleFrame(m_cameraHandle, &width, &height, &bpp, &channels, m_frameBuffer.data());
+
+            if (ret != QHYCCD_SUCCESS) {
+                DRIVER_DEBUG << "Failed to get frame (" << m_framesAcquired << "): " << ret;
+                emit errorOccurred(CameraError::makeError(
+                    CameraError::Code::CaptureFailed,
+                    QString("Failed to get frame").arg(ret)));
+                break;
+            }
         }
 
         if (width > 0 && height > 0) {

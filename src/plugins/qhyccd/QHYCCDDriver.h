@@ -274,6 +274,7 @@ private:
     /// Camera model name
     QString m_cameraModel;
     QStringList m_readModeNames;
+    QStringList m_streamModeNames;
 
     /// Image dimensions
     uint32_t m_imageWidth = 0;
