@@ -33,6 +33,7 @@ tests/
 - Test slots: `initTestCase()`, `cleanupTestCase()`, `init()`, `cleanup()`, test methods
 - Assertions: `QVERIFY2()`, `QCOMPARE()`, `QVERIFY()`
 - Disabled tests (`test_cli`, `test_qhyccd_driver`) are commented out in parent `CMakeLists.txt`
+- when test signals, you should use `QSignalSpy`, and use `spy.wait()` to wait for the signal and check `spy.count()` to check the signal was emitted. Both ways should use together incase of signals arrive before `wait()`.
 
 ## COMMANDS
 ```bash
