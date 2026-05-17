@@ -32,4 +32,8 @@ target_sources(ezspeccam_gui PRIVATE
     widgets/dialogs/CustomRangeDialog.h widgets/dialogs/CustomRangeDialog.cpp
     widgets/dialogs/RowRangeDialog.h widgets/dialogs/RowRangeDialog.cpp
     workers/FileSaverWorker.h workers/FileSaverWorker.cpp
+    workers/SaveTypes.h
+    workers/IImageFormatHandler.h
+    workers/formats/CsvFormatHandler.h workers/formats/CsvFormatHandler.cpp
+    workers/formats/TiffFormatHandler.h workers/formats/TiffFormatHandler.cpp
 )

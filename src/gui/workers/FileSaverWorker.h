@@ -3,27 +3,22 @@
 
 #include <QObject>
 #include <QString>
-#include <QImage>
-#include <QVector>
-#include <QJsonObject>
-#include <QFile>
-#include <QTextStream>
-#include <QRgb>
-#include <QJsonDocument>
+#include <QStringList>
+#include <QHash>
 #include <QFileInfo>
 #include <QDir>
+#include <vector>
+#include <memory>
 
-#include "CameraTypes.h"
+#include "IImageFormatHandler.h"
+#include "SaveTypes.h"
 
 /**
  * @class FileSaverWorker
- * @brief Worker for non-blocking file save operations
+ * @brief 格式注册中心 + 分发器
  *
- * Lives on a dedicated QThread. All blocking I/O (QImage::save, QFile::write)
- * runs here to keep the GUI thread responsive.
- *
- * Thread affinity: the QThread this worker is moved to via moveToThread().
- * All public slots execute on that thread. Signals cross threads to MainWindow.
+ * 负责注册格式处理器、根据路径分发保存请求。
+ * 所有阻塞 I/O 在此线程执行。
  */
 class FileSaverWorker : public QObject
 {
@@ -33,33 +28,25 @@ public:
     explicit FileSaverWorker(QObject *parent = nullptr);
     ~FileSaverWorker() override;
 
+    /// @brief 注册格式处理器 ( ownership 转移 )
+    void registerHandler(std::unique_ptr<IImageFormatHandler> handler);
+
+    /// @brief 获取所有可用格式的显示名称列表 (用于文件对话框)
+    QStringList availableFormatNames() const;
+
 public slots:
-    /// @brief Save ImageData to file (TIFF by default, format inferred from path)
-    /// @param frame Image and metadata to save
-    /// @param path Target file path
-    /// @param saveMetadata If true, write _metadata.json alongside
-    void saveFrame(const ImageData &frame, const QString &path, bool saveMetadata);
-
-    /// @brief Export 1D spectrum to CSV with Wavelength,Intensity header
-    void exportSpectrumCsv(const QVector<double> &xData,
-                           const QVector<double> &yData,
-                           const QString &path);
-
-    /// @brief Export a QImage to CSV (pixel values as rows of integers)
-    void exportImageCsv(const QImage &image, const QString &path);
+    /// @brief 统一保存入口 - 根据 request.filePath 自动选择 Handler
+    void saveFrame(const SaveRequest &request);
 
 signals:
-    /// @brief Emitted when save completes
     void completed(const QString &path);
-
-    /// @brief Emitted when save fails
-    void failed(const QString &error);
+    void failed(const QString &error, const QString &details);
 
 private:
-    bool saveImage(const QImage &img, const QString &path);
-    bool saveSpectrumCsv(const QVector<double> &x, const QVector<double> &y, const QString &path);
-    bool saveImageCsv(const QImage &img, const QString &path);
-    bool saveMetadataJson(const QString &imgPath, const ImageData &frame);
+    IImageFormatHandler *findHandler(const QString &filePath) const;
+
+    std::vector<std::unique_ptr<IImageFormatHandler>> m_handlers;      // ownership
+    QHash<QString, IImageFormatHandler*> m_extensionMap;            // ext -> handler
 };
 
 #endif // FILESAVERWORKER_H
