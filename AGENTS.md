@@ -1,7 +1,7 @@
 # EZSpecCam Knowledge Base
 
-**Generated:** 2026-05-12
-**Commit:** fb78fec
+**Generated:** 2026-05-17
+**Commit:** 0418e4e
 **Branch:** main
 
 ## OVERVIEW

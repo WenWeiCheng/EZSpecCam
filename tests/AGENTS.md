@@ -1,6 +1,6 @@
 # tests — Test Suite
 
-**Generated:** 2026-05-12
+**Generated:** 2026-05-17
 
 ## OVERVIEW
 Qt Test framework (`Qt6::Test`). Each test module is a separate executable with its own `CMakeLists.txt`. Run via `ctest`.

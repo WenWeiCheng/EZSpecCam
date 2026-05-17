@@ -1,6 +1,6 @@
 # src/gui — Qt GUI Application
 
-**Generated:** 2026-05-12
+**Generated:** 2026-05-17
 
 ## OVERVIEW
 Qt 6.8 GUI app with QCustomPlot-based image/spectrum display, camera parameter configuration, and plugin loading. Entry point: `main.cpp` → `QApplication` → `MainWindow`.
