@@ -394,6 +394,7 @@ void MainWindow::on_actionChangeAutoSaveDir_triggered()
 void MainWindow::on_actionConfig_triggered()
 {
     if (m_configDialog) {
+        m_configDialog->setModal(false); 
         m_configDialog->show();
         m_configDialog->raise();
         m_configDialog->activateWindow();
@@ -401,6 +402,7 @@ void MainWindow::on_actionConfig_triggered()
     }
     m_configDialog = new CameraConfigDialog(this);
     m_configDialog->setAppController(m_appController);
+    m_configDialog->setModal(false); 
     m_configDialog->show();
 }
 
