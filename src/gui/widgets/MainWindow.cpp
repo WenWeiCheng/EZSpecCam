@@ -12,6 +12,9 @@
 #include "config/CameraConfigDialog.h"
 #include "PostProcess.h"
 #include "../workers/FileSaverWorker.h"
+#include "../workers/SaveTypes.h"
+#include "../workers/formats/CsvFormatHandler.h"
+#include "../workers/formats/TiffFormatHandler.h"
 
 #include <QMessageBox>
 #include <QCloseEvent>
@@ -106,6 +109,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_fileSaverWorker, &FileSaverWorker::failed,
             this, &MainWindow::onFileSaveFailed, Qt::QueuedConnection);
 
+    m_fileSaverWorker->registerHandler(std::make_unique<CsvFormatHandler>());
+    m_fileSaverWorker->registerHandler(std::make_unique<TiffFormatHandler>());
+
     connect(ui->menuActionSaveFrameAs, &QAction::triggered,
             this, &MainWindow::on_actionSaveFrameAs_triggered);
     connect(ui->menuActionSaveFrame, &QAction::triggered,
@@ -187,96 +193,21 @@ MainWindow::~MainWindow()
     }
 }
 
-bool MainWindow::exportSpectrumAsCsv(const QString &filePath, bool saveOriginal) const
-{
-    QVector<double> xData = m_spectrumViewWidget->xData();
-    QVector<double> yData = m_spectrumViewWidget->yData();
-
-    if (xData.isEmpty() || yData.isEmpty() || !m_spectrumViewWidget->hasData()) {
-        return false;
-    }
-
-    QVector<double> xCopy = xData;
-    QVector<double> yCopy = yData;
-    QImage origImageCopy;
-
-    if (saveOriginal && !m_currentFrame.originalImage.isNull()) {
-        origImageCopy = m_currentFrame.originalImage;
-    }
-
-    QMetaObject::invokeMethod(m_fileSaverWorker, [this, filePath, xCopy, yCopy, origImageCopy, saveOriginal]() {
-        m_fileSaverWorker->exportSpectrumCsv(xCopy, yCopy, filePath);
-        if (saveOriginal && !origImageCopy.isNull()) {
-            QString origFilePath = filePath;
-            int dotIndex = origFilePath.lastIndexOf('.');
-            if (dotIndex > 0) {
-                origFilePath.insert(dotIndex, "_original");
-            } else {
-                origFilePath += "_original";
-            }
-            m_fileSaverWorker->exportImageCsv(origImageCopy, origFilePath);
-        }
-    }, Qt::QueuedConnection);
-
-    return true;
-}
-
-bool MainWindow::exportImageAsCsv(const QString &filePath, const QImage &image, bool saveOriginal) const
-{
-    if (image.isNull()) {
-        return false;
-    }
-
-    QImage imageCopy = image;
-    QImage origImageCopy;
-
-    if (saveOriginal && !m_currentFrame.originalImage.isNull()) {
-        origImageCopy = m_currentFrame.originalImage;
-    }
-
-    QMetaObject::invokeMethod(m_fileSaverWorker, [this, filePath, imageCopy, origImageCopy, saveOriginal]() {
-        m_fileSaverWorker->exportImageCsv(imageCopy, filePath);
-        if (saveOriginal && !origImageCopy.isNull()) {
-            QString origFilePath = filePath;
-            int dotIndex = origFilePath.lastIndexOf('.');
-            if (dotIndex > 0) {
-                origFilePath.insert(dotIndex, "_original");
-            } else {
-                origFilePath += "_original";
-            }
-            m_fileSaverWorker->exportImageCsv(origImageCopy, origFilePath);
-        }
-    }, Qt::QueuedConnection);
-
-    return true;
-}
-
-void MainWindow::saveFrameToFile(const QString &filePath, bool isCsv)
+void MainWindow::saveFrameToFile(const QString &filePath)
 {
     QSettings settings;
-    if (isCsv) {
-        int height = m_currentFrame.image.height();
-        bool saveOriginal = settings.value("data/saveOriginalData", false).toBool();
+    SaveOptions opts;
+    opts.saveOriginal = settings.value("data/saveOriginalData", false).toBool();
+    opts.saveMetadata = settings.value("data/saveMetadata", true).toBool();
 
-        bool success = false;
-        if (height == 1) {
-            success = exportSpectrumAsCsv(filePath, saveOriginal);
-        } else {
-            success = exportImageAsCsv(filePath, m_currentFrame.image, saveOriginal);
-        }
+    SaveRequest request;
+    request.frame = m_currentFrame;
+    request.filePath = filePath;
+    request.options = opts;
 
-        if (!success) {
-            QMessageBox::critical(this, tr("Save Error"),
-                tr("Failed to save CSV to:\n%1").arg(filePath));
-            return;
-        }
-    } else {
-        ImageData frameCopy = m_currentFrame;
-        bool saveMetadata = settings.value("data/saveMetadata", true).toBool();
-        QMetaObject::invokeMethod(m_fileSaverWorker, [this, filePath, frameCopy, saveMetadata]() {
-            m_fileSaverWorker->saveFrame(frameCopy, filePath, saveMetadata);
-        }, Qt::QueuedConnection);
-    }
+    QMetaObject::invokeMethod(m_fileSaverWorker, [this, request]() {
+        m_fileSaverWorker->saveFrame(request);
+    }, Qt::QueuedConnection);
 }
 
 void MainWindow::on_actionSaveFrameAs_triggered()
@@ -297,43 +228,27 @@ void MainWindow::on_actionSaveFrameAs_triggered()
     dialog.setAcceptMode(QFileDialog::AcceptSave);
     dialog.setFileMode(QFileDialog::AnyFile);
 
-    QStringList filters;
-    filters << tr("TIFF Image (*.tiff *.tif)");
-    filters << tr("CSV File (*.csv)");
-    dialog.setNameFilters(filters);
-
-    QString selectedFormat = settings.value("data/imageFormat", "TIFF").toString();
-    if (selectedFormat == "CSV") {
-        dialog.selectNameFilter(filters.last());
-    } else {
-        dialog.selectNameFilter(filters.first());
-    }
+    dialog.setNameFilters(m_fileSaverWorker->availableFormatNames());
 
     QDateTime now = QDateTime::currentDateTime();
-    QString ext = (selectedFormat == "CSV") ? "csv" : "tiff";
     QString prefix = settings.value("data/filenamePrefix", "").toString();
     QString suffix = settings.value("data/filenameSuffix", "").toString();
+    QString imageFormat = settings.value("data/imageFormat", "TIFF").toString();
+    QString ext = imageFormat.toLower();
     QString prefixStr = prefix.isEmpty() ? "" : prefix + "_";
     QString suffixStr = suffix.isEmpty() ? "" : "_" + suffix;
-    QString defaultName = QString("%1img_%2%3.%4").arg(prefixStr).arg(now.toString("yyyyMMdd_hhmmss")).arg(suffixStr).arg(ext);
+    QString defaultName = QString("%1img_%2%3.%4").arg(prefixStr).arg(now.toString("yyyyMMdd_hhmmss_zzz")).arg(suffixStr).arg(ext);
     dialog.selectFile(defaultName);
 
-    if (dialog.exec() != QDialog::Accepted) {
+    if (!dialog.exec() || dialog.selectedFiles().isEmpty()) {
         return;
     }
 
     QString filePath = dialog.selectedFiles().first();
-    if (filePath.isEmpty()) {
-        return;
-    }
-
     QFileInfo fileInfo(filePath);
     settings.setValue("data/lastSaveAsDirectory", fileInfo.absoluteDir().absolutePath());
 
-    QString selectedFilter = dialog.selectedNameFilter();
-    bool isCsv = selectedFilter.contains("CSV");
-
-    saveFrameToFile(filePath, isCsv);
+    saveFrameToFile(filePath);
 }
 
 void MainWindow::on_actionSaveFrame_triggered()
@@ -353,19 +268,17 @@ void MainWindow::on_actionSaveFrame_triggered()
         return;
     }
 
-    QString imageFormat = settings.value("data/imageFormat", "TIFF").toString();
-    bool isCsv = (imageFormat == "CSV");
-
     QDateTime now = QDateTime::currentDateTime();
-    QString ext = isCsv ? "csv" : "tiff";
     QString prefix = settings.value("data/filenamePrefix", "").toString();
     QString suffix = settings.value("data/filenameSuffix", "").toString();
+    QString imageFormat = settings.value("data/imageFormat", "TIFF").toString();
+    QString ext = imageFormat.toLower();
     QString prefixStr = prefix.isEmpty() ? "" : prefix + "_";
     QString suffixStr = suffix.isEmpty() ? "" : "_" + suffix;
     QString fileName = QString("%1img_%2%3.%4").arg(prefixStr).arg(now.toString("yyyyMMdd_hhmmss_zzz")).arg(suffixStr).arg(ext);
     QString filePath = saveDir + "/" + fileName;
 
-    saveFrameToFile(filePath, isCsv);
+    saveFrameToFile(filePath);
 }
 
 void MainWindow::on_actionAutoSaveToggle_triggered(bool checked)
@@ -942,7 +855,8 @@ void MainWindow::onFileSaveCompleted(const QString &path)
     showStatusMessage(tr("Saved: %1").arg(path), 10000);
 }
 
-void MainWindow::onFileSaveFailed(const QString &error)
+void MainWindow::onFileSaveFailed(const QString &error, const QString &/*details*/)
 {
-    QMessageBox::critical(this, tr("Save Error"), error);
+    QMessageBox::critical(this, tr("Save Error"),
+        tr("Failed to save file:\n%1").arg(error));
 }

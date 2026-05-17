@@ -67,7 +67,7 @@ private slots:
     void onCaptureStopped();
 
     void onFileSaveCompleted(const QString &);
-    void onFileSaveFailed(const QString &);
+    void onFileSaveFailed(const QString &error, const QString &details);
 
     void onCrosshairCleared();
     void onCrosshairMoved(const QPointF &position, int value);
@@ -83,9 +83,7 @@ private:
     void updateFpsDisplay();
     void onFpsTimerTimeout();
     void showStatusMessage(const QString &message, int timeoutMs = 3000);
-    bool exportSpectrumAsCsv(const QString &filePath, bool saveOriginal) const;
-    bool exportImageAsCsv(const QString &filePath, const QImage &image, bool saveOriginal) const;
-    void saveFrameToFile(const QString &filePath, bool isCsv);
+    void saveFrameToFile(const QString &filePath);
 
     QElapsedTimer m_frameTimer;
     static constexpr int MIN_FRAME_INTERVAL_MS = 33;
