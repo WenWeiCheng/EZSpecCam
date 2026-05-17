@@ -931,99 +931,194 @@ private slots:
         qDebug() << "Pressure:" << pressureVal.toString();
     }
 
+    void test_stream_mode()
+    {
+        //======================================================================
+        // Case 1: Parameter definition
+        //======================================================================
+        QStringList names = m_driver->parameterNames();
+        QVERIFY2(names.contains("stream_mode"), "stream_mode parameter should exist");
+
+        ParameterDefinition param = m_driver->parameter("stream_mode");
+        QVERIFY2(param.isValid(), "stream_mode should be a valid parameter");
+        QVERIFY2(param.type == ParameterType::StringCollection, "stream_mode should be StringCollection type");
+        QVERIFY2(param.category == ParameterCategory::Core, "stream_mode should be Core category");
+        QVERIFY2(!param.displayName.isEmpty(), "stream_mode displayName should be non-empty");
+
+        QVector<QVariant> validModesVec = param.constraint.validValues;
+        QStringList validModes;
+        for (const QVariant &v : validModesVec) {
+            validModes.append(v.toString());
+        }
+        qDebug() << "Available stream_mode values:" << validModes;
+        QVERIFY2(!validModes.isEmpty(), "stream_mode should have at least one valid value");
+
+        //======================================================================
+        // Case 2: Default value is valid and matches actual parameter value
+        //======================================================================
+        QVariant defaultVal = param.defaultValue;
+        QVERIFY2(validModes.contains(defaultVal.toString()),
+                 qPrintable(QString("Default value '%1' should be in valid values: %2")
+                            .arg(defaultVal.toString()).arg(validModes.join(", "))));
+
+        QVariant actualVal = m_driver->parameterValue("stream_mode");
+        QVERIFY2(actualVal.isValid(), "stream_mode value should be readable");
+        qDebug() << "stream_mode default:" << defaultVal << "actual:" << actualVal;
+
+        //======================================================================
+        // Case 3 & 4: Set valid modes (Single Frame / Live Video)
+        //======================================================================
+        QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+
+        for (const QString &mode : validModes) {
+            errorSpy.clear();
+            qDebug() << "Setting stream_mode to" << mode;
+            m_driver->setParameter("stream_mode", mode);
+            m_driver->commitParameters();
+
+            // Verify no error occurred
+            bool hasError = !errorSpy.isEmpty() &&
+                            errorSpy.at(0).at(0).value<CameraError>().code != CameraError::Code::None;
+            QVERIFY2(!hasError,
+                     qPrintable(QString("Setting stream_mode to '%1' should not produce error").arg(mode)));
+
+            // Verify the value was actually set
+            QVariant setVal = m_driver->parameterValue("stream_mode");
+            QVERIFY2(setVal.isValid(), qPrintable(QString("stream_mode '%1' should be readable after set").arg(mode)));
+        }
+
+        //======================================================================
+        // Case 6: Invalid value is rejected
+        //======================================================================
+        errorSpy.clear();
+        m_driver->setParameter("stream_mode", "InvalidMode123");
+        m_driver->commitParameters();
+
+        bool gotError = !errorSpy.isEmpty() &&
+                        errorSpy.at(0).at(0).value<CameraError>().code != CameraError::Code::None;
+        qDebug() << "Invalid stream_mode produced error:" << gotError;
+        QVERIFY2(gotError, "Invalid stream_mode value should be rejected");
+    }
+
     //==========================================================================
     // Capture Mode Tests (captureCount parameter)
     //==========================================================================
     void test_capture_single_mode()
     {
-        // captureCount = 1: single frame capture, should auto-stop after 1 frame
-        m_driver->setParameter("exposure", 100.0);
-        m_driver->commitParameters();
+        QVector<QVariant> validModesVec = m_driver->parameter("stream_mode").constraint.validValues;
+        QStringList validModes;
+        for (const QVariant &v : validModesVec) {
+            validModes.append(v.toString());
+        }
+        qDebug() << "Testing single capture with stream modes:" << validModes;
 
-        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
-        QSignalSpy captureStoppedSpy(m_driver, &ICameraDriver::captureStopped);
+        for (const QString &mode : validModes) {
+            qDebug() << "=== Single capture with stream_mode:" << mode << "===";
+            m_driver->setParameter("stream_mode", mode);
+            m_driver->setParameter("exposure", 100.0);
+            m_driver->commitParameters();
 
-        bool started = m_driver->startCapture(1);
-        QVERIFY2(started, "Should start single frame capture");
+            QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+            QSignalSpy captureStoppedSpy(m_driver, &ICameraDriver::captureStopped);
 
-        // Should receive exactly 1 frame and then captureStopped
-        bool gotFrame = frameSpy.wait(6000);
-        QVERIFY2(gotFrame, "Should receive single frame");
+            bool started = m_driver->startCapture(1);
+            QVERIFY2(started, qPrintable(QString("Should start single frame capture (mode: %1)").arg(mode)));
 
-        // Wait for captureStopped signal (single frame should auto-stop)
-        bool stopped = captureStoppedSpy.wait(3000) || captureStoppedSpy.count() >= 1;
-        QVERIFY2(stopped, "Single capture should auto-stop after 1 frame");
+            bool gotFrame = frameSpy.wait(6000);
+            QVERIFY2(gotFrame, qPrintable(QString("Should receive single frame (mode: %1)").arg(mode)));
 
-        // Verify we got exactly 1 frame
-        QList<QList<QVariant>> allFrames = frameSpy;
-        qDebug() << "Single mode: received" << allFrames.size() << "frame(s)";
-        QVERIFY2(allFrames.size() == 1, "Single mode should capture exactly 1 frame");
+            bool stopped = captureStoppedSpy.wait(3000) || captureStoppedSpy.count() >= 1;
+            QVERIFY2(stopped, qPrintable(QString("Single capture should auto-stop after 1 frame (mode: %1)").arg(mode)));
+
+            QList<QList<QVariant>> allFrames = frameSpy;
+            qDebug() << "Single mode (" << mode << "): received" << allFrames.size() << "frame(s)";
+            QVERIFY2(allFrames.size() == 1,
+                     qPrintable(QString("Single mode should capture exactly 1 frame (mode: %1)").arg(mode)));
+        }
     }
 
     void test_capture_live_mode()
     {
-        // captureCount = 0: live/continuous mode, stops only when stopCapture is called
-        m_driver->setParameter("exposure", 100.0);
-        m_driver->commitParameters();
-
-        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
-        QSignalSpy captureStoppedSpy(m_driver, &ICameraDriver::captureStopped);
-
-        bool started = m_driver->startCapture(0);  // 0 = continuous
-        QVERIFY2(started, "Should start live capture");
-
-        // Wait for at least 3 frames
-        int frameCount = 0;
-        for (int i = 0; i < 3; ++i) {
-            bool gotFrame = frameSpy.wait(6000);
-            QVERIFY2(gotFrame, qPrintable(QString("Should receive frame %1 in live mode").arg(i + 1)));
-            frameCount = frameSpy.size();
-            qDebug() << "Live mode: received" << frameCount << "frame(s) so far";
+        QVector<QVariant> validModesVec = m_driver->parameter("stream_mode").constraint.validValues;
+        QStringList validModes;
+        for (const QVariant &v : validModesVec) {
+            validModes.append(v.toString());
         }
+        qDebug() << "Testing live capture with stream modes:" << validModes;
 
-        // Live mode should NOT auto-stop - captureStopped should not fire yet
-        QVERIFY2(captureStoppedSpy.size() == 0, "Live mode should not auto-stop");
+        for (const QString &mode : validModes) {
+            qDebug() << "=== Live capture with stream_mode:" << mode << "===";
+            m_driver->setParameter("stream_mode", mode);
+            m_driver->setParameter("exposure", 100.0);
+            m_driver->commitParameters();
 
-        // Now stop capture
-        m_driver->stopCapture(5000);
-        bool stopped = captureStoppedSpy.wait(3000) || captureStoppedSpy.count() >= 1;
-        QVERIFY2(stopped, "Should receive captureStopped after stopCapture()");
+            QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+            QSignalSpy captureStoppedSpy(m_driver, &ICameraDriver::captureStopped);
 
-        // Final frame count should be >= 3
-        qDebug() << "Live mode: stopped after" << frameSpy.size() << "total frames";
-        QVERIFY2(frameSpy.size() >= 3, "Live mode should capture multiple frames before stop");
+            bool started = m_driver->startCapture(0);
+            QVERIFY2(started, qPrintable(QString("Should start live capture (mode: %1)").arg(mode)));
+
+            int frameCount = 0;
+            for (int i = 0; i < 3; ++i) {
+                bool gotFrame = frameSpy.wait(6000);
+                QVERIFY2(gotFrame,
+                         qPrintable(QString("Should receive frame %1 in live mode (mode: %2)").arg(i + 1).arg(mode)));
+                frameCount = frameSpy.size();
+                qDebug() << "Live mode (" << mode << "): received" << frameCount << "frame(s) so far";
+            }
+
+            QVERIFY2(captureStoppedSpy.size() == 0,
+                     qPrintable(QString("Live mode should not auto-stop (mode: %1)").arg(mode)));
+
+            m_driver->stopCapture(5000);
+            bool stopped = captureStoppedSpy.wait(3000) || captureStoppedSpy.count() >= 1;
+            QVERIFY2(stopped,
+                     qPrintable(QString("Should receive captureStopped after stopCapture() (mode: %1)").arg(mode)));
+
+            qDebug() << "Live mode (" << mode << "): stopped after" << frameSpy.size() << "total frames";
+            QVERIFY2(frameSpy.size() >= 3,
+                     qPrintable(QString("Live mode should capture multiple frames before stop (mode: %1)").arg(mode)));
+        }
     }
 
     void test_capture_burst_mode()
     {
-        // captureCount = N (N > 1): burst mode, should auto-stop after N frames
+        QVector<QVariant> validModesVec = m_driver->parameter("stream_mode").constraint.validValues;
+        QStringList validModes;
+        for (const QVariant &v : validModesVec) {
+            validModes.append(v.toString());
+        }
+        qDebug() << "Testing burst capture with stream modes:" << validModes;
+
         const int burstCount = 5;
-        m_driver->setParameter("exposure", 100.0);
-        m_driver->commitParameters();
 
-        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
-        QSignalSpy captureStoppedSpy(m_driver, &ICameraDriver::captureStopped);
+        for (const QString &mode : validModes) {
+            qDebug() << "=== Burst capture with stream_mode:" << mode << "===";
+            m_driver->setParameter("stream_mode", mode);
+            m_driver->setParameter("exposure", 100.0);
+            m_driver->commitParameters();
 
-        bool started = m_driver->startCapture(burstCount);
-        QVERIFY2(started, "Should start burst capture");
+            QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+            QSignalSpy captureStoppedSpy(m_driver, &ICameraDriver::captureStopped);
 
-        // Wait for all frames to arrive
-        bool gotAllFrames = frameSpy.wait(15000);  // 5 frames may take time
-        QVERIFY2(gotAllFrames, "Should receive burst frames");
+            bool started = m_driver->startCapture(burstCount);
+            QVERIFY2(started, qPrintable(QString("Should start burst capture (mode: %1)").arg(mode)));
 
-        // Wait for captureStopped signal
-        bool stopped = captureStoppedSpy.wait(5000) || captureStoppedSpy.count() >= 1;
-        QVERIFY2(stopped, "Burst capture should auto-stop after N frames");
+            bool gotAllFrames = frameSpy.wait(15000);
+            QVERIFY2(gotAllFrames,
+                     qPrintable(QString("Should receive burst frames (mode: %1)").arg(mode)));
 
-        // Verify we got exactly burstCount frames
-        QList<QList<QVariant>> allFrames = frameSpy;
-        qDebug() << "Burst mode (N="
-                 << burstCount
-                 << "): received"
-                 << allFrames.size()
-                 << "frame(s)";
-        QVERIFY2(allFrames.size() == burstCount,
-                 qPrintable(QString("Burst mode should capture exactly %1 frames").arg(burstCount)));
+            bool stopped = captureStoppedSpy.wait(5000) || captureStoppedSpy.count() >= 1;
+            QVERIFY2(stopped,
+                     qPrintable(QString("Burst capture should auto-stop after N frames (mode: %1)").arg(mode)));
+
+            QList<QList<QVariant>> allFrames = frameSpy;
+            qDebug() << "Burst mode (" << mode << ", N=" << burstCount << "): received"
+                     << allFrames.size() << "frame(s)";
+            QVERIFY2(allFrames.size() == burstCount,
+                     qPrintable(QString("Burst mode should capture exactly %1 frames (mode: %2)")
+                                .arg(burstCount).arg(mode)));
+        }
     }
 
     //==========================================================================
