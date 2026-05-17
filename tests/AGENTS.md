@@ -15,7 +15,7 @@ tests/
 ├── test_mock_driver/               # MockCameraDriver tests (~820 lines)
 ├── test_plugin_loading/            # Plugin discovery + loading tests
 ├── test_profile_demo/              # Profile/stats widget tests
-├── test_qhyccd_driver/             # QHYCCD driver tests (DISABLED — needs hardware)
+├── test_qhyccd_driver/             # QHYCCD driver tests 
 └── test_view_widgets_perf/         # View widget performance tests
 ```
 
@@ -32,7 +32,7 @@ tests/
 - Each test class inherits `QObject` and uses `Q_OBJECT`
 - Test slots: `initTestCase()`, `cleanupTestCase()`, `init()`, `cleanup()`, test methods
 - Assertions: `QVERIFY2()`, `QCOMPARE()`, `QVERIFY()`
-- Disabled tests (`test_cli`, `test_qhyccd_driver`) are commented out in parent `CMakeLists.txt`
+- Disabled tests (`test_cli`) are commented out in parent `CMakeLists.txt`
 - when test signals, you should use `QSignalSpy`, and use `spy.wait()` to wait for the signal and check `spy.count()` to check the signal was emitted. Both ways should use together incase of signals arrive before `wait()`.
 
 ## COMMANDS
