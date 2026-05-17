@@ -4,6 +4,9 @@ echo EZSpecCam Build using CMakePresets
 echo ============================================
 
 call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1
+
+:: Use VS bundled ninja, not Strawberry's (which may be first in PATH)
+set "PATH=C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;%PATH%"
 if errorlevel 1 (
     echo ERROR: Failed to setup MSVC environment
     exit /b 1

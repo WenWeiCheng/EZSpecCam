@@ -42,7 +42,7 @@
                 "Exiv2_DIR": "C:/Users/weichen/vcpkg/installed/x64-windows/share/exiv2",
                 "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDLL",
                 "CMAKE_POLICY_VERSION_MINIMUM": "3.20",
-                "EZSPECCAM_BUILD_GUI": "OFF",
+                "EZSPECCAM_BUILD_GUI": "ON",
                 "EZSPECCAM_BUILD_CLI": "OFF",
                 "EZSPECCAM_BUILD_PLUGINS": "ON",
                 "EZSPECCAM_BUILD_TESTS": "ON"
