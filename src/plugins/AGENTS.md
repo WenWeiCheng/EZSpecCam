@@ -11,13 +11,13 @@ plugins/
 ├── CMakeLists.txt              # Shared plugin loader library
 ├── mock/                       # Simulated camera for development/testing
 │   ├── CMakeLists.txt
-│   ├── mock.json               # Plugin metadata
-│   ├── MockCameraDriver.cpp    # ~700 lines
+│   ├── mock.json               
+│   ├── MockCameraDriver.cpp    
 │   └── MockCameraDriver.h
-└── qhyccd/                     # Real QHYCCD hardware driver (DISABLED)
+└── qhyccd/                     # Real QHYCCD hardware driver
     ├── CMakeLists.txt
     ├── qhyccd.json
-    ├── QHYCCDDriver.cpp        # ~580 lines
+    ├── QHYCCDDriver.cpp        
     └── QHYCCDDriver.h
 ```
 
@@ -33,9 +33,7 @@ plugins/
 - Each driver is a Qt plugin: inherits `QObject` + `ICameraDriver`, uses `Q_PLUGIN_METADATA`
 - `.json` descriptor file required for `Q_PLUGIN_METADATA`
 - Signal-based: `frameReady()`, `connectionChanged()`, `errorOccurred()`, `captureStarted()`, `captureStopped()`
-- `enumerate()` returns camera IDs for discovery
-- State management: track `CameraState` enum internally
 
 ## ANTI-PATTERNS
 - **DO NOT** have the same plugin `.json` descriptor name as another plugin — `QPluginLoader` resolves by name
-- QHYCCD plugin is **disabled in CMake** (comment out `add_subdirectory` to re-enable)
+- **DO NOT** block the main thread in camera drivers — use async signals

@@ -16,7 +16,6 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 │   ├── cli/            # CLI app (QCoreApplication)
 │   └── plugins/        # Camera driver plugins → see src/plugins/AGENTS.md
 ├── tests/              # Qt Test suite → see tests/AGENTS.md
-├── tutorial/           # Empty — placeholder for docs
 └── build/              # CMake build outputs (gitignored)
 ```
 
@@ -57,15 +56,19 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 
 ## ANTI-PATTERNS (THIS PROJECT)
 - **DO NOT** modify `src/gui/qcustomplot.*` — external library (bundled QCustomPlot 2.1.1)
-- **DO NOT** block the main thread in camera drivers — use async signals
-- QHYCCD plugin is currently disabled in CMake (hardware-dependent)
-- **DO NOT** add absolute paths to sibling project directories in CMakeLists.txt 
+- **DO NOT** add absolute paths to sibling project directories in CMakeLists.txt and build scripts.
 
 ## Build and Test
 
 ```bash
-# Configure + build (MSVC Debug)
+# Configure + build (MSVC Debug default) 
 & ".\build_preset.bat" 2>&1
+
+# Configure + build (MSVC Debug)
+& ".\build_preset.bat debug" 2>&1
+
+# Configure + build (MSVC Release)
+& ".\build_preset.bat release" 2>&1
 
 # Run tests
 & ".\run_tests.bat" 2>&1
@@ -75,13 +78,10 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 ## NOTES
 - `qcustomplot.cpp` is 32k lines — largest file; read-only
 - Exiv2 for image metadata (optional, warns if missing)
-- OpenGL required for QCustomPlot hardware acceleration
 - Camera drivers loaded via Qt plugin system (`QPluginLoader`); each has a `.json` descriptor
 - Test executables are separate targets built with Qt Test framework (`Qt6::Test`)
-- Some tests (`test_cli`, `test_qhyccd_driver`) are commented out in CMake
 - IDE: `.clangd` config present for LSP; `compile_commands.json` generated at build
-- `AGENTS_bak.md` is the old knowledge base — keep for reference, this file supersedes it
 
 ## BUILD CONVENTIONS
 - Root CMakeLists.txt: Uses `file(MAKE_DIRECTORY ...)` after setting output dirs — redundant butharmless
-- Qt plugins use separate `.json` metadata files (not `Q_PLUGIN_METADATA` inline in source)
+- Use `build_preset.bat` to configure and build.
