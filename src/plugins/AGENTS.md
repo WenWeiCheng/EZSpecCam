@@ -33,6 +33,7 @@ plugins/
 - Each driver is a Qt plugin: inherits `QObject` + `ICameraDriver`, uses `Q_PLUGIN_METADATA`
 - `.json` descriptor file required for `Q_PLUGIN_METADATA`
 - Signal-based: `frameReady()`, `connectionChanged()`, `errorOccurred()`, `captureStarted()`, `captureStopped()`
+- Each driver should implement `ICameraDriver`, but each plugin driver can have it's own parameters without doubt.
 
 ## ANTI-PATTERNS
 - **DO NOT** have the same plugin `.json` descriptor name as another plugin — `QPluginLoader` resolves by name
