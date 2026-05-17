@@ -24,7 +24,7 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/msvc-debug/bin/Debug/test_qhyccd_driver.exe",
-            "args": [""],
+            "args": ["test_capture_burst_mode"],
             "cwd": "${workspaceFolder}/build/msvc-debug/bin/Debug",
             "environment": [],
         } 

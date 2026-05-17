@@ -932,6 +932,101 @@ private slots:
     }
 
     //==========================================================================
+    // Capture Mode Tests (captureCount parameter)
+    //==========================================================================
+    void test_capture_single_mode()
+    {
+        // captureCount = 1: single frame capture, should auto-stop after 1 frame
+        m_driver->setParameter("exposure", 100.0);
+        m_driver->commitParameters();
+
+        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+        QSignalSpy captureStoppedSpy(m_driver, &ICameraDriver::captureStopped);
+
+        bool started = m_driver->startCapture(1);
+        QVERIFY2(started, "Should start single frame capture");
+
+        // Should receive exactly 1 frame and then captureStopped
+        bool gotFrame = frameSpy.wait(6000);
+        QVERIFY2(gotFrame, "Should receive single frame");
+
+        // Wait for captureStopped signal (single frame should auto-stop)
+        bool stopped = captureStoppedSpy.wait(3000) || captureStoppedSpy.count() >= 1;
+        QVERIFY2(stopped, "Single capture should auto-stop after 1 frame");
+
+        // Verify we got exactly 1 frame
+        QList<QList<QVariant>> allFrames = frameSpy;
+        qDebug() << "Single mode: received" << allFrames.size() << "frame(s)";
+        QVERIFY2(allFrames.size() == 1, "Single mode should capture exactly 1 frame");
+    }
+
+    void test_capture_live_mode()
+    {
+        // captureCount = 0: live/continuous mode, stops only when stopCapture is called
+        m_driver->setParameter("exposure", 100.0);
+        m_driver->commitParameters();
+
+        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+        QSignalSpy captureStoppedSpy(m_driver, &ICameraDriver::captureStopped);
+
+        bool started = m_driver->startCapture(0);  // 0 = continuous
+        QVERIFY2(started, "Should start live capture");
+
+        // Wait for at least 3 frames
+        int frameCount = 0;
+        for (int i = 0; i < 3; ++i) {
+            bool gotFrame = frameSpy.wait(6000);
+            QVERIFY2(gotFrame, qPrintable(QString("Should receive frame %1 in live mode").arg(i + 1)));
+            frameCount = frameSpy.size();
+            qDebug() << "Live mode: received" << frameCount << "frame(s) so far";
+        }
+
+        // Live mode should NOT auto-stop - captureStopped should not fire yet
+        QVERIFY2(captureStoppedSpy.size() == 0, "Live mode should not auto-stop");
+
+        // Now stop capture
+        m_driver->stopCapture(5000);
+        bool stopped = captureStoppedSpy.wait(3000) || captureStoppedSpy.count() >= 1;
+        QVERIFY2(stopped, "Should receive captureStopped after stopCapture()");
+
+        // Final frame count should be >= 3
+        qDebug() << "Live mode: stopped after" << frameSpy.size() << "total frames";
+        QVERIFY2(frameSpy.size() >= 3, "Live mode should capture multiple frames before stop");
+    }
+
+    void test_capture_burst_mode()
+    {
+        // captureCount = N (N > 1): burst mode, should auto-stop after N frames
+        const int burstCount = 5;
+        m_driver->setParameter("exposure", 100.0);
+        m_driver->commitParameters();
+
+        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+        QSignalSpy captureStoppedSpy(m_driver, &ICameraDriver::captureStopped);
+
+        bool started = m_driver->startCapture(burstCount);
+        QVERIFY2(started, "Should start burst capture");
+
+        // Wait for all frames to arrive
+        bool gotAllFrames = frameSpy.wait(15000);  // 5 frames may take time
+        QVERIFY2(gotAllFrames, "Should receive burst frames");
+
+        // Wait for captureStopped signal
+        bool stopped = captureStoppedSpy.wait(5000) || captureStoppedSpy.count() >= 1;
+        QVERIFY2(stopped, "Burst capture should auto-stop after N frames");
+
+        // Verify we got exactly burstCount frames
+        QList<QList<QVariant>> allFrames = frameSpy;
+        qDebug() << "Burst mode (N="
+                 << burstCount
+                 << "): received"
+                 << allFrames.size()
+                 << "frame(s)";
+        QVERIFY2(allFrames.size() == burstCount,
+                 qPrintable(QString("Burst mode should capture exactly %1 frames").arg(burstCount)));
+    }
+
+    //==========================================================================
     // Signal Tests
     //==========================================================================
     void test_signals()
