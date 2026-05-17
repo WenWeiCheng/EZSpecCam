@@ -84,14 +84,18 @@ bool CsvFormatHandler::exportSpectrumCsv(const QVector<double> &spectrum, const 
         return false;
     }
 
-    QTextStream s(&f);
-    s << "Wavelength,Intensity\n";
+    QString content;
+    content.reserve(spectrum.size() * 25);
+    content += "Wavelength,Intensity\n";
 
     for (int i = 0; i < spectrum.size(); ++i) {
-        s << QString::number(i, 'f', 6) << ","
-          << QString::number(spectrum[i], 'f', 6) << "\n";
+        content += QString::number(i, 'f', 6);
+        content += ',';
+        content += QString::number(spectrum[i], 'f', 6);
+        content += '\n';
     }
 
+    f.write(content.toUtf8());
     return true;
 }
 
@@ -102,36 +106,39 @@ bool CsvFormatHandler::exportImageCsv(const QImage &img, const QString &path)
     }
 
     QFile f(path);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+    if (!f.open(QIODevice::WriteOnly)) {
         return false;
     }
 
-    QTextStream s(&f);
     const int height = img.height();
     const int width = img.width();
+    const int lineEstimate = width * 7 + 1;
+    QString content;
+    content.reserve(height * lineEstimate);
 
     if (img.format() == QImage::Format_Grayscale16) {
         const ushort *bits = reinterpret_cast<const ushort *>(img.bits());
+        const int bytesPerRow = img.bytesPerLine();
         for (int y = 0; y < height; ++y) {
-            QStringList rowValues;
-            const ushort *row = bits + y * width;
+            const ushort *row = bits + y * (bytesPerRow / sizeof(ushort));
             for (int x = 0; x < width; ++x) {
-                rowValues << QString::number(row[x]);
+                if (x > 0) content += ',';
+                content += QString::number(row[x]);
             }
-            s << rowValues.join(",") << "\n";
+            content += '\n';
         }
     } else {
         for (int y = 0; y < height; ++y) {
-            QStringList rowValues;
             for (int x = 0; x < width; ++x) {
+                if (x > 0) content += ',';
                 QRgb pixel = img.pixel(x, y);
-                int gray = qGray(pixel);
-                rowValues << QString::number(gray);
+                content += QString::number(qGray(pixel));
             }
-            s << rowValues.join(",") << "\n";
+            content += '\n';
         }
     }
 
+    f.write(content.toUtf8());
     return true;
 }
 
