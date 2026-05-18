@@ -28,6 +28,8 @@ Makefile*
 *.pgd
 *.exp
 *.lib
+!src/plugins/qhyccd/sdk/winlib/x64/*.lib
+!src/plugins/qhyccd/sdk/winlib/x86/*.lib
 *.dll
 *.exe
 *.user
