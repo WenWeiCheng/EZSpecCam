@@ -114,6 +114,8 @@ void ImageViewWidget::updateColorMap(const QImage &image)
 
     m_colorMap->setData(newMapData, false);
 
+    checkOverexposure(image);
+
     m_colorMap->rescaleDataRange();
     applyColorScaleMode();
 
@@ -121,6 +123,41 @@ void ImageViewWidget::updateColorMap(const QImage &image)
         m_plot->xAxis->setRange(0, origWidth);
         m_plot->yAxis->setRange(0, origHeight);
         m_plot->replot(QCustomPlot::rpQueuedReplot);
+    }
+}
+
+void ImageViewWidget::checkOverexposure(const QImage &image)
+{
+    if (image.isNull()) {
+        return;
+    }
+
+    const int width = image.width();
+    const int height = image.height();
+
+    if (image.format() == QImage::Format_Grayscale16) {
+        const int maxValue = 65535;
+        for (int y = 0; y < height; ++y) {
+            const quint16 *sourceLine = reinterpret_cast<const quint16 *>(
+                image.constBits() + y * image.bytesPerLine());
+            for (int x = 0; x < width; ++x) {
+                if (sourceLine[x] >= maxValue) {
+                    emit overexposureDetected(QPoint(x, y));
+                    return;
+                }
+            }
+        }
+    } else {
+        const int maxValue = 255;
+        for (int y = 0; y < height; ++y) {
+            for (int x = 0; x < width; ++x) {
+                QRgb pixel = image.pixel(x, y);
+                if (qRed(pixel) >= maxValue || qGreen(pixel) >= maxValue || qBlue(pixel) >= maxValue) {
+                    emit overexposureDetected(QPoint(x, y));
+                    return;
+                }
+            }
+        }
     }
 }
 
