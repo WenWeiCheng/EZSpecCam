@@ -18,6 +18,7 @@ MainWindowUi::MainWindowUi(QObject *parent)
     , frameCountLabel(nullptr)
     , fpsLabel(nullptr)
     , coordLabel(nullptr)
+    , overexposureLabel(nullptr)
     , toolBar(nullptr)
     , menuActionSaveFrame(nullptr)
     , menuActionConfig(nullptr)
@@ -163,6 +164,10 @@ void MainWindowUi::createStatusBar(QMainWindow *mainWindow)
     coordLabel->setMinimumWidth(150);
     statusBar->addWidget(coordLabel);
 
+    overexposureLabel = new QLabel("Overexposure: --", statusBar);
+    overexposureLabel->setMinimumWidth(150);
+    statusBar->addWidget(overexposureLabel);
+
     fpsLabel = new QLabel("FPS: 0", statusBar);
     fpsLabel->setMinimumWidth(80);
     statusBar->addPermanentWidget(fpsLabel);
@@ -185,6 +190,9 @@ void MainWindowUi::initializeLabels()
     }
     if (coordLabel) {
         coordLabel->setText("Crosshair: --");
+    }
+    if (overexposureLabel) {
+        overexposureLabel->setText("Overexposure: --");
     }
 }
 

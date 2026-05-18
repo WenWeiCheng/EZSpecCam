@@ -51,6 +51,7 @@ public:
     QLabel *frameCountLabel;
     QLabel *fpsLabel;
     QLabel *coordLabel;
+    QLabel *overexposureLabel;
     QToolBar *toolBar;
     QStackedWidget *centralStackedWidget;
     ImageViewWidget *imageViewWidget;

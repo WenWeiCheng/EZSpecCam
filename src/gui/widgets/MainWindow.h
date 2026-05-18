@@ -63,6 +63,7 @@ private slots:
 
     void onCrosshairCleared();
     void onCrosshairMoved(const QPointF &position, int value);
+    void onOverexposureDetected(QPoint position);
 
     void onLiveModeTriggered();
     void onSingleModeTriggered();

@@ -67,6 +67,7 @@ signals:
     void crosshairMoved(const QPointF &position, int value);
     void crosshairsCleared();
     void pixelInfo(int x, int y, int value);
+    void overexposureDetected(QPoint position);
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
@@ -83,6 +84,7 @@ private slots:
 private:
     void setupPlot();
     void updateColorMap(const QImage &image);
+    void checkOverexposure(const QImage &image);
     void applyColorScaleMode();
     QPointF widgetToImageCoords(int widgetX, int widgetY) const;
     void updateDisplayData();
