@@ -773,7 +773,11 @@ void MainWindow::updateDisplay(const ImageData &frame)
     switchView(height);
 
     if (height == 1) {
-        m_spectrumViewWidget->setFromImage(frame.image);
+        if (!frame.spectrum.isEmpty()) {
+            m_spectrumViewWidget->setSpectrumData(frame.spectrum);
+        } else {
+            m_spectrumViewWidget->setFromImage(frame.image);
+        }
     } else {
         m_imageViewWidget->setImage(frame.image);
     }
