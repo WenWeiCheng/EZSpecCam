@@ -9,6 +9,7 @@
 #include "display/ProfileWindow.h"
 #include "dialogs/RowRangeDialog.h"
 #include "dialogs/CustomRangeDialog.h"
+#include "dialogs/ScaleControlDialog.h"
 #include "config/CameraConfigDialog.h"
 #include "PostProcess.h"
 #include "../workers/FileSaverWorker.h"
@@ -50,9 +51,6 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    ui->menuActionColorScaleAuto->setChecked(true);
-    ui->menuActionSpectrumRangeAuto->setChecked(true);
-
     ui->centralStackedWidget->hide();
 
     auto *shortcutConfig = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_C), this);
@@ -71,6 +69,40 @@ MainWindow::MainWindow(QWidget *parent)
 
     m_imageViewWidget = ui->imageViewWidget;
     m_spectrumViewWidget = ui->spectrumViewWidget;
+
+    m_scaleDialog = new ScaleControlDialog(this);
+    m_scaleDialog->setImageScaleType(0);
+    m_scaleDialog->setImageColorScaleMode(0);
+    m_scaleDialog->setSpectrumScaleType(0);
+
+    connect(m_scaleDialog, &ScaleControlDialog::imageScaleTypeChanged,
+            this, [this](int type) {
+                if (m_imageViewWidget) {
+                    m_imageViewWidget->setIntensityScaleType(
+                        type == 0 ? ImageViewWidget::IntensityScaleType::Linear
+                                  : ImageViewWidget::IntensityScaleType::Log);
+                }
+            });
+
+    connect(m_scaleDialog, &ScaleControlDialog::imageColorScaleModeChanged,
+            this, [this](int mode) {
+                if (m_imageViewWidget) {
+                    switch (mode) {
+                        case 0: m_imageViewWidget->setColorScaleMode(ImageViewWidget::ColorScaleMode::Auto); break;
+                        case 1: m_imageViewWidget->setColorScaleMode(ImageViewWidget::ColorScaleMode::Fixed8Bit); break;
+                        case 2: m_imageViewWidget->setColorScaleMode(ImageViewWidget::ColorScaleMode::Fixed16Bit); break;
+                    }
+                }
+            });
+
+    connect(m_scaleDialog, &ScaleControlDialog::spectrumScaleTypeChanged,
+            this, [this](int type) {
+                if (m_spectrumViewWidget) {
+                    m_spectrumViewWidget->setIntensityScaleType(
+                        type == 0 ? SpectrumViewWidget::IntensityScaleType::Auto
+                                  : SpectrumViewWidget::IntensityScaleType::Log);
+                }
+            });
 
     connect(m_imageViewWidget, &ImageViewWidget::crosshairsCleared,
             this, &MainWindow::onCrosshairCleared);
@@ -125,26 +157,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->menuActionAbout, &QAction::triggered,
             this, &MainWindow::on_actionAbout_triggered);
 
-    connect(ui->menuActionColorScaleAuto, &QAction::triggered,
-            this, &MainWindow::on_colorScaleAuto_triggered);
-    connect(ui->menuActionColorScale8Bit, &QAction::triggered,
-            this, &MainWindow::on_colorScale8Bit_triggered);
-    connect(ui->menuActionColorScale16Bit, &QAction::triggered,
-            this, &MainWindow::on_colorScale16Bit_triggered);
-
-    connect(ui->menuActionSpectrumRangeAuto, &QAction::triggered,
-            this, &MainWindow::on_spectrumRangeAuto_triggered);
-    connect(ui->menuActionSpectrumRangeFull, &QAction::triggered,
-            this, &MainWindow::on_spectrumRangeFull_triggered);
-    connect(ui->menuActionSpectrumRangeZoomLeft, &QAction::triggered,
-            this, &MainWindow::on_spectrumRangeZoomLeft_triggered);
-    connect(ui->menuActionSpectrumRangeZoomRight, &QAction::triggered,
-            this, &MainWindow::on_spectrumRangeZoomRight_triggered);
-    connect(ui->menuActionSpectrumRangeZoomCenter, &QAction::triggered,
-            this, &MainWindow::on_spectrumRangeZoomCenter_triggered);
-    connect(ui->menuActionSpectrumRangeCustom, &QAction::triggered,
-            this, &MainWindow::on_spectrumRangeCustom_triggered);
-
     connect(ui->menuActionShowAxes, &QAction::toggled,
             this, &MainWindow::on_showAxes_triggered);
 
@@ -158,6 +170,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->menuActionProfile, &QAction::triggered,
             this, &MainWindow::on_profile_triggered);
+
+    connect(ui->menuActionScale, &QAction::triggered,
+            this, &MainWindow::on_scale_triggered);
 
     connect(ui->toolbarActionConfig, &QAction::triggered,
             this, &MainWindow::on_actionConfig_triggered);
@@ -356,158 +371,12 @@ void MainWindow::on_actionStop_triggered()
     QMetaObject::invokeMethod(m_appController, "stopCapture", Qt::QueuedConnection);
 }
 
-void MainWindow::on_colorScaleAuto_triggered()
+void MainWindow::on_scale_triggered()
 {
-    if (!m_imageViewWidget) {
-        return;
-    }
-
-    m_imageViewWidget->setColorScaleMode(ImageViewWidget::ColorScaleMode::Auto);
-
-    ui->menuActionColorScaleAuto->setChecked(true);
-    ui->menuActionColorScale8Bit->setChecked(false);
-    ui->menuActionColorScale16Bit->setChecked(false);
-}
-
-void MainWindow::on_colorScale8Bit_triggered()
-{
-    if (!m_imageViewWidget) {
-        return;
-    }
-
-    m_imageViewWidget->setColorScaleMode(ImageViewWidget::ColorScaleMode::Fixed8Bit);
-
-    ui->menuActionColorScaleAuto->setChecked(false);
-    ui->menuActionColorScale8Bit->setChecked(true);
-    ui->menuActionColorScale16Bit->setChecked(false);
-}
-
-void MainWindow::on_colorScale16Bit_triggered()
-{
-    if (!m_imageViewWidget) {
-        return;
-    }
-
-    m_imageViewWidget->setColorScaleMode(ImageViewWidget::ColorScaleMode::Fixed16Bit);
-
-    ui->menuActionColorScaleAuto->setChecked(false);
-    ui->menuActionColorScale8Bit->setChecked(false);
-    ui->menuActionColorScale16Bit->setChecked(true);
-}
-
-void MainWindow::on_spectrumRangeAuto_triggered()
-{
-    if (!m_spectrumViewWidget) {
-        return;
-    }
-
-    m_spectrumViewWidget->setXAxisRangeMode(SpectrumViewWidget::XAxisRangeMode::Auto);
-
-    ui->menuActionSpectrumRangeAuto->setChecked(true);
-    ui->menuActionSpectrumRangeFull->setChecked(false);
-    ui->menuActionSpectrumRangeZoomLeft->setChecked(false);
-    ui->menuActionSpectrumRangeZoomRight->setChecked(false);
-    ui->menuActionSpectrumRangeZoomCenter->setChecked(false);
-    ui->menuActionSpectrumRangeCustom->setChecked(false);
-}
-
-void MainWindow::on_spectrumRangeFull_triggered()
-{
-    if (!m_spectrumViewWidget) {
-        return;
-    }
-
-    m_spectrumViewWidget->setXAxisRangeMode(SpectrumViewWidget::XAxisRangeMode::Full);
-
-    ui->menuActionSpectrumRangeAuto->setChecked(false);
-    ui->menuActionSpectrumRangeFull->setChecked(true);
-    ui->menuActionSpectrumRangeZoomLeft->setChecked(false);
-    ui->menuActionSpectrumRangeZoomRight->setChecked(false);
-    ui->menuActionSpectrumRangeZoomCenter->setChecked(false);
-    ui->menuActionSpectrumRangeCustom->setChecked(false);
-}
-
-void MainWindow::on_spectrumRangeZoomLeft_triggered()
-{
-    if (!m_spectrumViewWidget) {
-        return;
-    }
-
-    m_spectrumViewWidget->setXAxisRangeMode(SpectrumViewWidget::XAxisRangeMode::ZoomLeft);
-
-    ui->menuActionSpectrumRangeAuto->setChecked(false);
-    ui->menuActionSpectrumRangeFull->setChecked(false);
-    ui->menuActionSpectrumRangeZoomLeft->setChecked(true);
-    ui->menuActionSpectrumRangeZoomRight->setChecked(false);
-    ui->menuActionSpectrumRangeZoomCenter->setChecked(false);
-    ui->menuActionSpectrumRangeCustom->setChecked(false);
-}
-
-void MainWindow::on_spectrumRangeZoomRight_triggered()
-{
-    if (!m_spectrumViewWidget) {
-        return;
-    }
-
-    m_spectrumViewWidget->setXAxisRangeMode(SpectrumViewWidget::XAxisRangeMode::ZoomRight);
-
-    ui->menuActionSpectrumRangeAuto->setChecked(false);
-    ui->menuActionSpectrumRangeFull->setChecked(false);
-    ui->menuActionSpectrumRangeZoomLeft->setChecked(false);
-    ui->menuActionSpectrumRangeZoomRight->setChecked(true);
-    ui->menuActionSpectrumRangeZoomCenter->setChecked(false);
-    ui->menuActionSpectrumRangeCustom->setChecked(false);
-}
-
-void MainWindow::on_spectrumRangeZoomCenter_triggered()
-{
-    if (!m_spectrumViewWidget) {
-        return;
-    }
-
-    m_spectrumViewWidget->setXAxisRangeMode(SpectrumViewWidget::XAxisRangeMode::ZoomCenter);
-
-    ui->menuActionSpectrumRangeAuto->setChecked(false);
-    ui->menuActionSpectrumRangeFull->setChecked(false);
-    ui->menuActionSpectrumRangeZoomLeft->setChecked(false);
-    ui->menuActionSpectrumRangeZoomRight->setChecked(false);
-    ui->menuActionSpectrumRangeZoomCenter->setChecked(true);
-    ui->menuActionSpectrumRangeCustom->setChecked(false);
-}
-
-void MainWindow::on_spectrumRangeCustom_triggered()
-{
-    if (!m_spectrumViewWidget) {
-        return;
-    }
-
-    double imageWidth = static_cast<double>(m_spectrumViewWidget->dataWidth());
-    if (imageWidth <= 0) {
-        imageWidth = 100.0;
-    }
-
-    double currentMin = m_spectrumViewWidget->currentXMin();
-    double currentMax = m_spectrumViewWidget->currentXMax();
-
-    CustomRangeDialog *dialog = new CustomRangeDialog(this);
-    dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setImageWidth(imageWidth);
-    dialog->setValues(currentMin, currentMax);
-
-    if (dialog->exec() == QDialog::Accepted) {
-        double minVal = dialog->minValue();
-        double maxVal = dialog->maxValue();
-        m_spectrumViewWidget->setCustomXRange(minVal, maxVal);
-        m_spectrumViewWidget->setXAxisRangeMode(SpectrumViewWidget::XAxisRangeMode::Custom);
-
-        ui->menuActionSpectrumRangeAuto->setChecked(false);
-        ui->menuActionSpectrumRangeFull->setChecked(false);
-        ui->menuActionSpectrumRangeZoomLeft->setChecked(false);
-        ui->menuActionSpectrumRangeZoomRight->setChecked(false);
-        ui->menuActionSpectrumRangeZoomCenter->setChecked(false);
-        ui->menuActionSpectrumRangeCustom->setChecked(true);
-    } else {
-        // If user cancels, keep the existing range mode
+    if (m_scaleDialog) {
+        m_scaleDialog->show();
+        m_scaleDialog->raise();
+        m_scaleDialog->activateWindow();
     }
 }
 
@@ -527,6 +396,7 @@ void MainWindow::on_statistics_triggered()
     }
 
     StatisticsDialog *dialog = new StatisticsDialog(this);
+    dialog->setModal(false);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setImageData(m_currentFrame.image);
     dialog->show();
@@ -793,13 +663,9 @@ void MainWindow::switchView(int height)
         ui->centralStackedWidget->setCurrentWidget(m_spectrumViewWidget);
         QCoreApplication::processEvents();
         m_spectrumViewWidget->resize(ui->centralStackedWidget->size());
-        ui->menuActionColorScale->setEnabled(false);
-        ui->menuActionSpectrumRange->setEnabled(true);
     } else {
         ui->centralStackedWidget->setCurrentWidget(m_imageViewWidget);
         QCoreApplication::processEvents();
-        ui->menuActionColorScale->setEnabled(true);
-        ui->menuActionSpectrumRange->setEnabled(false);
     }
 }
 

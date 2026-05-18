@@ -232,6 +232,35 @@ void SpectrumViewWidget::setCustomXRange(double min, double max)
     }
 }
 
+void SpectrumViewWidget::setIntensityScaleType(IntensityScaleType type)
+{
+    if (m_intensityScaleType == type) {
+        return;
+    }
+
+    m_intensityScaleType = type;
+
+    switch (m_intensityScaleType) {
+        case IntensityScaleType::Auto: {
+            m_plot->yAxis->setScaleType(QCPAxis::stLinear);
+            auto ticker = QSharedPointer<QCPAxisTicker>(new QCPAxisTicker());
+            m_plot->yAxis->setTicker(ticker);
+            break;
+        }
+        case IntensityScaleType::Log: {
+            m_plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
+            auto ticker = QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog());
+            m_plot->yAxis->setTicker(ticker);
+            break;
+        }
+    }
+
+    if (m_dataValid && !m_xData.isEmpty()) {
+        applyXAxisRange();
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
+    }
+}
+
 void SpectrumViewWidget::applyXAxisRange()
 {
     if (!m_dataValid || m_xData.isEmpty()) {

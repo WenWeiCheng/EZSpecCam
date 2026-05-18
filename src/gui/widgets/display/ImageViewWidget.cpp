@@ -126,6 +126,15 @@ void ImageViewWidget::updateColorMap(const QImage &image)
 
 void ImageViewWidget::applyColorScaleMode()
 {
+    switch (m_intensityScaleType) {
+        case IntensityScaleType::Linear:
+            m_colorMap->setDataScaleType(QCPAxis::stLinear);
+            break;
+        case IntensityScaleType::Log:
+            m_colorMap->setDataScaleType(QCPAxis::stLogarithmic);
+            break;
+    }
+
     switch (m_colorScaleMode) {
         case ColorScaleMode::Auto:
             m_colorMap->rescaleDataRange();
@@ -146,6 +155,20 @@ void ImageViewWidget::setColorScaleMode(ColorScaleMode mode)
     }
 
     m_colorScaleMode = mode;
+
+    if (m_imageValid && !m_currentImage.isNull()) {
+        applyColorScaleMode();
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
+    }
+}
+
+void ImageViewWidget::setIntensityScaleType(IntensityScaleType type)
+{
+    if (m_intensityScaleType == type) {
+        return;
+    }
+
+    m_intensityScaleType = type;
 
     if (m_imageValid && !m_currentImage.isNull()) {
         applyColorScaleMode();

@@ -37,19 +37,7 @@ public:
     QAction *menuActionAbout;
     QAction *toolbarActionConfig;
 
-    QAction *menuActionColorScale;
-    QAction *menuActionSpectrumRange;
-
-    QAction *menuActionColorScaleAuto;
-    QAction *menuActionColorScale8Bit;
-    QAction *menuActionColorScale16Bit;
-
-    QAction *menuActionSpectrumRangeAuto;
-    QAction *menuActionSpectrumRangeFull;
-    QAction *menuActionSpectrumRangeZoomLeft;
-    QAction *menuActionSpectrumRangeZoomRight;
-    QAction *menuActionSpectrumRangeZoomCenter;
-    QAction *menuActionSpectrumRangeCustom;
+    QAction *menuActionScale;
 
     QAction *menuActionShowAxes;
     QAction *menuActionProfile;

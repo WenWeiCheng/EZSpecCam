@@ -29,6 +29,12 @@ public:
     };
     Q_ENUM(XAxisRangeMode)
 
+    enum class IntensityScaleType {
+        Auto,
+        Log
+    };
+    Q_ENUM(IntensityScaleType)
+
     explicit SpectrumViewWidget(QWidget *parent = nullptr);
     ~SpectrumViewWidget() override;
 
@@ -49,6 +55,9 @@ public:
     XAxisRangeMode xAxisRangeMode() const { return m_xAxisRangeMode; }
     void setXAxisRangeMode(XAxisRangeMode mode);
     void setCustomXRange(double min, double max);
+
+    IntensityScaleType intensityScaleType() const { return m_intensityScaleType; }
+    void setIntensityScaleType(IntensityScaleType type);
 
     double customXMin() const { return m_customXMin; }
     double customXMax() const { return m_customXMax; }
@@ -86,6 +95,7 @@ private:
     QString m_xAxisLabel;
     QString m_yAxisLabel;
     XAxisRangeMode m_xAxisRangeMode = XAxisRangeMode::Auto;
+    IntensityScaleType m_intensityScaleType = IntensityScaleType::Auto;
     double m_customXMin = 0;
     double m_customXMax = 100;
 

@@ -26,17 +26,6 @@ MainWindowUi::MainWindowUi(QObject *parent)
     , centralStackedWidget(nullptr)
     , imageViewWidget(nullptr)
     , spectrumViewWidget(nullptr)
-    , menuActionColorScale(nullptr)
-    , menuActionSpectrumRange(nullptr)
-    , menuActionColorScaleAuto(nullptr)
-    , menuActionColorScale8Bit(nullptr)
-    , menuActionColorScale16Bit(nullptr)
-    , menuActionSpectrumRangeAuto(nullptr)
-    , menuActionSpectrumRangeFull(nullptr)
-    , menuActionSpectrumRangeZoomLeft(nullptr)
-    , menuActionSpectrumRangeZoomRight(nullptr)
-    , menuActionSpectrumRangeZoomCenter(nullptr)
-    , menuActionSpectrumRangeCustom(nullptr)
     , menuActionShowAxes(nullptr)
     , menuActionProfile(nullptr)
     , menuActionStatistics(nullptr)
@@ -46,6 +35,7 @@ MainWindowUi::MainWindowUi(QObject *parent)
     , menuActionSaveFrameAs(nullptr)
     , menuActionAutoSaveToggle(nullptr)
     , menuActionChangeAutoSaveDir(nullptr)
+    , menuActionScale(nullptr)
 {
 }
 
@@ -108,58 +98,13 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     menuAnalyse->addAction(menuActionStatistics);
 
     QMenu *menuView = menuBar->addMenu("&View");
-    menuActionColorScale = new QAction("Color &Scale", mainWindow);
-    QMenu *subMenuColorScale = new QMenu(mainWindow);
-
-    menuActionColorScaleAuto = new QAction("&Auto (Image Range)", mainWindow);
-    menuActionColorScaleAuto->setCheckable(true);
-    subMenuColorScale->addAction(menuActionColorScaleAuto);
-
-    menuActionColorScale8Bit = new QAction("&8-bit (0-255)", mainWindow);
-    menuActionColorScale8Bit->setCheckable(true);
-    subMenuColorScale->addAction(menuActionColorScale8Bit);
-
-    menuActionColorScale16Bit = new QAction("&16-bit (0-65535)", mainWindow);
-    menuActionColorScale16Bit->setCheckable(true);
-    subMenuColorScale->addAction(menuActionColorScale16Bit);
-
-    menuActionColorScale->setMenu(subMenuColorScale);
-    menuView->addAction(menuActionColorScale);
-
-    menuActionSpectrumRange = new QAction("&Spectrum Range", mainWindow);
-    QMenu *subMenuSpectrumRange = new QMenu(mainWindow);
-
-    menuActionSpectrumRangeAuto = new QAction("&Auto (Fit All)", mainWindow);
-    menuActionSpectrumRangeAuto->setCheckable(true);
-    subMenuSpectrumRange->addAction(menuActionSpectrumRangeAuto);
-
-    menuActionSpectrumRangeFull = new QAction("&Full (Show All)", mainWindow);
-    menuActionSpectrumRangeFull->setCheckable(true);
-    subMenuSpectrumRange->addAction(menuActionSpectrumRangeFull);
-
-    menuActionSpectrumRangeZoomLeft = new QAction("Zoom &Left (0-50%)", mainWindow);
-    menuActionSpectrumRangeZoomLeft->setCheckable(true);
-    subMenuSpectrumRange->addAction(menuActionSpectrumRangeZoomLeft);
-
-    menuActionSpectrumRangeZoomRight = new QAction("Zoom &Right (50-100%)", mainWindow);
-    menuActionSpectrumRangeZoomRight->setCheckable(true);
-    subMenuSpectrumRange->addAction(menuActionSpectrumRangeZoomRight);
-
-    menuActionSpectrumRangeZoomCenter = new QAction("Zoom &Center (25-75%)", mainWindow);
-    menuActionSpectrumRangeZoomCenter->setCheckable(true);
-    subMenuSpectrumRange->addAction(menuActionSpectrumRangeZoomCenter);
-
-    menuActionSpectrumRangeCustom = new QAction("&Custom...", mainWindow);
-    menuActionSpectrumRangeCustom->setCheckable(true);
-    subMenuSpectrumRange->addAction(menuActionSpectrumRangeCustom);
-
-    menuActionSpectrumRange->setMenu(subMenuSpectrumRange);
-    menuView->addAction(menuActionSpectrumRange);
-
     menuActionShowAxes = new QAction("Show Image Axes", mainWindow);
     menuActionShowAxes->setCheckable(true);
     menuActionShowAxes->setChecked(false);
     menuView->addAction(menuActionShowAxes);
+
+    menuActionScale = new QAction("&Scale...", mainWindow);
+    menuView->addAction(menuActionScale);
 
     menuActionProfile = new QAction("&Profile", mainWindow);
     menuActionProfile->setShortcut(QKeySequence(Qt::Key_P));

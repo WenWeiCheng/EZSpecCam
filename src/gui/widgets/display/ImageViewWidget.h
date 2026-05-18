@@ -27,6 +27,12 @@ public:
     };
     Q_ENUM(ColorScaleMode)
 
+    enum class IntensityScaleType {
+        Linear,
+        Log
+    };
+    Q_ENUM(IntensityScaleType)
+
     explicit ImageViewWidget(QWidget *parent = nullptr);
     ~ImageViewWidget() override;
 
@@ -36,6 +42,9 @@ public:
 
     ColorScaleMode colorScaleMode() const { return m_colorScaleMode; }
     void setColorScaleMode(ColorScaleMode mode);
+
+    IntensityScaleType intensityScaleType() const { return m_intensityScaleType; }
+    void setIntensityScaleType(IntensityScaleType type);
 
     bool axesVisible() const { return m_axesVisible; }
     void setAxesVisible(bool visible);
@@ -89,6 +98,7 @@ private:
     QPointF m_currentCrosshairPos;
     bool m_imageValid;
     ColorScaleMode m_colorScaleMode = ColorScaleMode::Auto;
+    IntensityScaleType m_intensityScaleType = IntensityScaleType::Linear;
     bool m_axesVisible = false;
 
     QImage m_originalImage;
