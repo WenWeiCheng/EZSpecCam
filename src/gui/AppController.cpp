@@ -667,7 +667,8 @@ bool AppController::commitParameters()
 void AppController::onDriverFrameReady(const QSharedPointer<QImage> &image,
                                         quint64 timestamp,
                                         int frameNumber,
-                                        const QString &cameraId)
+                                        const QString &cameraId,
+                                     const QVariantMap &parameters)
 {
     if (!image) {
         return;
@@ -678,7 +679,7 @@ void AppController::onDriverFrameReady(const QSharedPointer<QImage> &image,
     frame.timestamp = timestamp;
     frame.frameNumber = frameNumber;
     frame.cameraId = cameraId;
-    frame.parameters = m_parameters;
+    frame.parameters = parameters;
 
     emit frameReady(frame);
 }

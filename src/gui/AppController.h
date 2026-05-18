@@ -308,7 +308,8 @@ private slots:
     void onDriverFrameReady(const QSharedPointer<QImage> &image,
                            quint64 timestamp,
                            int frameNumber,
-                           const QString &cameraId);
+                           const QString &cameraId,
+                          const QVariantMap &parameters);
     void onDriverCaptureStarted(const QString &cameraId);
     void onDriverCaptureStopped(const QString &cameraId);
     void onDriverConnectionChanged(bool connected, const QString &cameraId);

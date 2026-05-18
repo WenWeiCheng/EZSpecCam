@@ -197,7 +197,8 @@ Q_SIGNALS:
     void frameReady(const QSharedPointer<QImage> &image,
                     quint64 timestamp,
                     int frameNumber,
-                    const QString &cameraId);
+                    const QString &cameraId,
+                    const QVariantMap &parameters);
 
     /**
      * @brief Emitted when capture begins.

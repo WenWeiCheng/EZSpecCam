@@ -68,7 +68,7 @@ public:
     double gain() const { return m_gain; }
 
 signals:
-    void frameReady(const QSharedPointer<QImage> &image, quint64 timestamp, int frameNumber, const QString &cameraId);
+    void frameReady(const QSharedPointer<QImage> &image, quint64 timestamp, int frameNumber, const QString &cameraId, const QVariantMap &parameters);
     void captureStarted(const QString &cameraId);
     void captureStopped(const QString &cameraId);
     void connectionChanged(bool connected, const QString &cameraId);

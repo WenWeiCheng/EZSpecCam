@@ -561,7 +561,7 @@ void MainWindow::on_rowRange_triggered()
         return;
     }
 
-    int imageHeight = m_currentFrame.image.height();
+    int imageHeight = m_currentFrame.originalImage.height();
     RowRangeDialog *dialog = new RowRangeDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setImageHeight(imageHeight);

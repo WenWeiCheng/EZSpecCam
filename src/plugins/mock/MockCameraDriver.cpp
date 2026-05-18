@@ -287,7 +287,7 @@ void MockCameraDriver::stopCapture(int timeoutMs)
         int frameNum = ++m_frameNumber;
         quint64 timestamp = QDateTime::currentMSecsSinceEpoch() * 1000;
         QSharedPointer<QImage> imagePtr = QSharedPointer<QImage>::create(image);
-        emit frameReady(imagePtr, timestamp, frameNum, m_connectedCameraId);
+        emit frameReady(imagePtr, timestamp, frameNum, m_connectedCameraId, m_parameters);
     }
 
     emit captureStopped(m_connectedCameraId);
@@ -335,7 +335,7 @@ void MockCameraDriver::onCaptureTimer()
 
     QSharedPointer<QImage> imagePtr = QSharedPointer<QImage>::create(image);
 
-    emit frameReady(imagePtr, timestamp, frameNum, m_connectedCameraId);
+    emit frameReady(imagePtr, timestamp, frameNum, m_connectedCameraId, m_parameters);
 }
 
 void MockCameraDriver::initializeParameterDefinitions(const QString &cameraId)
