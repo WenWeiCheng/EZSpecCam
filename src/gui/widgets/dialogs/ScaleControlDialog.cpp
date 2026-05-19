@@ -33,15 +33,15 @@ void ScaleControlDialog::createImageGroup()
     QFormLayout *layout = new QFormLayout(m_imageGroup);
 
     m_imageScaleTypeCombo = new QComboBox(this);
-    m_imageScaleTypeCombo->addItem("image (linear)", 0);
-    m_imageScaleTypeCombo->addItem("Log", 1);
-    layout->addRow("Scale Type:", m_imageScaleTypeCombo);
+    m_imageScaleTypeCombo->addItem("linear", 0);
+    m_imageScaleTypeCombo->addItem("log", 1);
+    layout->addRow("Type:", m_imageScaleTypeCombo);
 
     m_imageColorScaleModeCombo = new QComboBox(this);
-    m_imageColorScaleModeCombo->addItem("Auto", 0);
+    m_imageColorScaleModeCombo->addItem("Auto (min-max)", 0);
     m_imageColorScaleModeCombo->addItem("8-bit (0-255)", 1);
     m_imageColorScaleModeCombo->addItem("16-bit (0-65535)", 2);
-    layout->addRow("Color Scale:", m_imageColorScaleModeCombo);
+    layout->addRow("Range:", m_imageColorScaleModeCombo);
 
     connect(m_imageScaleTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ScaleControlDialog::onImageScaleTypeChanged);
@@ -56,9 +56,9 @@ void ScaleControlDialog::createSpectrumGroup()
     QFormLayout *layout = new QFormLayout(m_spectrumGroup);
 
     m_spectrumScaleTypeCombo = new QComboBox(this);
-    m_spectrumScaleTypeCombo->addItem("auto", 0);
+    m_spectrumScaleTypeCombo->addItem("linear", 0);
     m_spectrumScaleTypeCombo->addItem("log", 1);
-    layout->addRow("Scale Type:", m_spectrumScaleTypeCombo);
+    layout->addRow("Type:", m_spectrumScaleTypeCombo);
 
     connect(m_spectrumScaleTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ScaleControlDialog::onSpectrumScaleTypeChanged);
