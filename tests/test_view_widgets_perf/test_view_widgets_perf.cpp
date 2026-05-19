@@ -177,9 +177,9 @@ private slots:
             SpectrumViewWidget widget;
             widget.resize(800, 600);
 
-            QVector<double> spectrum(640);
+            QVector<quint64> spectrum(640);
             for (int j = 0; j < 640; ++j) {
-                spectrum[j] = (j * 100.0) / 640;
+                spectrum[j] = (j * 100) ;
             }
 
             QElapsedTimer timer;
@@ -203,9 +203,9 @@ private slots:
             SpectrumViewWidget widget;
             widget.resize(800, 600);
 
-            QVector<double> spectrum(1920);
+            QVector<quint64> spectrum(1920);
             for (int j = 0; j < 1920; ++j) {
-                spectrum[j] = (j * 100.0) / 1920;
+                spectrum[j] = (j * 100);
             }
 
             QElapsedTimer timer;
@@ -229,9 +229,9 @@ private slots:
             SpectrumViewWidget widget;
             widget.resize(800, 600);
 
-            QVector<double> spectrum(6000);
+            QVector<quint64> spectrum(6000);
             for (int j = 0; j < 6000; ++j) {
-                spectrum[j] = (j * 100.0) / 6000;
+                spectrum[j] = (j * 100);
             }
 
             QElapsedTimer timer;
