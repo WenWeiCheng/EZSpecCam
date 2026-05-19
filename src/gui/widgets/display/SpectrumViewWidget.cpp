@@ -122,20 +122,23 @@ void SpectrumViewWidget::setFromImage(const QImage &image)
     setData(xData, yData);
 }
 
-void SpectrumViewWidget::setSpectrumData(const QVector<double> &spectrum)
+void SpectrumViewWidget::setSpectrumData(const QVector<quint64> &spectrum)
 {
     if (spectrum.isEmpty()) {
         return;
     }
 
     QVector<double> xData;
+    QVector<double> yData;
     xData.reserve(spectrum.size());
+    yData.reserve(spectrum.size());
 
     for (int i = 0; i < spectrum.size(); ++i) {
         xData.append(i);
+        yData.append(static_cast<double>(spectrum[i]));
     }
 
-    setData(xData, spectrum);
+    setData(xData, yData);
 }
 
 QVector<double> SpectrumViewWidget::xData() const

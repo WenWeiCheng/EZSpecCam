@@ -453,7 +453,7 @@ struct ImageData
 {
     QImage image;
     QImage originalImage;
-    QVector<double> spectrum;  ///< Full-precision vertical binning sums (1D spectrum)
+    QVector<quint64> spectrum;  ///< Full-precision vertical binning sums (1D spectrum)
     quint64 timestamp = 0;
     int frameNumber = 0;
     QString cameraId;

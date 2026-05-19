@@ -73,7 +73,7 @@ QString CsvFormatHandler::insertSuffix(const QString &filePath, const QString &s
     return result;
 }
 
-bool CsvFormatHandler::exportSpectrumCsv(const QVector<double> &spectrum, const QString &path)
+bool CsvFormatHandler::exportSpectrumCsv(const QVector<quint64> &spectrum, const QString &path)
 {
     if (spectrum.isEmpty()) {
         return false;
@@ -86,12 +86,12 @@ bool CsvFormatHandler::exportSpectrumCsv(const QVector<double> &spectrum, const 
 
     QString content;
     content.reserve(spectrum.size() * 25);
-    content += "Wavelength,Intensity\n";
+    content += "Index,Counts\n";
 
     for (int i = 0; i < spectrum.size(); ++i) {
-        content += QString::number(i, 'f', 6);
+        content += QString::number(i);
         content += ',';
-        content += QString::number(spectrum[i], 'f', 6);
+        content += QString::number(spectrum[i]);
         content += '\n';
     }
 

@@ -40,7 +40,7 @@ public:
 
     void setData(const QVector<double> &x, const QVector<double> &y);
     void setFromImage(const QImage &image);
-    void setSpectrumData(const QVector<double> &spectrum);
+    void setSpectrumData(const QVector<quint64> &spectrum);
 
     QVector<double> xData() const;
     QVector<double> yData() const;
