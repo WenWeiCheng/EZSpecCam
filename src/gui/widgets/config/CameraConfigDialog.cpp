@@ -12,6 +12,8 @@
 #include <QMetaObject>
 #include <QObject>
 #include <QDebug>
+#include <qcontainerfwd.h>
+#include <qvariant.h>
 
 static QVariantMap filterDriverParams(const QVariantMap &params)
 {
@@ -41,6 +43,11 @@ void CameraConfigDialog::showEvent(QShowEvent *event)
 {
     if (event->type() == QEvent::Show && ui && ui->cameraTab) {
         if (ui->cameraTab->ui->parameterGroup) {
+            AppController *controller = ui->cameraTab->appController();
+            QVariantMap currentParams = controller->allParameters();
+
+            ui->cameraTab->setBufferedConfig(currentParams);
+            ui->cameraTab->buildDynamicParameterPanel();
             ui->cameraTab->ui->parameterGroup->setVisible(true);
         }
     }
@@ -146,8 +153,15 @@ void CameraConfigDialog::on_restoreButton_clicked()
     if (ui && ui->cameraTab) {
         AppController *controller = ui->cameraTab->appController();
         if (controller && controller->isConnected()) {
-            QVariantMap currentParams = controller->allParameters();
-            ui->cameraTab->setBufferedConfig(currentParams);
+            QVariantMap defaultParams;
+            QStringList paramNames = controller->parameterNames();
+
+            for (const QString &paramName : paramNames) {
+                ParameterDefinition def = controller->parameter(paramName);
+                defaultParams[paramName] = def.defaultValue;
+            }
+
+            ui->cameraTab->setBufferedConfig(defaultParams);
             ui->cameraTab->buildDynamicParameterPanel();
         }
     }

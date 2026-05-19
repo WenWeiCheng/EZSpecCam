@@ -269,7 +269,7 @@ void CameraTab::buildDynamicParameterPanel()
                 m_parameterWidgets.insert(name, widget);
                 if (m_bufferedConfig.contains(name)) {
                     ParameterWidgetFactory::setWidgetValue(widget, m_bufferedConfig.value(name), def.type);
-                    CONFIG_DEBUG << "Set initial value for" << name << ":" << m_bufferedConfig.value(name);
+                    CONFIG_DEBUG << "Set widget value for" << name << ":" << m_bufferedConfig.value(name);
                 }
                 paramFormLayout->addRow(def.displayName + ":", widget);
             }
