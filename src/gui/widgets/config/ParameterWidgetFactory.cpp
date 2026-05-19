@@ -43,6 +43,15 @@ void installWheelBlocker(QWidget *widget)
 
 QWidget *ParameterWidgetFactory::createWidget(const ParameterDefinition &def)
 {
+    if (def.isReadOnly) {
+        QLabel *label = new QLabel(def.defaultValue.toString());
+        label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        if (!def.description.isEmpty()) {
+            label->setToolTip(def.description);
+        }
+        return label;
+    }
+
     switch (def.type) {
     case ParameterType::FloatRange:
         return createFloatRangeWidget(def);
