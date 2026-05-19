@@ -337,6 +337,7 @@ void CameraTab::setBufferedConfig(const QVariantMap &config)
 
 void CameraTab::updateBufferedConfigFromWidgets()
 {
+    m_bufferedConfig.clear();
     if (ui->captureModeComboBox) {
         m_bufferedConfig["captureMode"] = ui->captureModeComboBox->currentText();
     }
