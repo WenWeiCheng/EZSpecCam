@@ -113,6 +113,7 @@ Only these 12 properties are excluded:
 |-------------------|---------------|------|--------|-------|
 | `exposure` | `EXPOSURE TIME` | FloatRange | RW | 8μs – 30s, step 4μs |
 | `contrast_gain` | `CONTRAST GAIN` | IntRange | RW | 0 – 3, step 1 |
+| `binning` | `BINNING` | StringCollection | RO | Fixed: 1x1 (no binning) |
 | `trigger_source` | `TRIGGER SOURCE` | StringCollection | RW | INTERNAL, EXTERNAL |
 | `trigger_mode` | `TRIGGER MODE` | StringCollection | RO | Fixed: NORMAL |
 | `trigger_active` | `TRIGGER ACTIVE` | StringCollection | RO | Fixed: EDGE |
@@ -136,15 +137,13 @@ Only these 12 properties are excluded:
 | `sensor_mode` | `SENSOR MODE` | StringCollection | RO | Fixed: LINE |
 | `line_bundle_height` | `SENSOR MODE LINE BUNDLE HEIGHT` | IntRange | RW | 8 – 1024, step 8 |
 | `capture_mode` | `CAPTURE MODE` | StringCollection | RO | Fixed: NORMAL DATA |
-| `binning` | `BINNING` | StringCollection | RO | Fixed: 1x1 (no binning) |
 
 ### TYPE MAPPING RULES
 
 | DCAM Type | ParameterType | Condition |
 |-----------|--------------|-----------|
 | `DCAMPROP_TYPE_REAL` | `FloatRange` | Always |
-| `DCAMPROP_TYPE_LONG` | `IntRange` | No valuetext |
-| `DCAMPROP_TYPE_LONG` | `IntCollection` | Has valuetext |
+| `DCAMPROP_TYPE_LONG` | `IntRange` | Always |
 | `DCAMPROP_TYPE_MODE` | `StringCollection` | Has valuetext (use text labels) |
 | `DCAMPROP_TYPE_MODE` | `IntCollection` | No valuetext (fallback) |
 
@@ -156,90 +155,10 @@ For **Info category** (per requirement): all properties use `String` or `StringC
 
 2. **Dynamic Discovery**: Properties should be discovered at runtime via `dcam_getnextpropertyid()`, not hardcoded. Use the exclusion list above to filter.
 
-3. **Info Type Rules**: Per requirement, all Info category parameters must use String value type.
-
-4. **C16091 Limitations**:
+3. **C16091 Limitations**:
    - No pixel binning support (BINNING fixed at 1x1)
    - No vertical dimension control (VPOS/VSIZE not applicable for 1D sensor)
    - Only INTERNAL and EXTERNAL trigger sources supported
-
----
-
-## FRAME CAPTURE MAPPING
-
-### Worker Thread Design (following QHYCCD pattern)
-
-```
-startCapture(captureCount):
-    1. dcambuf_alloc(m_hdcam, frameCount)    — 10-30 frames typical
-    2. dcamcap_start(m_hdcam, SEQUENCE)       — begin acquisition
-    3. Start worker QTimer (or QThread):
-       - dcamwait_start(m_hwait, &ws) with timeout (e.g. 1000ms)
-       - On FRAMEREADY:
-         a. dcambuf_lockframe(m_hdcam, &bufframe)       // zero-copy
-         b. Convert bufframe.buf → QImage (see format conversion below)
-         c. emit frameReady(image, timestamp, frameNumber, cameraId, params)
-         d. dcambuf_copyframe() alternative if lock doesn't work
-       - On TIMEOUT: emit errorOccurred or continue
-       - On ABORT: exit loop (stop requested)
-    4. On captureCount reached or stopCapture():
-       - dcamwait_abort(m_hwait)
-       - dcamcap_stop(m_hdcam)
-       - dcambuf_release(m_hdcam)
-
-stopCapture(timeoutMs):
-    1. Set abort flag
-    2. dcamwait_abort(m_hwait)                  // interrupt any blocking wait
-    3. Wait for worker thread to join
-    4. dcamcap_stop(m_hdcam)
-    5. dcambuf_release(m_hdcam)
-    6. emit captureStopped()
-```
-
-### Pixel Format Conversion
-
-DCAM supports multiple pixel types (`DCAM_PIXELTYPE`). The most common for Hamamatsu scientific cameras:
-
-| DCAM_PIXELTYPE | QImage Format | Byte Depth |
-|----------------|---------------|------------|
-| MONO16         | QImage::Format_Grayscale16 | 2 bytes/pixel |
-| MONO8          | QImage::Format_Grayscale8  | 1 byte/pixel |
-| BGR24          | QImage::Format_BGR30 (or RGB888 conversion) | 3 bytes/pixel |
-
-MONO16 is the most common format for scientific cameras. Conversion:
-
-```cpp
-void* src = bufframe.buf;
-int width = bufframe.width;
-int height = bufframe.height;
-int rowbytes = bufframe.rowbytes;  // may include padding!
-
-QImage image(width, height, QImage::Format_Grayscale16);
-for (int y = 0; y < height; y++) {
-    memcpy(image.scanLine(y),
-           (char*)src + y * rowbytes,
-           width * 2);  // MONO16 = 2 bytes/pixel
-}
-```
-
-**Critical detail**: `DCAMBUF_FRAME.rowbytes` may differ from `width × bytes_per_pixel` due to alignment padding. Always use `rowbytes` for source line stride.
-
-
----
-
-
-## KNOWN LIMITATIONS
-
-1. **Recording (dcamrec_*)** — Not exposed in initial driver. DCAMREC is for streaming to disk, which overlaps with ICameraDriver's signal-based frame delivery. Skip for now.
-
-2. **dcambuf_attach** — External buffer attachment. ICameraDriver owns internal buffer management via dcambuf_alloc. Attach mode can be added later.
-
-3. **dcamdev_showpanel** — UI panel display. Not relevant to embedded Qt plugin.
-
-4. **Performance** — dcambuf_lockframe is zero-copy but locks DCAM's internal buffer. For high-speed acquisition (>100fps), consider dcambuf_copyframe with pre-allocated user buffers.
-
-6. **C16091 1D Sensor** — SUBARRAY/TIMING/RECORD excluded per C16091 analysis.
-
 
 ---
 
@@ -248,7 +167,5 @@ for (int y = 0; y < height; y++) {
 - **DO NOT** hardcode parameter lists — DCAM properties vary per camera model; use runtime enumeration via `dcamprop_getnextid()`
 - **DO NOT** assume all properties exist — always check `dcamprop_getattr()` return value
 - **DO NOT** block the main thread — use QThread for the dcamwait_start loop
-- **DO NOT** ignore `dcambuf_release()` — internal buffer leaks cause driver instability
-- **DO NOT** call `dcamapi_init/uninit` per-connect — use reference counting (same as QHYCCD)
 - **DO NOT** assume rowbytes = width × bpp — DCAM may add alignment padding
 - **DO NOT** modify SDK headers in `driver-sdk/dcamsdk4/inc/` — vendor files, copy to local `sdk/incude/` if needed. And copy `driver-sdk\dcamsdk4\lib` to local `sdk/include` if needed. Look at qhyccd driver directory for reference.
