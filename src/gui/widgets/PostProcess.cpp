@@ -1,5 +1,8 @@
 #include "PostProcess.h"
 
+#include <algorithm>
+#include <omp.h>
+
 #include "CameraTypes.h"
 
 namespace PostProcess
@@ -14,58 +17,71 @@ void verticalBinning(ImageData &frame, int startRow, int endRow)
     if (startRow > endRow) return;
 
     const int width = frame.image.width();
-    int rowCount = endRow - startRow + 1;
 
     if (frame.originalImage.isNull()) {
         frame.originalImage = frame.image;
     }
 
     QImage binnedImage(width, 1, frame.image.format());
-    frame.spectrum.resize(width);
-    frame.spectrum.fill(0.0);
 
     if (frame.image.format() == QImage::Format_Grayscale16) {
         const ushort *srcData = reinterpret_cast<const ushort *>(frame.image.bits());
         ushort *dstData = reinterpret_cast<ushort *>(binnedImage.bits());
-        for (int y = startRow; y <= endRow; y++) {
-            const ushort *row = srcData + y * width;
-            for (int x = 0; x < width; x++) {
-                frame.spectrum[x] += row[x];
+        frame.spectrum.resize(width);
+
+        #pragma omp parallel for schedule(static)
+        for (int x = 0; x < width; ++x) {
+            quint64 sum = 0;
+            const ushort *row = srcData + startRow * width + x;
+            for (int y = startRow; y <= endRow; ++y, row += width) {
+                sum += *row;
             }
+            frame.spectrum[x] = sum;
         }
-        double maxVal = 0.0;
-        for (int x = 0; x < width; x++) {
+
+        quint64 maxVal = 0;
+        for (int x = 0; x < width; ++x) {
             if (frame.spectrum[x] > maxVal) maxVal = frame.spectrum[x];
         }
-        if (maxVal > 0.0 && maxVal <= 65535.0) {
-            for (int x = 0; x < width; x++) {
+
+        if (maxVal > 0 && maxVal <= 65535) {
+            for (int x = 0; x < width; ++x) {
                 dstData[x] = static_cast<ushort>(frame.spectrum[x]);
             }
         } else {
-            for (int x = 0; x < width; x++) {
-                dstData[x] = static_cast<ushort>(frame.spectrum[x] / maxVal * 65535.0);
+            const double scale = 65535.0 / maxVal;
+            for (int x = 0; x < width; ++x) {
+                dstData[x] = static_cast<ushort>(frame.spectrum[x] * scale);
             }
         }
     } else if (frame.image.format() == QImage::Format_Grayscale8) {
         const uchar *srcData = frame.image.bits();
         uchar *dstData = binnedImage.bits();
-        for (int y = startRow; y <= endRow; y++) {
-            const uchar *row = srcData + y * width;
-            for (int x = 0; x < width; x++) {
-                frame.spectrum[x] += row[x];
+        frame.spectrum.resize(width);
+
+        #pragma omp parallel for schedule(static)
+        for (int x = 0; x < width; ++x) {
+            quint64 sum = 0;
+            const uchar *row = srcData + startRow * width + x;
+            for (int y = startRow; y <= endRow; ++y, row += width) {
+                sum += *row;
             }
+            frame.spectrum[x] = sum;
         }
-        double maxVal = 0.0;
-        for (int x = 0; x < width; x++) {
+
+        quint64 maxVal = 0;
+        for (int x = 0; x < width; ++x) {
             if (frame.spectrum[x] > maxVal) maxVal = frame.spectrum[x];
         }
-        if (maxVal > 0.0 && maxVal <= 255.0) {
-            for (int x = 0; x < width; x++) {
+
+        if (maxVal > 0 && maxVal <= 255) {
+            for (int x = 0; x < width; ++x) {
                 dstData[x] = static_cast<uchar>(frame.spectrum[x]);
             }
         } else {
-            for (int x = 0; x < width; x++) {
-                dstData[x] = static_cast<uchar>(frame.spectrum[x] / maxVal * 255.0);
+            const double scale = 255.0 / maxVal;
+            for (int x = 0; x < width; ++x) {
+                dstData[x] = static_cast<uchar>(frame.spectrum[x] * scale);
             }
         }
     } else if (frame.image.format() == QImage::Format_RGB888) {
@@ -73,38 +89,40 @@ void verticalBinning(ImageData &frame, int startRow, int endRow)
         uchar *dstData = binnedImage.bits();
         const int rowStride = width * 3;
         frame.spectrum.resize(width * 3);
-        frame.spectrum.fill(0.0);
-        QVector<double> sumsR(width, 0.0), sumsG(width, 0.0), sumsB(width, 0.0);
-        for (int y = startRow; y <= endRow; y++) {
-            const uchar *row = srcData + y * rowStride;
-            for (int x = 0; x < width; x++) {
-                int idx = x * 3;
-                sumsR[x] += row[idx];
-                sumsG[x] += row[idx + 1];
-                sumsB[x] += row[idx + 2];
+
+        #pragma omp parallel for schedule(static)
+        for (int x = 0; x < width; ++x) {
+            quint64 sumR = 0, sumG = 0, sumB = 0;
+            const uchar *row = srcData + startRow * rowStride + x * 3;
+            for (int y = startRow; y <= endRow; ++y, row += rowStride) {
+                sumR += row[0];
+                sumG += row[1];
+                sumB += row[2];
             }
+            frame.spectrum[x * 3 + 0] = sumR;
+            frame.spectrum[x * 3 + 1] = sumG;
+            frame.spectrum[x * 3 + 2] = sumB;
         }
-        double maxVal = 0.0;
-        for (int x = 0; x < width; x++) {
-            frame.spectrum[x * 3 + 0] = sumsR[x];
-            frame.spectrum[x * 3 + 1] = sumsG[x];
-            frame.spectrum[x * 3 + 2] = sumsB[x];
-            double vals[3] = { sumsR[x], sumsG[x], sumsB[x] };
-            for (int c = 0; c < 3; c++) {
-                if (vals[c] > maxVal) maxVal = vals[c];
-            }
+
+        quint64 maxVal = 0;
+        for (int x = 0; x < width; ++x) {
+            if (frame.spectrum[x * 3 + 0] > maxVal) maxVal = frame.spectrum[x * 3 + 0];
+            if (frame.spectrum[x * 3 + 1] > maxVal) maxVal = frame.spectrum[x * 3 + 1];
+            if (frame.spectrum[x * 3 + 2] > maxVal) maxVal = frame.spectrum[x * 3 + 2];
         }
-        if (maxVal > 0.0 && maxVal <= 255.0) {
-            for (int x = 0; x < width; x++) {
-                dstData[x * 3] = static_cast<uchar>(sumsR[x]);
-                dstData[x * 3 + 1] = static_cast<uchar>(sumsG[x]);
-                dstData[x * 3 + 2] = static_cast<uchar>(sumsB[x]);
+
+        if (maxVal > 0 && maxVal <= 255) {
+            for (int x = 0; x < width; ++x) {
+                dstData[x * 3 + 0] = static_cast<uchar>(frame.spectrum[x * 3 + 0]);
+                dstData[x * 3 + 1] = static_cast<uchar>(frame.spectrum[x * 3 + 1]);
+                dstData[x * 3 + 2] = static_cast<uchar>(frame.spectrum[x * 3 + 2]);
             }
         } else {
-            for (int x = 0; x < width; x++) {
-                dstData[x * 3] = static_cast<uchar>(sumsR[x] / maxVal * 255.0);
-                dstData[x * 3 + 1] = static_cast<uchar>(sumsG[x] / maxVal * 255.0);
-                dstData[x * 3 + 2] = static_cast<uchar>(sumsB[x] / maxVal * 255.0);
+            const double scale = 255.0 / maxVal;
+            for (int x = 0; x < width; ++x) {
+                dstData[x * 3 + 0] = static_cast<uchar>(frame.spectrum[x * 3 + 0] * scale);
+                dstData[x * 3 + 1] = static_cast<uchar>(frame.spectrum[x * 3 + 1] * scale);
+                dstData[x * 3 + 2] = static_cast<uchar>(frame.spectrum[x * 3 + 2] * scale);
             }
         }
     }
