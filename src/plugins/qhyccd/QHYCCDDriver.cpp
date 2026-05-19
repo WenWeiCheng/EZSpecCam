@@ -301,6 +301,39 @@ bool QHYCCDDriver::commitParameters()
             m_pendingParameters.insert(name, value);
         }
     }
+    
+    // binning validation and apply. Apply binning before roi
+    bool binningChanged = m_pendingParameters.contains("binning");
+    if(binningChanged){
+        int binFactor = m_pendingParameters.value("binning").toInt();
+        // update roi
+        int roiX = 0;
+        int roiY = 0;
+        int roiW = m_imageWidth / binFactor;
+        int roiH = m_imageHeight / binFactor;
+        m_parameters.insert("roi_x", roiX);
+        m_parameters.insert("roi_y", roiY);
+        m_parameters.insert("roi_width", roiW);
+        m_parameters.insert("roi_height", roiH);
+        m_parameterDefinitions["roi_x"].defaultValue = roiX;
+        m_parameterDefinitions["roi_x"].constraint.maxValue = roiW - 1;
+        m_parameterDefinitions["roi_y"].defaultValue = roiY;
+        m_parameterDefinitions["roi_y"].constraint.maxValue = roiH - 1;
+        m_parameterDefinitions["roi_width"].defaultValue = roiW;
+        m_parameterDefinitions["roi_width"].constraint.maxValue = roiW;
+        m_parameterDefinitions["roi_height"].defaultValue = roiH;
+        m_parameterDefinitions["roi_height"].constraint.maxValue = roiH;
+        // Set binning via SDK - both wbin and hbin
+        ret = SetQHYCCDBinMode(m_cameraHandle, binFactor, binFactor);
+        ret |= SetQHYCCDResolution(m_cameraHandle , roiX, roiY, roiW, roiH);
+        if(ret != QHYCCD_SUCCESS){
+            emit errorOccurred(CameraError::makeError(
+                CameraError::Code::DriverError,
+                QString("Failed to set binning: %1").arg(ret)));
+            return false;
+        }
+        m_pendingParameters.remove("binning");
+    }
 
     // roi validation and apply
     bool roiChanged = m_pendingParameters.contains("roi_x") || 
@@ -400,34 +433,15 @@ bool QHYCCDDriver::commitParameters()
         } else if (name == "transfer_bit"){
             int traffic = value.toInt();
             ret = SetQHYCCDParam(m_cameraHandle, CONTROL_TRANSFERBIT, traffic);
-        } else if (name == "binning") {
-            int binFactor = value.toInt();
-            // update roi
-            int roiX = 0;
-            int roiY = 0;
-            int roiW = m_imageWidth / binFactor;
-            int roiH = m_imageHeight / binFactor;
-            m_parameters.insert("roi_x", roiX);
-            m_parameters.insert("roi_y", roiY);
-            m_parameters.insert("roi_width", roiW);
-            m_parameters.insert("roi_height", roiH);
-            m_parameterDefinitions["roi_x"].defaultValue = roiX;
-            m_parameterDefinitions["roi_x"].constraint.maxValue = roiW - 1;
-            m_parameterDefinitions["roi_y"].defaultValue = roiY;
-            m_parameterDefinitions["roi_y"].constraint.maxValue = roiH - 1;
-            m_parameterDefinitions["roi_width"].defaultValue = roiW;
-            m_parameterDefinitions["roi_width"].constraint.maxValue = roiW;
-            m_parameterDefinitions["roi_height"].defaultValue = roiH;
-            m_parameterDefinitions["roi_height"].constraint.maxValue = roiH;
-            // Set binning via SDK - both wbin and hbin
-            ret = SetQHYCCDBinMode(m_cameraHandle, binFactor, binFactor);
-            ret |= SetQHYCCDResolution(m_cameraHandle , roiX, roiY, roiW, roiH);
+        } else {
+            DRIVER_DEBUG << "Unhandled parameter: " << name;
+            continue;
         }
 
         if (ret != QHYCCD_SUCCESS) {
             emit errorOccurred(CameraError::makeError(
                 CameraError::Code::CommitFailed,
-                QString("Failed to set binning: %1").arg(ret)));
+                QString("Failed to set parameter: %1").arg(name)));
             m_pendingParameters.clear();
             return false;
         }
