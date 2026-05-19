@@ -628,31 +628,31 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.displayName = "Chip Width";
         param.description = "Sensor chip width in mm";
         param.category = ParameterCategory::Info;
-        param.type = ParameterType::String;
+        param.type = ParameterType::FloatRange;
         param.isReadOnly = true;
         param.order = 3.0f;
-        param.defaultValue = static_cast<double>(m_chipWidth);
+        param.defaultValue = m_chipWidth;
         m_parameterDefinitions.insert("chipWidth", param);
-        m_parameters.insert("chipWidth", static_cast<double>(m_chipWidth));
+        m_parameters.insert("chipWidth", m_chipWidth);
         
         param = ParameterDefinition();
         param.name = "chipHeight";
         param.displayName = "Chip Height";
         param.description = "Sensor chip height in mm";
         param.category = ParameterCategory::Info;
-        param.type = ParameterType::String;
+        param.type = ParameterType::FloatRange;
         param.isReadOnly = true;
         param.order = 4.0f;
-        param.defaultValue = static_cast<double>(m_chipHeight);
+        param.defaultValue = m_chipHeight;
         m_parameterDefinitions.insert("chipHeight", param);
-        m_parameters.insert("chipHeight", static_cast<double>(m_chipHeight));
+        m_parameters.insert("chipHeight", m_chipHeight);
         
         param = ParameterDefinition();
         param.name = "imageWidth";
         param.displayName = "Image Width";
         param.description = "Maximum image width in pixels";
         param.category = ParameterCategory::Info;
-        param.type = ParameterType::String;
+        param.type = ParameterType::IntRange;
         param.isReadOnly = true;
         param.order = 5.0f;
         param.defaultValue = m_imageWidth;
@@ -664,7 +664,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.displayName = "Image Height";
         param.description = "Maximum image height in pixels";
         param.category = ParameterCategory::Info;
-        param.type = ParameterType::String;
+        param.type = ParameterType::IntRange;
         param.isReadOnly = true;
         param.order = 6.0f;
         param.defaultValue = m_imageHeight;
@@ -676,7 +676,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.displayName = "Pixel Width";
         param.description = "Pixel width in microns";
         param.category = ParameterCategory::Info;
-        param.type = ParameterType::String;
+        param.type = ParameterType::FloatRange;
         param.isReadOnly = true;
         param.order = 7.0f;
         param.defaultValue = m_pixelWidth;
@@ -688,7 +688,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.displayName = "Pixel Height";
         param.description = "Pixel height in microns";
         param.category = ParameterCategory::Info;
-        param.type = ParameterType::String;
+        param.type = ParameterType::FloatRange;
         param.isReadOnly = true;
         param.order = 8.0f;
         param.defaultValue = m_pixelHeight;
@@ -700,7 +700,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.displayName = "Image Bytes";
         param.description = "Image buffer size in bytes";
         param.category = ParameterCategory::Info;
-        param.type = ParameterType::String;
+        param.type = ParameterType::IntRange;
         param.isReadOnly = true;
         param.order = 9.0f;
         param.defaultValue = m_imageBytes;
@@ -1096,14 +1096,14 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.displayName = "Current Temperature";
         param.description = "Current sensor temperature in Celsius. When capturing, this value update will stop.";
         param.category = ParameterCategory::Cooling;
-        param.type = ParameterType::String;
+        param.type = ParameterType::FloatRange;
         param.isReadOnly = true;
         param.isDynamic = true;
         param.isExtrinsic = true;
         param.order = 12.0f;
-        param.defaultValue = "-";
+        param.defaultValue = 25.0;
         m_parameterDefinitions.insert("current_temperature", param);
-        m_parameters.insert("current_temperature", "-");
+        m_parameters.insert("current_temperature", 25.0);
     }
 
     // Humidity - check availability
@@ -1114,14 +1114,14 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.displayName = "Humidity";
         param.description = "Humidity in percent. When capturing, this value update will stop.";
         param.category = ParameterCategory::Cooling;
-        param.type = ParameterType::String;
+        param.type = ParameterType::FloatRange;
         param.isReadOnly = true;
         param.isDynamic = true;
         param.isExtrinsic = true;
         param.order = 13.0f;
-        param.defaultValue = "-";
+        param.defaultValue = 50.0;
         m_parameterDefinitions.insert("humidity", param);
-        m_parameters.insert("humidity", "-");
+        m_parameters.insert("humidity", 50.0);
     }
     
     // Pressure - check availability
@@ -1132,25 +1132,25 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.displayName = "Pressure";
         param.description = "Pressure in mbar. When capturing, this value update will stop.";
         param.category = ParameterCategory::Cooling;
-        param.type = ParameterType::String;
+        param.type = ParameterType::FloatRange;
         param.isReadOnly = true;
         param.isDynamic = true;
         param.isExtrinsic = true;
         param.order = 14.0f;
-        param.defaultValue = "-";
+        param.defaultValue = 1013.25;
         m_parameterDefinitions.insert("pressure", param);
-        m_parameters.insert("pressure", "-");
+        m_parameters.insert("pressure", 1013.25);
     }
 
     // Check effective area
     ret = GetQHYCCDEffectiveArea(m_cameraHandle, &m_effectiveStartX, &m_effectiveStartY, &m_effectiveWidth, &m_effectiveHeight);
 
     param = ParameterDefinition();
-    param.name = "Effective Area start x";
+    param.name = "effective_start_x";
     param.displayName = "Effective Area start x";
     param.description = "Effective area start x";
     param.category = ParameterCategory::Info;
-    param.type = ParameterType::String;
+    param.type = ParameterType::IntRange;
     param.isReadOnly = true;
     param.order = 15.0f;
     param.defaultValue = m_effectiveStartX;
@@ -1158,11 +1158,11 @@ void QHYCCDDriver::initializeParameterDefinitions()
     m_parameters.insert("effective_start_x", m_effectiveStartX);
     
     param = ParameterDefinition();
-    param.name = "Effective Area start y";
+    param.name = "effective_start_y";
     param.displayName = "Effective Area start y";
     param.description = "Effective area start y";
     param.category = ParameterCategory::Info;
-    param.type = ParameterType::String;
+    param.type = ParameterType::IntRange;
     param.isReadOnly = true;
     param.order = 16.0f;
     param.defaultValue = m_effectiveStartY;
@@ -1170,11 +1170,11 @@ void QHYCCDDriver::initializeParameterDefinitions()
     m_parameters.insert("effective_start_y", m_effectiveStartY);
 
     param = ParameterDefinition();
-    param.name = "Effective Area width";
+    param.name = "effective_width";
     param.displayName = "Effective Area width";
     param.description = "Effective area width";
     param.category = ParameterCategory::Info;
-    param.type = ParameterType::String;
+    param.type = ParameterType::IntRange;
     param.isReadOnly = true;
     param.order = 17.0f;
     param.defaultValue = m_effectiveWidth;
@@ -1182,11 +1182,11 @@ void QHYCCDDriver::initializeParameterDefinitions()
     m_parameters.insert("effective_width", m_effectiveWidth);
 
     param = ParameterDefinition();
-    param.name = "Effective Area height";
+    param.name = "effective_height";
     param.displayName = "Effective Area height";
     param.description = "Effective area height";
     param.category = ParameterCategory::Info;
-    param.type = ParameterType::String;
+    param.type = ParameterType::IntRange;
     param.isReadOnly = true;
     param.order = 18.0f;
     param.defaultValue = m_effectiveHeight;

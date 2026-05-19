@@ -386,25 +386,13 @@ void CameraTab::onCoolingTimerTimeout()
     QStringList paramNames = m_appController->parameterNames();
     for (const QString &paramName : paramNames) {
         ParameterDefinition def = m_appController->parameter(paramName);
-        if (def.isDynamic && def.isExtrinsic) {
+        if (def.isReadOnly && def.isDynamic && def.isExtrinsic) {
             QVariant value = m_appController->parameterValue(paramName);
             QWidget *widget = m_parameterWidgets.value(paramName);
             if (widget) {
-                if (def.type == ParameterType::String) {
-                    QLabel *label = qobject_cast<QLabel*>(widget);
-                    if (label) {
-                        label->setText(value.toString());
-                    }
-                } else if (def.type == ParameterType::FloatRange) {
-                    QDoubleSpinBox *spinBox = qobject_cast<QDoubleSpinBox*>(widget);
-                    if (spinBox) {
-                        spinBox->setValue(value.toDouble());
-                    }
-                } else if (def.type == ParameterType::IntRange) {
-                    QSpinBox *spinBox = qobject_cast<QSpinBox*>(widget);
-                    if (spinBox) {
-                        spinBox->setValue(value.toInt());
-                    }
+                QLabel *label = qobject_cast<QLabel*>(widget);
+                if (label) {
+                    label->setText(value.toString());
                 }
             }
         }

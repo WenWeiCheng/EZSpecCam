@@ -522,12 +522,12 @@ void MockCameraDriver::initializeParameterDefinitions(const QString &cameraId)
         param.displayName = "Sensor Temperature";
         param.description = "Current sensor die temperature";
         param.category = ParameterCategory::Cooling;
-        param.type = ParameterType::String;
+        param.type = ParameterType::FloatRange;
         param.isReadOnly = true;
         param.isDynamic = true;
         param.isExtrinsic = true;
         param.order = 3.0f;
-        param.defaultValue = "-";
+        param.defaultValue = 25.0;
         m_parameterDefinitions.insert("cooling_sensor_temp", param);
         m_parameters.insert("cooling_sensor_temp", param.defaultValue);
 
@@ -536,12 +536,12 @@ void MockCameraDriver::initializeParameterDefinitions(const QString &cameraId)
         param.displayName = "Heatsink Temperature";
         param.description = "Current heatsink temperature";
         param.category = ParameterCategory::Cooling;
-        param.type = ParameterType::String;
+        param.type = ParameterType::FloatRange;
         param.isReadOnly = true;
         param.isDynamic = true;
         param.isExtrinsic = true;
         param.order = 4.0f;
-        param.defaultValue = "-";
+        param.defaultValue = 30.0;
         m_parameterDefinitions.insert("cooling_heatsink_temp", param);
         m_parameters.insert("cooling_heatsink_temp", param.defaultValue);
     }
@@ -551,10 +551,10 @@ void MockCameraDriver::initializeParameterDefinitions(const QString &cameraId)
     param.displayName = "Sensor Width";
     param.description = "Total sensor width in pixels";
     param.category = ParameterCategory::Info;
-    param.type = ParameterType::String;
+    param.type = ParameterType::IntRange;
     param.isReadOnly = true;
     param.order = 1.0f;
-    param.defaultValue = QString::number(maxWidth);
+    param.defaultValue = maxWidth;
     m_parameterDefinitions.insert("sensor_width", param);
     m_parameters.insert("sensor_width", param.defaultValue);
 
@@ -563,10 +563,10 @@ void MockCameraDriver::initializeParameterDefinitions(const QString &cameraId)
     param.displayName = "Sensor Height";
     param.description = "Total sensor height in pixels";
     param.category = ParameterCategory::Info;
-    param.type = ParameterType::String;
+    param.type = ParameterType::IntRange;
     param.isReadOnly = true;
     param.order = 2.0f;
-    param.defaultValue = QString::number(maxHeight);
+    param.defaultValue = maxHeight;
     m_parameterDefinitions.insert("sensor_height", param);
     m_parameters.insert("sensor_height", param.defaultValue);
 
