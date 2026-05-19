@@ -340,9 +340,9 @@ bool QHYCCDDriver::commitParameters()
               roiH >= 1 && roiH <= imageHeight &&
               roiX + roiW <= imageWidth &&
               roiY + roiH <= imageHeight)) {
-            CameraError::makeError(
+            emit errorOccurred(CameraError::makeError(
                 CameraError::Code::InvalidParameter,
-                "roi parameters is invalid");
+                "roi parameters is invalid"));
             DRIVER_DEBUG << "ROI validation failed - x:" << roiX << "y:" << roiY 
                        << "w:" << roiW << "h:" << roiH << "image:" << imageWidth << "x" << imageHeight;
             return false;
@@ -350,9 +350,9 @@ bool QHYCCDDriver::commitParameters()
         
         uint32_t ret = SetQHYCCDResolution(m_cameraHandle , roiX, roiY, roiW, roiH);
         if (ret != QHYCCD_SUCCESS) {
-            CameraError::makeError(
+            emit errorOccurred(CameraError::makeError(
                 CameraError::Code::CommitFailed,
-                QString("Failed to set camera roi, try to reconnect camera").arg(ret));
+                QString("Failed to set camera roi, try to reconnect camera").arg(ret)));
             return false;
         }
         m_parameters.insert("roi_x", roiX);
@@ -399,7 +399,7 @@ bool QHYCCDDriver::commitParameters()
             ret = SetQHYCCDParam(m_cameraHandle, CONTROL_USBTRAFFIC, traffic);
         } else if (name == "transfer_bit"){
             int traffic = value.toInt();
-            ret = SetQHYCCDParam(m_cameraHandle, CONTROL_USBTRAFFIC, traffic);
+            ret = SetQHYCCDParam(m_cameraHandle, CONTROL_TRANSFERBIT, traffic);
         } else if (name == "binning") {
             int binFactor = value.toInt();
             // update roi
@@ -1197,14 +1197,14 @@ void QHYCCDDriver::captureLoop()
     }
 
     while (m_captureRunning.load()) {
-        if(m_parameters["stream_mode"] == "Single Frame"){
+        if(m_parameters["stream_mode"] == "Live Video"){
             ret = GetQHYCCDLiveFrame(m_cameraHandle, &width, &height, &bpp, &channels, m_frameBuffer.data());
             if(ret != QHYCCD_SUCCESS){
                 QThread::msleep(1);
                 continue;
             }
         }
-        if(m_parameters["stream_mode"] == "Live Video"){
+        if(m_parameters["stream_mode"] == "Single Frame"){
             ExpQHYCCDSingleFrame(m_cameraHandle);
             ret = GetQHYCCDSingleFrame(m_cameraHandle, &width, &height, &bpp, &channels, m_frameBuffer.data());
 
