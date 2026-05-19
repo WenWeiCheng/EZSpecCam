@@ -168,6 +168,84 @@ private slots:
         printStats("SpectrumViewWidget 6000 points", timings);
     }
 
+    void test_spectrumviewwidget_setSpectrumData_640()
+    {
+        const int runs = 10;
+        QList<qint64> timings;
+
+        for (int i = 0; i < runs; ++i) {
+            SpectrumViewWidget widget;
+            widget.resize(800, 600);
+
+            QVector<double> spectrum(640);
+            for (int j = 0; j < 640; ++j) {
+                spectrum[j] = (j * 100.0) / 640;
+            }
+
+            QElapsedTimer timer;
+            timer.start();
+            widget.setSpectrumData(spectrum);
+            timings.append(timer.elapsed());
+
+            QVERIFY2(widget.hasData(), "Widget should have data after setSpectrumData");
+            QVERIFY2(widget.dataWidth() == 640, "Data width should be 640");
+        }
+
+        printStats("SpectrumViewWidget::setSpectrumData 640 points", timings);
+    }
+
+    void test_spectrumviewwidget_setSpectrumData_1920()
+    {
+        const int runs = 10;
+        QList<qint64> timings;
+
+        for (int i = 0; i < runs; ++i) {
+            SpectrumViewWidget widget;
+            widget.resize(800, 600);
+
+            QVector<double> spectrum(1920);
+            for (int j = 0; j < 1920; ++j) {
+                spectrum[j] = (j * 100.0) / 1920;
+            }
+
+            QElapsedTimer timer;
+            timer.start();
+            widget.setSpectrumData(spectrum);
+            timings.append(timer.elapsed());
+
+            QVERIFY2(widget.hasData(), "Widget should have data after setSpectrumData");
+            QVERIFY2(widget.dataWidth() == 1920, "Data width should be 1920");
+        }
+
+        printStats("SpectrumViewWidget::setSpectrumData 1920 points", timings);
+    }
+
+    void test_spectrumviewwidget_setSpectrumData_6000()
+    {
+        const int runs = 10;
+        QList<qint64> timings;
+
+        for (int i = 0; i < runs; ++i) {
+            SpectrumViewWidget widget;
+            widget.resize(800, 600);
+
+            QVector<double> spectrum(6000);
+            for (int j = 0; j < 6000; ++j) {
+                spectrum[j] = (j * 100.0) / 6000;
+            }
+
+            QElapsedTimer timer;
+            timer.start();
+            widget.setSpectrumData(spectrum);
+            timings.append(timer.elapsed());
+
+            QVERIFY2(widget.hasData(), "Widget should have data after setSpectrumData");
+            QVERIFY2(widget.dataWidth() == 6000, "Data width should be 6000");
+        }
+
+        printStats("SpectrumViewWidget::setSpectrumData 6000 points", timings);
+    }
+
     void test_imageviewwidget_repeated_sets()
     {
         const int runs = 10;
