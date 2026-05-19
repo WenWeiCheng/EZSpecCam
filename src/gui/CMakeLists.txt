@@ -1,6 +1,6 @@
 # GUI application
 find_package(OpenMP REQUIRED)
-qt_add_executable(ezspeccam_gui)
+qt_add_executable(ezspeccam_gui WIN32)
 
 target_link_libraries(ezspeccam_gui PRIVATE
     ezspeccam_core
