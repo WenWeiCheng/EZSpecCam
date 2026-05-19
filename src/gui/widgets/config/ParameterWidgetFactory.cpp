@@ -9,6 +9,8 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QWheelEvent>
+#include <QtWidgets>
+#include <qslider.h>
 
 namespace {
 class WheelBlocker : public QObject
@@ -286,6 +288,20 @@ void ParameterWidgetFactory::setWidgetValue(QWidget *widget, const QVariant &val
         QSpinBox *spinBox = qobject_cast<QSpinBox *>(widget);
         if (spinBox) {
             spinBox->setValue(value.toInt());
+        }
+        QSlider *slider = qobject_cast<QSlider *>(widget);
+        if(slider) {
+            slider->setValue(value.toInt());
+            return;
+        }
+        QHBoxLayout *layout = qobject_cast<QHBoxLayout *>(widget->layout());
+        if(layout) {
+            for(int i=0; i<layout->count(); ++i){
+                QWidget *itemWidget = layout->itemAt(i)->widget();
+                if(itemWidget){
+                    setWidgetValue(itemWidget, value, type);
+                }
+            }
         }
         break;
     }
