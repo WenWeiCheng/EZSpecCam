@@ -1001,7 +1001,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
             return;
         }
         
-        param.defaultValue = qBound(param.constraint.minValue, 16.0, param.constraint.maxValue);
+        param.defaultValue = minTraffic;
         param.order = 1.0f;
         m_parameterDefinitions.insert("usb_traffic", param);
         m_parameters.insert("usb_traffic", param.defaultValue.toInt());
@@ -1082,7 +1082,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
             return;
         }
         
-        param.defaultValue = qBound(param.constraint.minValue, -10.0, param.constraint.maxValue);
+        param.defaultValue = minTemp;
         param.order = 11.0f;
         m_parameterDefinitions.insert("target_temperature", param);
         m_parameters.insert("target_temperature", param.defaultValue);
