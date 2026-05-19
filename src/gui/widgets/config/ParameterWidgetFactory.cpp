@@ -33,7 +33,7 @@ void installWheelBlocker(QWidget *widget)
     if (!widget) {
         return;
     }
-    WheelBlocker *blocker = new WheelBlocker();
+    WheelBlocker *blocker = new WheelBlocker(widget);
     widget->installEventFilter(blocker);
     for (auto child : widget->findChildren<QWidget*>()) {
         child->installEventFilter(blocker);
