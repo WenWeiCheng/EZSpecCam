@@ -1235,13 +1235,13 @@ void QHYCCDDriver::captureLoop()
             QImage image = convertBufferToImage(width, height, bpp, channels);
 
             quint64 timestamp = QDateTime::currentMSecsSinceEpoch() * 1000000; // us since epoch
-            int frameNum = m_framesAcquired.fetch_add(1);
+            int frameNum = m_framesAcquired.fetch_add(1) + 1;
 
             emit frameReady(QSharedPointer<QImage>::create(image), timestamp, frameNum, m_connectedCameraId, m_parameters);
 
             // Check if we reached the capture count
             int count = m_captureCount.load();
-            if (count > 0 && frameNum >= count - 1) {
+            if (count > 0 && frameNum >= count) {
                 break;
             }
         }

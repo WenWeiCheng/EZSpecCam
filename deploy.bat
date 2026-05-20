@@ -63,10 +63,12 @@ echo Copying camera driver plugins...
 if exist "%BUILD_DIR%\lib\Release\qhyccd_camera_driver.dll" (
     copy /Y "%BUILD_DIR%\lib\Release\qhyccd_camera_driver.dll" "%DEPLOY_DIR%\plugins\drivers\"
     copy /Y "%BUILD_DIR%\lib\Release\mock_camera_driver.dll" "%DEPLOY_DIR%\plugins\drivers\"
+    copy /Y "%BUILD_DIR%\lib\Release\hamamatsu_camera_driver.dll" "%DEPLOY_DIR%\plugins\drivers\"
 ) else (
     if exist "%BUILD_DIR%\lib\Debug\qhyccd_camera_driver.dll" (
         copy /Y "%BUILD_DIR%\lib\Debug\qhyccd_camera_driver.dll" "%DEPLOY_DIR%\plugins\drivers\"
         copy /Y "%BUILD_DIR%\lib\Debug\mock_camera_driver.dll" "%DEPLOY_DIR%\plugins\drivers\"
+        copy /Y "%BUILD_DIR%\lib\Debug\hamamatsu_camera_driver.dll" "%DEPLOY_DIR%\plugins\drivers\"
     )
 )
 

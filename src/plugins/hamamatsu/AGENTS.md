@@ -147,8 +147,6 @@ Only these 12 properties are excluded:
 | `DCAMPROP_TYPE_MODE` | `StringCollection` | Has valuetext (use text labels) |
 | `DCAMPROP_TYPE_MODE` | `IntCollection` | No valuetext (fallback) |
 
-For **Info category** (per requirement): all properties use `String` or `StringCollection` type regardless of DCAM type.
-
 ### Implementation Notes
 
 1. **MODE → StringCollection**: When a MODE property has valuetext (e.g., TRIGGER SOURCE has "INTERNAL"/"EXTERNAL"), store the text strings in `constraint.validValues` and use `StringCollection` type.
