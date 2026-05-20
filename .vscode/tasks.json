@@ -28,6 +28,15 @@
             "detail": "Run the tests"
         },
         {
+            "label": "Deploy",
+            "type": "shell",
+            "command": "${workspaceFolder}\\deploy.bat",
+            "problemMatcher": [],
+            "dependsOn": [],
+            "group": "test",
+            "detail": "Run the tests"
+        },
+        {
             "label": "Test QHYCCDDriver",
             "type": "shell",
             "command": [
