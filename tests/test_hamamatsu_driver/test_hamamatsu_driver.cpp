@@ -267,6 +267,8 @@ private slots:
         verifyParamReadWrite(name, ParameterType::FloatRange);
         ParameterDefinition def = m_driver->parameter(name);
 
+        qDebug() << "parameter " << name << ": min(" << def.constraint.minValue << ") max(" << def.constraint.maxValue << ") " << "step(" << def.constraint.step << ")";
+
         // Set min
         bool ok = m_driver->setParameter(name, def.constraint.minValue);
         QVERIFY2(ok,
@@ -691,8 +693,9 @@ private slots:
 
         // Set a reasonable exposure
         if (m_params.contains("exposure")) {
-            m_driver->setParameter("exposure", 100.0);  // 100ms
-            m_driver->commitParameters();
+            bool suc = m_driver->setParameter("exposure", 100000.0);  // 100ms
+            suc &= m_driver->commitParameters();
+            QVERIFY2(suc, "Setting exposure should succeed");
         }
 
         bool started = m_driver->startCapture(1);
@@ -750,7 +753,7 @@ private slots:
 
         // Set a short exposure for live capture
         if (m_params.contains("exposure")) {
-            m_driver->setParameter("exposure", 50.0);  // 50ms
+            m_driver->setParameter("exposure", 50000.0);  // 50ms
             m_driver->commitParameters();
         }
 
@@ -801,7 +804,7 @@ private slots:
 
         // Set a short exposure for burst capture
         if (m_params.contains("exposure")) {
-            m_driver->setParameter("exposure", 50.0);  // 50ms
+            m_driver->setParameter("exposure", 50000.0);  // 50ms
             m_driver->commitParameters();
         }
 

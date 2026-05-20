@@ -213,11 +213,14 @@ struct ParameterDefinition
     bool isDynamic = false;            // True if parameter can be changed with other params, environment, time changing
     bool isExtrinsic = false;          // True if parameter change with environment or time changing, but cannot be changed by user directly
     bool needReconnect = false;        // True if parameter change need to reconnect
-    float order = 0.0f;
+    float order = 10000000.0f;         // Order of parameter in GUI, lower number means higher priority
 
     bool isValid() const {
-        if (name.isEmpty() || !constraint.isValid()) return false;
-        return validate(defaultValue, constraint, type);
+        if (name.isEmpty() || (isReadOnly != true && !constraint.isValid())) return false;
+        if(category != ParameterCategory::Info){
+            return validate(defaultValue, constraint, type);
+        }
+        return true;
     }
 
     bool operator==(const ParameterDefinition &other) const

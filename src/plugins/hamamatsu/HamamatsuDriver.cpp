@@ -1,9 +1,11 @@
 #include "HamamatsuDriver.h"
+#include "CameraTypes.h"
 #include "gui/DebugMacros.h"
 
 #include <QDateTime>
 #include <QDebug>
 #include <cstring>
+#include <qobject.h>
 #include <qthread.h>
 #include <qtmetamacros.h>
 #include <qtypes.h>
@@ -23,6 +25,7 @@ Q_LOGGING_CATEGORY(driverCategory, "Driver")
 std::atomic<bool> HamamatsuDriver::s_sdkInitialized{false};
 int HamamatsuDriver::s_sdkRefCount = 0;
 const char *const HamamatsuDriver::s_driverVersion = "1.0.0";
+static DCAMAPI_INIT s_apiinit;
 
 //==============================================================================
 // DCAM Property Name → ICameraDriver Parameter Name Mapping
@@ -158,11 +161,10 @@ bool HamamatsuDriver::initSdk()
         return true;
     }
 
-    DCAMAPI_INIT apiinit;
-    std::memset(&apiinit, 0, sizeof(apiinit));
-    apiinit.size = sizeof(apiinit);
+    std::memset(&s_apiinit, 0, sizeof(s_apiinit));
+    s_apiinit.size = sizeof(s_apiinit);
 
-    DCAMERR err = dcamapi_init(&apiinit);
+    DCAMERR err = dcamapi_init(&s_apiinit);
     if (dcamFailed(err)) {
         DRIVER_DEBUG << "dcamapi_init failed:" << err;
         return false;
@@ -170,7 +172,7 @@ bool HamamatsuDriver::initSdk()
 
     s_sdkInitialized.store(true);
     s_sdkRefCount = 1;
-    DRIVER_DEBUG << "DCAMSDK4 initialized, devices found:" << apiinit.iDeviceCount;
+    DRIVER_DEBUG << "DCAMSDK4 initialized, devices found:" << s_apiinit.iDeviceCount;
     return true;
 }
 
@@ -201,18 +203,8 @@ QStringList HamamatsuDriver::enumerate()
         }
     }
 
-    DCAMAPI_INIT apiinit;
-    std::memset(&apiinit, 0, sizeof(apiinit));
-    apiinit.size = sizeof(apiinit);
-
-    DCAMERR err = dcamapi_init(&apiinit);
-    if (dcamFailed(err)) {
-        DRIVER_DEBUG << "dcamapi_init enumerate failed:" << err;
-        return QStringList();
-    }
-
     QStringList cameras;
-    int32 nDevice = apiinit.iDeviceCount;
+    int32 nDevice = s_apiinit.iDeviceCount;
     for (int32 i = 0; i < nDevice; i++) {
         QString desc = buildCameraIdString(i);
         if (!desc.isEmpty()) {
@@ -220,7 +212,6 @@ QStringList HamamatsuDriver::enumerate()
         }
     }
 
-    dcamapi_uninit();
     return cameras;
 }
 
@@ -274,16 +265,11 @@ QString HamamatsuDriver::buildCameraIdString(int deviceIndex) const
 
 int HamamatsuDriver::deviceIndexFromId(const QString &cameraId) const
 {
-    DCAMAPI_INIT apiinit;
-    std::memset(&apiinit, 0, sizeof(apiinit));
-    apiinit.size = sizeof(apiinit);
-
-    DCAMERR err = dcamapi_init(&apiinit);
-    if (dcamFailed(err)) {
+    if(!s_sdkInitialized.load()){
         return -1;
     }
 
-    int32 nDevice = apiinit.iDeviceCount;
+    int32 nDevice = s_apiinit.iDeviceCount;
     int foundIndex = -1;
 
     for (int32 i = 0; i < nDevice; i++) {
@@ -294,7 +280,6 @@ int HamamatsuDriver::deviceIndexFromId(const QString &cameraId) const
         }
     }
 
-    dcamapi_uninit();
     return foundIndex;
 }
 
@@ -584,37 +569,22 @@ bool HamamatsuDriver::commitParameters()
             dcamValue = static_cast<double>(value.toInt());
             break;
         case ParameterType::StringCollection: {
-            // For StringCollection, we need to map the text back to a numeric value
-            // Try each valid value and compare text
-            char text[64] = {0};
-            QString targetText = value.toString();
-            bool found = false;
-
-            for (const QVariant &validVal : def.constraint.validValues) {
-                DCAMPROP_VALUETEXT pvt;
-                std::memset(&pvt, 0, sizeof(pvt));
-                pvt.cbSize = sizeof(pvt);
-                pvt.iProp = iProp;
-                pvt.value = validVal.toDouble();
-                pvt.text = text;
-                pvt.textbytes = sizeof(text);
-
-                DCAMERR err = dcamprop_getvaluetext(m_hdcam, &pvt);
-                if (!dcamFailed(err) && targetText == QString::fromLatin1(text)) {
-                    dcamValue = validVal.toDouble();
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found) {
-                // Fallback: try direct numeric conversion
-                dcamValue = value.toDouble();
+            QString key = def.displayName + "::" + value.toString();
+            auto it = m_stringCollectionValueMap.find(key);
+            if (it != m_stringCollectionValueMap.end()) {
+                dcamValue = it.value();
+            } else {
+                qCWarning(parameterCategory) << "StringCollection value not found in cache:" << key;
+                return false;
             }
             break;
         }
         default:
             continue;
+        }
+        
+        if(name == "exposure"){
+            dcamValue /= 1000000.0;
         }
 
         if (!setDcamPropertyValue(iProp, dcamValue)) {
@@ -757,24 +727,24 @@ void HamamatsuDriver::onCaptureLoop()
             continue;
         }
 
-        int captured = m_framesCaptured.fetch_add(1) + 1;
-        int target = m_captureCountTarget.load();
-        if (target > 0 && captured >= target) {
-            m_capturing.store(false);
-        }
-
         QSharedPointer<QImage> image = convertFrameToImage(bufframe);
 
-        quint64 timestamp = static_cast<quint64>(bufframe.timestamp.sec) * 1000000ULL
-                          + static_cast<quint64>(bufframe.timestamp.microsec);
+        quint64 timestamp = QDateTime::currentMSecsSinceEpoch() * 1000000; // us since epoch
+        int frameNum = m_framesCaptured.fetch_add(1) + 1;
 
         QVariantMap params;
         for (auto it = m_parameters.constBegin(); it != m_parameters.constEnd(); ++it) {
             params.insert(it.key(), it.value());
         }
 
-        emit frameReady(image, timestamp, bufframe.framestamp,
+        emit frameReady(image, timestamp, frameNum,
                         m_connectedCameraId, params);
+
+        // Check if we reached the capture count
+        int count = m_captureCountTarget.load();
+        if (count > 0 && frameNum >= count) {
+            break;
+        }
     }
 
     QMetaObject::invokeMethod(this, "onCaptureCompleted", Qt::QueuedConnection);
@@ -865,6 +835,7 @@ void HamamatsuDriver::enumerateProperties()
             def.type = ParameterType::String;
             def.isReadOnly = true;
             def.constraint = ParameterConstraint();
+            def.defaultValue = QString::fromLatin1(text);
             m_parameterDefinitions.insert(def.name, def);
             m_parameters.insert(def.name, QString::fromLatin1(text));
         }
@@ -918,45 +889,7 @@ void HamamatsuDriver::enumerateProperties()
         if (def.isValid()) {
             m_parameterDefinitions.insert(def.name, def);
             m_propertyIds.insert(def.name, iProp);
-
-            // Read current value
-            double currentValue = 0;
-            if (getDcamPropertyValue(iProp, currentValue)) {
-                // Convert to appropriate type for storage
-                switch (def.type) {
-                case ParameterType::FloatRange:
-                case ParameterType::FloatCollection:
-                    m_parameters.insert(def.name, currentValue);
-                    break;
-                case ParameterType::IntRange:
-                case ParameterType::IntCollection:
-                    m_parameters.insert(def.name, static_cast<int>(currentValue));
-                    break;
-                case ParameterType::StringCollection:
-                case ParameterType::String: {
-                    // Try to get text label
-                    char text[64] = {0};
-                    DCAMPROP_VALUETEXT pvt;
-                    std::memset(&pvt, 0, sizeof(pvt));
-                    pvt.cbSize = sizeof(pvt);
-                    pvt.iProp = iProp;
-                    pvt.value = currentValue;
-                    pvt.text = text;
-                    pvt.textbytes = sizeof(text);
-
-                    DCAMERR vtErr = dcamprop_getvaluetext(m_hdcam, &pvt);
-                    if (!dcamFailed(vtErr)) {
-                        m_parameters.insert(def.name, QString::fromLatin1(text));
-                    } else {
-                        m_parameters.insert(def.name, currentValue);
-                    }
-                    break;
-                }
-                default:
-                    m_parameters.insert(def.name, currentValue);
-                    break;
-                }
-            }
+            m_parameters.insert(def.name, def.defaultValue);
         }
 
         // Next property
@@ -970,6 +903,7 @@ ParameterDefinition HamamatsuDriver::buildParameterDefinition(
     int32 iProp, const QString &propName, const DCAMPROP_ATTR &attr) const
 {
     ParameterDefinition def;
+    double value = 0;
 
     // Map DCAM property name to ICameraDriver parameter name
     QString paramName = mapPropertyName(propName);
@@ -979,7 +913,7 @@ ParameterDefinition HamamatsuDriver::buildParameterDefinition(
     }
 
     def.name = paramName;
-    def.displayName = paramName;
+    def.displayName = propName;
     def.category = categorizeProperty(propName, iProp);
 
     bool isWritable = (attr.attribute & DCAMPROP_ATTR_WRITABLE) != 0;
@@ -994,40 +928,62 @@ ParameterDefinition HamamatsuDriver::buildParameterDefinition(
     // Check for valuetext support
     bool hasValueText = (attr.attribute & DCAMPROP_ATTR_HASVALUETEXT) != 0;
 
+    // Set dynamic/extrinsic flags for volatile properties
+    if (isVolatile) {
+        if (paramName == "system_alive") {
+            def.isDynamic = true;
+            def.isExtrinsic = true;
+        } else if (paramName.startsWith("sensor_temperature") || paramName == "sensor_cooler_status") {
+            def.isDynamic = true;
+            def.isExtrinsic = true;
+        }
+    }
+
     if (def.category == ParameterCategory::Info) {
         if (dcamType == DCAMPROP_TYPE_MODE && hasValueText) {
             def.type = ParameterType::StringCollection;
             def.isReadOnly = true;
 
             // Enumerate mode values
-            if (hasValueText) {
-                double v = attr.valuemin;
-                do {
-                    char text[64] = {0};
-                    DCAMPROP_VALUETEXT pvt;
-                    std::memset(&pvt, 0, sizeof(pvt));
-                    pvt.cbSize = sizeof(pvt);
-                    pvt.iProp = iProp;
-                    pvt.value = v;
-                    pvt.text = text;
-                    pvt.textbytes = sizeof(text);
+            double v = attr.valuemin;
+            do {
+                char text[64] = {0};
+                DCAMPROP_VALUETEXT pvt;
+                std::memset(&pvt, 0, sizeof(pvt));
+                pvt.cbSize = sizeof(pvt);
+                pvt.iProp = iProp;
+                pvt.value = v;
+                pvt.text = text;
+                pvt.textbytes = sizeof(text);
 
-                    DCAMERR err = dcamprop_getvaluetext(m_hdcam, &pvt);
-                    if (!dcamFailed(err)) {
-                        def.constraint.validValues.append(QString::fromLatin1(text));
-                    }
+                DCAMERR err = dcamprop_getvaluetext(m_hdcam, &pvt);
+                if (!dcamFailed(err)) {
+                    QString valueText = QString::fromLatin1(text);
+                    def.constraint.validValues.append(valueText);
+                    m_stringCollectionValueMap[propName + "::" + valueText] = v;
+                }
 
-                    // Get next value
-                    err = dcamprop_queryvalue(m_hdcam, iProp, &v, DCAMPROP_OPTION_NEXT);
-                    if (dcamFailed(err)) break;
-                } while (true);
-            }
+                // Get next value
+                err = dcamprop_queryvalue(m_hdcam, iProp, &v, DCAMPROP_OPTION_NEXT);
+                if (dcamFailed(err)) break;
+            } while (true);
+            def.defaultValue = def.constraint.validValues.first();
         } else if (dcamType == DCAMPROP_TYPE_LONG) {
             def.type = ParameterType::IntRange;
             def.isReadOnly = true;
+            getDcamPropertyValue(iProp, value);
+            def.defaultValue = value;
+            def.constraint.minValue = attr.valuemin;
+            def.constraint.maxValue = attr.valuemax;
+            def.constraint.step = attr.valuestep;
         } else if (dcamType == DCAMPROP_TYPE_REAL) {
             def.type = ParameterType::FloatRange;
             def.isReadOnly = true;
+            getDcamPropertyValue(iProp, value);
+            def.defaultValue = value;
+            def.constraint.minValue = attr.valuemin;
+            def.constraint.maxValue = attr.valuemax;
+            def.constraint.step = attr.valuestep;
         }
 
         return def;
@@ -1052,78 +1008,45 @@ ParameterDefinition HamamatsuDriver::buildParameterDefinition(
 
                 DCAMERR err = dcamprop_getvaluetext(m_hdcam, &pvt);
                 if (!dcamFailed(err)) {
-                    def.constraint.validValues.append(QString::fromLatin1(text));
+                    QString valueText = QString::fromLatin1(text);
+                    def.constraint.validValues.append(valueText);
+                    m_stringCollectionValueMap[propName + "::" + valueText] = v;
                 }
 
                 err = dcamprop_queryvalue(m_hdcam, iProp, &v, DCAMPROP_OPTION_NEXT);
                 if (dcamFailed(err)) break;
             } while (true);
+            def.defaultValue = def.constraint.validValues.first();
         }
         break;
 
     case DCAMPROP_TYPE_LONG: {
-        bool hasRange = (attr.attribute & DCAMPROP_ATTR_HASRANGE) != 0;
-        bool hasStep = (attr.attribute & DCAMPROP_ATTR_HASSTEP) != 0;
-
-        if (hasValueText) {
-            // LONG with valuetext → IntCollection
-            def.type = ParameterType::IntCollection;
-            // Enumerate values via valuetext
-            double v = attr.valuemin;
-            do {
-                char text[64] = {0};
-                DCAMPROP_VALUETEXT pvt;
-                std::memset(&pvt, 0, sizeof(pvt));
-                pvt.cbSize = sizeof(pvt);
-                pvt.iProp = iProp;
-                pvt.value = v;
-                pvt.text = text;
-                pvt.textbytes = sizeof(text);
-
-                DCAMERR err = dcamprop_getvaluetext(m_hdcam, &pvt);
-                if (!dcamFailed(err)) {
-                    def.constraint.validValues.append(static_cast<int>(v));
-                }
-
-                err = dcamprop_queryvalue(m_hdcam, iProp, &v, DCAMPROP_OPTION_NEXT);
-                if (dcamFailed(err)) break;
-            } while (true);
-        } else {
-            // LONG without valuetext → IntRange
-            def.type = ParameterType::IntRange;
-            if (hasRange) {
-                def.constraint.minValue = attr.valuemin;
-                def.constraint.maxValue = attr.valuemax;
-            }
-            if (hasStep) {
-                def.constraint.step = attr.valuestep;
-            }
-        }
+        def.type = ParameterType::IntRange;
+        def.constraint.minValue = attr.valuemin;
+        def.constraint.maxValue = attr.valuemax;
+        def.constraint.step = attr.valuestep;
+        def.defaultValue = attr.valuemin;
         break;
     }
 
     case DCAMPROP_TYPE_REAL: {
-        bool hasRange = (attr.attribute & DCAMPROP_ATTR_HASRANGE) != 0;
-        bool hasStep = (attr.attribute & DCAMPROP_ATTR_HASSTEP) != 0;
-
-        // Check if this is READOUT FREQUENCY → use FloatCollection
-        if (paramName == "readout_frequency") {
+        def.type = ParameterType::FloatRange;
+        def.constraint.minValue = attr.valuemin;
+        def.constraint.maxValue = attr.valuemax;
+        def.constraint.step = attr.valuestep;
+        def.defaultValue = attr.valuemin;
+        if(propName == "READOUT FREQUECY"){
             def.type = ParameterType::FloatCollection;
-            // Generate discrete values from min/max/step
-            if (hasRange && hasStep && attr.valuestep > 0) {
-                for (double v = attr.valuemin; v <= attr.valuemax + (attr.valuestep * 0.5); v += attr.valuestep) {
-                    def.constraint.validValues.append(v);
-                }
+            for(int i=attr.valuemin;i<=attr.valuemax;i+=attr.valuestep){
+                def.constraint.validValues.append(i);
             }
-        } else {
-            def.type = ParameterType::FloatRange;
-            if (hasRange) {
-                def.constraint.minValue = attr.valuemin;
-                def.constraint.maxValue = attr.valuemax;
-            }
-            if (hasStep) {
-                def.constraint.step = attr.valuestep;
-            }
+        }
+        if(propName == "EXPOSURE TIME"){
+            def.constraint.unit = {"us", "ms", "s"};
+            def.constraint.unitRange = {1000.0, 1000000.0};
+            def.constraint.minValue = attr.valuemin * 1000000.0;
+            def.constraint.maxValue = attr.valuemax * 1000000.0;
+            def.constraint.step = attr.valuestep * 1000000.0;
         }
         break;
     }
@@ -1133,23 +1056,15 @@ ParameterDefinition HamamatsuDriver::buildParameterDefinition(
         return def;
     }
 
-    // Set dynamic/extrinsic flags for volatile properties
-    if (isVolatile) {
-        if (paramName == "system_alive") {
-            def.isDynamic = true;
-            def.isExtrinsic = true;
-        } else if (paramName.startsWith("sensor_temperature") || paramName == "sensor_cooler_status") {
-            def.isDynamic = true;
-            def.isExtrinsic = true;
-        }
-    }
-
     // Set default value
     if (attr.attribute & DCAMPROP_ATTR_HASDEFAULT) {
         switch (def.type) {
         case ParameterType::FloatRange:
         case ParameterType::FloatCollection:
             def.defaultValue = attr.valuedefault;
+            if(propName == "EXPOSURE TIME"){
+                def.defaultValue = attr.valuedefault * 1000000.0;
+            }
             break;
         case ParameterType::IntRange:
         case ParameterType::IntCollection:
@@ -1178,6 +1093,14 @@ ParameterDefinition HamamatsuDriver::buildParameterDefinition(
             def.defaultValue = attr.valuedefault;
             break;
         }
+    }
+    
+    // set order
+    if(paramName == "exposure"){
+        def.order = 1.0;
+    }
+    else if(paramName == "contrast_gain"){
+        def.order = 2.0;
     }
 
     return def;

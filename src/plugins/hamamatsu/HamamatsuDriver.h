@@ -22,6 +22,7 @@
 #include <QVariantMap>
 #include <atomic>
 #include <cstdint>
+#include <qobject.h>
 #include <vector>
 
 // DCAMSDK4 headers
@@ -326,6 +327,7 @@ private:
     QMap<QString, QVariant> m_pendingParameters;
     QMap<QString, int32> m_propertyIds;
     QMap<int32, QString> m_dcamPropNames;
+    mutable QMap<QString, double> m_stringCollectionValueMap;  // Maps "propName::textValue" -> numeric value
 
     // Capture state
     QThread *m_captureThread = nullptr;
