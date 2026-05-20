@@ -34,6 +34,7 @@ plugins/
 - `.json` descriptor file required for `Q_PLUGIN_METADATA`
 - Signal-based: `frameReady()`, `connectionChanged()`, `errorOccurred()`, `captureStarted()`, `captureStopped()`
 - Each driver should implement `ICameraDriver`, but each plugin driver can have it's own parameters defined in `initializeParameterDefinitions()`.
+- Define a slot named `onCaptureCompleted` to trigger `stopCapture()`. Use `QMetaObject::invokeMethod()` to call it when `onCaptureLoop()` completes. `stopCapture()` can not use `QMetaObject::invokeMethod()` to be invoked because it's a slot.
 
 ## ANTI-PATTERNS
 - **DO NOT** have the same plugin `.json` descriptor name as another plugin — `QPluginLoader` resolves by name

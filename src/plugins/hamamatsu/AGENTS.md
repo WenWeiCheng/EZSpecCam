@@ -148,17 +148,13 @@ Only these 12 properties are excluded:
 | `DCAMPROP_TYPE_MODE` | `StringCollection` | Has valuetext (use text labels) |
 | `DCAMPROP_TYPE_MODE` | `IntCollection` | No valuetext (fallback) |
 
-For **Info category** (per requirement): all properties use `String` or `StringCollection` type regardless of DCAM type.
-
 ### Implementation Notes
 
 1. **MODE → StringCollection**: When a MODE property has valuetext (e.g., TRIGGER SOURCE has "INTERNAL"/"EXTERNAL"), store the text strings in `constraint.validValues` and use `StringCollection` type.
 
 2. **Dynamic Discovery**: Properties should be discovered at runtime via `dcam_getnextpropertyid()`, not hardcoded. Use the exclusion list above to filter.
 
-3. **Info Type Rules**: Per requirement, all Info category parameters must use String value type.
-
-4. **C16091 Limitations**:
+3. **C16091 Limitations**:
    - No pixel binning support (BINNING fixed at 1x1)
    - No vertical dimension control (VPOS/VSIZE not applicable for 1D sensor)
    - Only INTERNAL and EXTERNAL trigger sources supported
