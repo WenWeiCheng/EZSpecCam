@@ -36,6 +36,8 @@ Run the application:
 ./build/gui/EZSpecCam.exe
 ```
 
+> Ensure Visual C++ v14 Redistributable and camera drivers are installed.
+
 ## Architecture
 
 ```
@@ -62,11 +64,11 @@ Each camera driver is a Qt plugin implementing `ICameraDriver`. Drivers are load
 
 ## Supported Cameras
 
-| Driver | Type | Notes |
-|--------|------|-------|
-| Mock | Simulated | For development and testing |
-| QHYCCD | Hardware | Real QHY camera support |
-| Hamamatsu | Hardware | Hamamatsu camera support |
+| Driver | Type | Notes | Drivers |
+|--------|------|-------|-------|
+| Mock | Simulated | For development and testing | None |
+| QHYCCD | Hardware | Real QHY camera support | [download](https://www.qhyccd.cn/download/) |
+| Hamamatsu | Hardware | Hamamatsu camera support | [download](https://www.hamamatsu.com/jp/en/product/cameras/software/driver-software.html) |
 
 ## Building
 
