@@ -1184,4 +1184,4 @@ private:
 };
 
 QTEST_MAIN(TestQHYCCDDriver)
-#include "test_qhyccd_driver.moc"
+#include "test_qhyccd_driver_QHY268m.moc"

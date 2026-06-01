@@ -848,4 +848,4 @@ private slots:
 };
 
 QTEST_MAIN(TestHamamatsuDriver)
-#include "test_hamamatsu_driver.moc"
+#include "test_hamamatsu_driver_C16091-10.moc"
