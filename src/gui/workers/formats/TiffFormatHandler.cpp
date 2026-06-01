@@ -98,14 +98,6 @@ bool TiffFormatHandler::saveMetadataJson(const QString &imgPath, const SaveReque
     }
     root["parameters"] = paramsObj;
 
-    if (!frame.config.isEmpty()) {
-        QJsonObject configObj;
-        for (auto it = frame.config.constBegin(); it != frame.config.constEnd(); ++it) {
-            configObj[it.key()] = QJsonValue::fromVariant(it.value());
-        }
-        root["config"] = configObj;
-    }
-
     QFile file(metadataPath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         return false;

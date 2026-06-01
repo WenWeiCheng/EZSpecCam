@@ -11,7 +11,7 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 ```
 ./
 ├── src/
-│   ├── core/           # Camera driver interface + types (static lib)
+│   ├── core/           # Camera driver interface + types → see src/core/ICameraDriver.md
 │   ├── gui/            # Qt GUI app → see src/gui/AGENTS.md
 │   ├── cli/            # CLI app (QCoreApplication)
 │   └── plugins/        # Camera driver plugins → see src/plugins/AGENTS.md
@@ -22,8 +22,8 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 ## WHERE TO LOOK
 | Task | Location | Notes |
 |------|----------|-------|
-| Camera driver interface | `src/core/ICameraDriver.h` | ~10 pure virtual methods; Q_DECLARE_INTERFACE |
-| Core data types | `src/core/CameraTypes.h` | ROIs, binning, params, errors, enums |
+| Camera driver interface | `src/core/ICameraDriver.h` | ~15 pure virtual methods + 5 signals; Q_DECLARE_INTERFACE → see `src/core/ICameraDriver.md` |
+| Core data types | `src/core/CameraTypes.h` | ROIs, binning, params, errors, enums → see `src/core/CameraTypes.md` |
 | App controller (GUI) | `src/gui/AppController.h` | Merged CameraManager + PluginManager |
 | MainWindow | `src/gui/widgets/MainWindow.h` | QMainWindow with toolbar, menus, signals |
 | CLI entry point | `src/cli/main.cpp` | QCoreApplication, CommandLineParser |
@@ -33,7 +33,7 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 ## CODE MAP
 | Symbol | Type | Location | Role |
 |--------|------|----------|------|
-| `ICameraDriver` | Interface | `src/core/ICameraDriver.h` | Contract for all camera drivers |
+| `ICameraDriver` | Interface | `src/core/ICameraDriver.h` | Contract for all camera drivers → detailed docs at `src/core/ICameraDriver.md` |
 | `AppController` | Class | `src/gui/AppController.h` | GUI state machine (Disconnected→Connecting→Connected→Acquiring→Error) |
 | `MainWindow` | Class | `src/gui/widgets/MainWindow.h` | Main Qt window; owns all widgets |
 | `MainWindowUi` | Class | `src/gui/ui/MainWindowUi.h` | Separated UI setup (toolbar, menus, docks) |

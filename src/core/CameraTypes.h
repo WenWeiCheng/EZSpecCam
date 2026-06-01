@@ -12,15 +12,10 @@
 #include <QImage>
 #include <QVector>
 #include <QVariant>
-#include <QJsonObject>
-
 //==============================================================================
 // Forward Declarations
 //==============================================================================
 
-struct ROI;
-struct PixelBinning;
-struct VerticalBinning;
 struct ParameterConstraint;
 struct ParameterDefinition;
 struct ImageData;
@@ -62,70 +57,6 @@ enum class ParameterCategory {
     Info,     ///< Read-only informational parameters
     Advanced, ///< Advanced/hidden parameters
     Debug     ///< Debug parameters
-};
-
-//==============================================================================
-// Parameter System Types
-//==============================================================================
-// Basic Types
-//==============================================================================
-
-/**
- * @brief Region of Interest (ROI) configuration for selective image capture
- *
- * Defines a rectangular sub-region of the sensor to use for acquisition.
- * Origin (0, 0) is at the top-left corner. Coordinates are in pixels.
- *
- * @note Drivers should validate ROI bounds in setConfig()
- */
-struct ROI
-{
-    int x = 0;
-    int y = 0;
-    int width = 0;
-    int height = 0;
-
-    bool isValid() const { return width > 0 && height > 0; }
-
-    bool operator==(const ROI &other) const
-    {
-        return x == other.x && y == other.y &&
-               width == other.width && height == other.height;
-    }
-
-    bool operator!=(const ROI &other) const { return !(*this == other); }
-};
-
-/**
- * @brief Pixel binning configuration for combining adjacent pixels
- *
- * Hardware pixel binning combines adjacent pixels during readout to improve
- * signal-to-noise ratio at the cost of reduced resolution.
- *
- * Supported factors: 1, 2, 4, 8
- */
-struct PixelBinning
-{
-    int factor = 1;
-
-    bool isValid() const { return factor == 1 || factor == 2 || factor == 4 || factor == 8; }
-
-    bool operator==(const PixelBinning &other) const { return factor == other.factor; }
-    bool operator!=(const PixelBinning &other) const { return !(*this == other); }
-};
-
-/**
- * @brief Vertical binning for 1D spectral output
- *
- * Sums all pixel values along the vertical axis within the ROI,
- * converting a 2D image into a 1D spectrum.
- */
-struct VerticalBinning
-{
-    bool enabled = false;
-
-    bool operator==(const VerticalBinning &other) const { return enabled == other.enabled; }
-    bool operator!=(const VerticalBinning &other) const { return !(*this == other); }
 };
 
 //==============================================================================
@@ -461,70 +392,9 @@ struct ImageData
     int frameNumber = 0;
     QString cameraId;
     QVariantMap parameters;
-    QVariantMap config;
 
     bool isValid() const { return !image.isNull() && timestamp > 0; }
     bool hasOriginal() const { return !originalImage.isNull(); }
-};
-
-/**
- * @brief Metadata associated with a captured frame
- */
-struct FrameMetadata
-{
-    QString cameraId;
-    double exposure = 0.0;
-    double gain = 0.0;
-    ROI roi;
-    double temperature = 0.0;
-    quint64 timestamp = 0;
-    int frameNumber = 0;
-    QString softwareVersion;
-
-    QJsonObject toJson() const;
-};
-
-//==============================================================================
-// Configuration and Capabilities
-//==============================================================================
-
-struct CoolingConfig {
-    bool enabled = false;
-    double targetTemperature = -10.0;
-};
-
-/**
- * @brief Camera configuration for acquisition settings
- */
-struct CameraConfig {
-    QString mode;
-    double exposure = 100.0;
-    double gain = 0.0;
-    double offset = 0.0;
-    int burstFrameCount = 1;
-    ROI roi;
-    PixelBinning pixelBinning;
-    VerticalBinning verticalBinning;
-    CoolingConfig cooling;
-};
-
-/**
- * @brief Camera hardware capabilities and limits
- */
-struct CameraCapabilities {
-    int maxWidth = 2048;
-    int maxHeight = 2048;
-    int bitDepth = 16;
-    double minExposure = 1.0;
-    double maxExposure = 1000.0;
-    double exposureStep = 1.0;
-    bool hardwareSupportsROI = true;
-    bool hardwareSupportsPixelBinning = true;
-    bool hardwareSupportsVerticalBinning = true;
-    bool hardwareSupportedLiveMode = true;
-    QVector<int> hardwareSupportedPixelBinningFactors;
-
-    CameraCapabilities() : hardwareSupportedPixelBinningFactors({1, 2, 4, 8}) {}
 };
 
 //==============================================================================
@@ -539,28 +409,3 @@ Q_DECLARE_METATYPE(CameraError)
 Q_DECLARE_METATYPE(CameraError::Code)
 Q_DECLARE_METATYPE(CameraError::Severity)
 Q_DECLARE_METATYPE(CameraState)
-
-//==============================================================================
-// Inline Method Implementations
-//==============================================================================
-
-inline QJsonObject FrameMetadata::toJson() const
-{
-    QJsonObject obj;
-    obj["cameraId"] = cameraId;
-    obj["exposure"] = exposure;
-    obj["gain"] = gain;
-    obj["temperature"] = temperature;
-    obj["timestamp"] = static_cast<qint64>(timestamp);
-    obj["frameNumber"] = frameNumber;
-    obj["softwareVersion"] = softwareVersion;
-
-    QJsonObject roiObj;
-    roiObj["x"] = roi.x;
-    roiObj["y"] = roi.y;
-    roiObj["width"] = roi.width;
-    roiObj["height"] = roi.height;
-    obj["roi"] = roiObj;
-
-    return obj;
-}
