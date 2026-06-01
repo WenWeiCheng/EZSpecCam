@@ -26,6 +26,11 @@ option(EZSPECCAM_BUILD_TESTS "Build test executables" ON)
 option(EZSPECCAM_BUILD_GUI "Build GUI application" ON)
 option(EZSPECCAM_BUILD_CLI "Build CLI application" ON)
 option(EZSPECCAM_BUILD_PLUGINS "Build plugins" ON)
+option(EZSPECCAM_BUILD_PLUGIN_PICAM "Build PICam camera driver plugin (requires PICAM_SDK_ROOT for live mode)" ON)
+
+# External SDK paths — set by installer environment variables.
+# Override with -D<VAR>=<path> if needed.
+set(PICAM_SDK_ROOT "" CACHE PATH "Override for \$ENV{PicamRoot}")
 
 # ===========================================
 # Find Qt Components

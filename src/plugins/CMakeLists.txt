@@ -2,3 +2,4 @@
 add_subdirectory(mock)
 add_subdirectory(qhyccd)
 add_subdirectory(hamamatsu)
+add_subdirectory(picam)
