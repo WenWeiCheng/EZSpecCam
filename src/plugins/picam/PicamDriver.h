@@ -19,6 +19,7 @@
 #include <QRecursiveMutex>
 #include <QMap>
 #include <QVariantMap>
+#include <QThread>
 #include <atomic>
 #include <cstdint>
 
@@ -99,6 +100,8 @@ private:
      */
     ParameterDefinition buildParameterDefinition(PicamParameter param);
 
+    void initializeRoisSubParameters();
+
     /**
      * @brief Categorize a Picam parameter into a ParameterCategory
      * @param param Picam parameter enum
@@ -119,6 +122,8 @@ private:
      * @return PicamValueType enum
      */
     PicamValueType getValueType(const QString &name) const;
+
+    ParameterType mapValueType(PicamValueType vt) const;
 
     /**
      * @brief Sync all current parameter values from hardware
@@ -157,6 +162,11 @@ private:
      */
     void assembleRois(PicamRois &rois) const;
 
+    void onCaptureLoop();
+    void processFrame(const PicamAvailableData& data);
+    PicamError setEnumeratedParameter(PicamParameter param, const QString &value);
+    QString mapParameterNameReverse(PicamParameter param) const;
+
     // ——— SDK Lifecycle ———
 
     static void initializeSDK();
@@ -189,13 +199,14 @@ private:
     QMap<QString, PicamValueType> m_paramTypeMap; // name → PicamValueType
 
     // ROI cache — composite PicamRois decomposed for sub-param access
-    PicamRoi m_cachedRoi;
-    bool m_roiDirty = false;
+    mutable PicamRoi m_cachedRoi;
+    mutable bool m_roiDirty = false;
 
     // Capture state
     std::atomic<bool> m_capturing{false};
     std::atomic<int> m_captureCountTarget{0};
     std::atomic<int> m_framesCaptured{0};
+    QThread* m_captureThread = nullptr;
 
     // SDK reference counting (static, shared across instances)
     static std::atomic<bool> s_sdkInitialized;

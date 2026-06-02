@@ -75,6 +75,12 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 ```
 > **Never use cmake to build directly without vcvars64.bat called. Otherwise the build will fail**. The best way to build is to use the provided build_preset.bat script or write a custom script in the same style as the provided build_preset.bat script.
 
+When executing certain test executable, you can't see the output in terminal, so you should output a txt file and read its content to see the test result. For example:
+
+```
+& "build\msvc-debug\bin\Debug\test_picam_driver_PIXIS100B.exe" -v2 -o test_output.txt 2>&1; Get-Content test_output.txt -Tail 100
+```
+
 ## NOTES
 - `qcustomplot.cpp` is 32k lines — largest file; read-only
 - Exiv2 for image metadata (optional, warns if missing)
