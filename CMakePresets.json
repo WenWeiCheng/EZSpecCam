@@ -22,7 +22,7 @@
                 "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDebugDLL",
                 "CMAKE_POLICY_VERSION_MINIMUM": "3.20",
                 "EZSPECCAM_BUILD_GUI": "ON",
-                "EZSPECCAM_BUILD_CLI": "OFF",
+                "EZSPECCAM_BUILD_CLI": "ON",
                 "EZSPECCAM_BUILD_PLUGINS": "ON",
                 "EZSPECCAM_BUILD_TESTS": "ON"
             }
@@ -43,7 +43,7 @@
                 "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDLL",
                 "CMAKE_POLICY_VERSION_MINIMUM": "3.20",
                 "EZSPECCAM_BUILD_GUI": "ON",
-                "EZSPECCAM_BUILD_CLI": "OFF",
+                "EZSPECCAM_BUILD_CLI": "ON",
                 "EZSPECCAM_BUILD_PLUGINS": "ON",
                 "EZSPECCAM_BUILD_TESTS": "ON"
             }
