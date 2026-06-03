@@ -123,6 +123,17 @@ void CameraConfigDialogUi::createButtonBox(QDialog *dialog)
     buttonBox->addButton(applyButton, QDialogButtonBox::ApplyRole);
     buttonBox->addButton(restoreButton, QDialogButtonBox::ActionRole);
 
+    // Disable auto-default on all buttons so that pressing Enter inside an
+    // input field (QSpinBox, QDoubleSpinBox, QLineEdit, ...) commits the
+    // value via editingFinished instead of activating the OK button and
+    // closing the dialog. Buttons are still activatable by mouse click or
+    // by Tab-focusing them and pressing Enter/Space.
+    okButton->setAutoDefault(false);
+    okButton->setDefault(false);
+    cancelButton->setAutoDefault(false);
+    applyButton->setAutoDefault(false);
+    restoreButton->setAutoDefault(false);
+
     CameraConfigDialog *configDialog = qobject_cast<CameraConfigDialog*>(dialog);
     if (configDialog) {
         connect(buttonBox, &QDialogButtonBox::accepted,

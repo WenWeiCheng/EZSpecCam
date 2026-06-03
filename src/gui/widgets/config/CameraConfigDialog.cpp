@@ -12,6 +12,11 @@
 #include <QMetaObject>
 #include <QObject>
 #include <QDebug>
+#include <QApplication>
+#include <QKeyEvent>
+#include <QLineEdit>
+#include <QAbstractSpinBox>
+#include <QWidget>
 #include <qcontainerfwd.h>
 #include <qvariant.h>
 
@@ -33,10 +38,14 @@ CameraConfigDialog::CameraConfigDialog(QWidget *parent)
     , ui(new CameraConfigDialogUi(this))
 {
     ui->setupUi(this);
+    qApp->installEventFilter(this);
 }
 
 CameraConfigDialog::~CameraConfigDialog()
 {
+    if (qApp) {
+        qApp->removeEventFilter(this);
+    }
 }
 
 void CameraConfigDialog::showEvent(QShowEvent *event)
@@ -207,4 +216,30 @@ void CameraConfigDialog::onCommitParametersFinished(bool success)
         m_acceptAfterCommit = false;
         accept();
     }
+}
+
+bool CameraConfigDialog::eventFilter(QObject *obj, QEvent *event)
+{
+    if (event->type() == QEvent::KeyPress) {
+        QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+        if (keyEvent->key() == Qt::Key_Enter || keyEvent->key() == Qt::Key_Return) {
+            // Only intercept Enter on input widgets that belong to this dialog
+            // (avoids swallowing Enter in sub-dialogs or sibling windows).
+            if (obj->isWidgetType()
+                && qobject_cast<QWidget *>(obj)->window() == this
+                && (qobject_cast<QLineEdit *>(obj) || qobject_cast<QAbstractSpinBox *>(obj))) {
+                // Commit the current value for spin boxes (QLineEdit commits
+                // on every keystroke already).
+                if (auto *spinBox = qobject_cast<QAbstractSpinBox *>(obj)) {
+                    spinBox->interpretText();
+                }
+                // Emit editingFinished so listeners can react to the commit.
+                QMetaObject::invokeMethod(obj, "editingFinished", Qt::DirectConnection);
+                // Consume the event so it does not bubble up to the dialog
+                // and activate the default button (which would close it).
+                return true;
+            }
+        }
+    }
+    return QDialog::eventFilter(obj, event);
 }
