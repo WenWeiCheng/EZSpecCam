@@ -27,6 +27,7 @@ public:
 
 protected:
     void showEvent(QShowEvent *event) override;
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
 public slots:
     void on_buttonBox_accepted();

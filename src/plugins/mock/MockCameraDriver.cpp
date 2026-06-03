@@ -607,6 +607,20 @@ void MockCameraDriver::initializeParameterDefinitions(const QString &cameraId)
     param.order = 1.0f;
     m_parameterDefinitions.insert("pattern_type", param);
     m_parameters.insert("pattern_type", 0);
+
+    param = ParameterDefinition();
+    param.name = "readout_rate";
+    param.displayName = "Readout Rate";
+    param.description = "Readout frequency in MHz, step=1.25";
+    param.category = ParameterCategory::Advanced;
+    param.type = ParameterType::FloatRange;
+    param.constraint.minValue = 1.25;
+    param.constraint.maxValue = 5.0;
+    param.constraint.step = 1.25;
+    param.defaultValue = 2.5;
+    param.order = 2.0f;
+    m_parameterDefinitions.insert("readout_rate", param);
+    m_parameters.insert("readout_rate", 2.5);
 }
 
 QImage MockCameraDriver::generateFrame()

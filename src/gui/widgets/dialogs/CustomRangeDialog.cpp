@@ -26,7 +26,11 @@ CustomRangeDialog::CustomRangeDialog(QWidget *parent)
     m_maxSpinBox->setValue(100.0);
 
     m_okButton = new QPushButton(tr("OK"), this);
-    m_okButton->setDefault(true);
+    // Don't make OK the dialog's default button — pressing Enter inside
+    // the spinbox should commit the value via editingFinished rather than
+    // activating OK. The button is still activatable by mouse click or by
+    // Tab-focusing it and pressing Enter/Space.
+    m_okButton->setDefault(false);
     m_cancelButton = new QPushButton(tr("Cancel"), this);
 
     auto *minLayout = new QHBoxLayout();

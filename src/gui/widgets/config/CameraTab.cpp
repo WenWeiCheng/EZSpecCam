@@ -268,7 +268,7 @@ void CameraTab::buildDynamicParameterPanel()
             if (widget) {
                 m_parameterWidgets.insert(name, widget);
                 if (m_bufferedConfig.contains(name)) {
-                    ParameterWidgetFactory::setWidgetValue(widget, m_bufferedConfig.value(name), def.type);
+                    ParameterWidgetFactory::setWidgetValue(widget, m_bufferedConfig.value(name), def);
                     CONFIG_DEBUG << "Set widget value for" << name << ":" << m_bufferedConfig.value(name);
                 }
                 paramFormLayout->addRow(def.displayName + ":", widget);
@@ -308,6 +308,55 @@ void CameraTab::clearDynamicParameterPanel()
     }
     m_parameterWidgets.clear();
     m_parameterDefinitions.clear();
+}
+
+void CameraTab::rebuildParameterWidget(const QString &paramName)
+{
+    if (!m_appController) {
+        return;
+    }
+
+    ParameterDefinition newDef = m_appController->parameter(paramName);
+    QGroupBox *categoryGroup = m_categoryGroups.value(newDef.category);
+    if (!categoryGroup) {
+        return;
+    }
+
+    QFormLayout *formLayout = qobject_cast<QFormLayout*>(categoryGroup->layout());
+    if (!formLayout) {
+        return;
+    }
+
+    QWidget *oldWidget = m_parameterWidgets.value(paramName);
+    if (!oldWidget) {
+        return;
+    }
+
+    int row = formLayout->rowCount();
+    for (int i = 0; i < formLayout->rowCount(); ++i) {
+        if (formLayout->itemAt(i, QFormLayout::FieldRole)->widget() == oldWidget) {
+            row = i;
+            break;
+        }
+    }
+    if (row == formLayout->rowCount()) {
+        return;
+    }
+
+    QWidget *newWidget = ParameterWidgetFactory::createWidget(newDef);
+    if (!newWidget) {
+        return;
+    }
+
+    if (m_bufferedConfig.contains(paramName)) {
+        ParameterWidgetFactory::setWidgetValue(newWidget, m_bufferedConfig.value(paramName), newDef);
+    }
+
+    formLayout->replaceWidget(oldWidget, newWidget);
+    oldWidget->deleteLater();
+
+    m_parameterWidgets.insert(paramName, newWidget);
+    m_parameterDefinitions.insert(paramName, newDef);
 }
 
 void CameraTab::refreshCameraList()
@@ -411,20 +460,17 @@ void CameraTab::onParametersCommitted()
     for (const QString &paramName : paramNames) {
         ParameterDefinition def = m_appController->parameter(paramName);
         if (def.isDynamic) {
-            QVariant value = m_appController->parameterValue(paramName);
             QWidget *widget = m_parameterWidgets.value(paramName);
+            ParameterDefinition oldDef = m_parameterDefinitions.value(paramName);
+
+            if (widget && oldDef.constraint != def.constraint) {
+                rebuildParameterWidget(paramName);
+                widget = m_parameterWidgets.value(paramName);
+            }
+
             if (widget) {
-                if (def.type == ParameterType::IntRange) {
-                    QSpinBox *spinBox = qobject_cast<QSpinBox*>(widget);
-                    if (spinBox) {
-                        spinBox->setValue(value.toInt());
-                    }
-                } else if (def.type == ParameterType::FloatRange) {
-                    QDoubleSpinBox *spinBox = qobject_cast<QDoubleSpinBox*>(widget);
-                    if (spinBox) {
-                        spinBox->setValue(value.toDouble());
-                    }
-                }
+                QVariant value = m_appController->parameterValue(paramName);
+                ParameterWidgetFactory::setWidgetValue(widget, value, def);
             }
         }
     }

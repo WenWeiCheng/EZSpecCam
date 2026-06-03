@@ -20,7 +20,7 @@ class ParameterWidgetFactory
 public:
     static QWidget *createWidget(const ParameterDefinition &def);
     static QVariant getWidgetValue(QWidget *widget, ParameterType type);
-    static void setWidgetValue(QWidget *widget, const QVariant &value, ParameterType type);
+    static void setWidgetValue(QWidget *widget, const QVariant &value, ParameterDefinition def);
     static bool isModified(QWidget *widget, const QVariant &originalValue, ParameterType type);
 
 private:
@@ -34,6 +34,13 @@ private:
     static QWidget *createStringWidget(const ParameterDefinition &def);
     static QWidget *createStringCollectionWidget(const ParameterDefinition &def);
     static QWidget *createBooleanWidget(const ParameterDefinition &def);
+
+    // The chosen unit index is stored on the container widget as the "currentUnitIndex"
+    // property so the QComboBox::currentIndexChanged slot can read the previous index.
+    static void setFloatRangeWidgetWithUnitValue(QWidget *widget, const ParameterDefinition &def,
+                                                 double rawValue);
+    static void setIntRangeWidgetWithUnitValue(QWidget *widget, const ParameterDefinition &def,
+                                               double rawValue);
 };
 
 #endif // PARAMETERWIDGETFACTORY_H
