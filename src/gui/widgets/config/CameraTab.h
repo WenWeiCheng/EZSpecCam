@@ -53,6 +53,7 @@ private:
     void updateConnectionState();
     void clearDynamicParameterPanel();
     void applyCaptureMode();
+    void rebuildParameterWidget(const QString &paramName);
 
     QPointer<AppController> m_appController;
     QVariantMap m_bufferedConfig;
