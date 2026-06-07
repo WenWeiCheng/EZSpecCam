@@ -221,15 +221,13 @@ private slots:
 
     void test_connect_invalid()
     {
-        // Note: PICam driver falls back to demo camera when requested camera
-        // is not found, so this test cannot verify false return for invalid IDs
-        // when no real camera is present. The fallback behavior is by design.
         QString invalidId = "nonexistent-camera-xyz";
         bool result = m_driver->connectToCamera(invalidId);
-        // With demo fallback, we may still get true - that's acceptable
-        // The important thing is the driver handles the call gracefully
-        qDebug() << "Connect to invalid ID returned:" << result
-                 << "(demo fallback may return true)";
+        QVERIFY2(!result, "connectToCamera should return false for non-existent camera ID");
+        QVERIFY2(m_driver->state() == CameraState::Disconnected,
+                 "State should be Disconnected after failed connect");
+        QVERIFY2(!m_driver->isConnected(),
+                 "isConnected should be false after failed connect");
     }
 
     void test_disconnect()
@@ -529,6 +527,129 @@ private slots:
             testFloatRangeParam("sensor_temperature_target");
             QVariant currentTemp = m_driver->parameterValue("sensor_temperature");
             qDebug() << "Current sensor temperature:" << currentTemp.toString();
+        }
+    }
+
+    //==========================================================================
+    // Extended Sensor Info Parameters (Read-Only)
+    //==========================================================================
+    void test_param_sensor_info_extended()
+    {
+        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
+
+        verifyParamReadOnly("sensor_extended_height", ParameterType::IntRange);
+        verifyParamReadOnly("sensor_secondary_height", ParameterType::IntRange);
+        verifyParamReadOnly("sensor_left_margin", ParameterType::IntRange);
+        verifyParamReadOnly("sensor_right_margin", ParameterType::IntRange);
+        verifyParamReadOnly("sensor_top_margin", ParameterType::IntRange);
+        verifyParamReadOnly("sensor_bottom_margin", ParameterType::IntRange);
+        verifyParamReadOnly("sensor_masked_height", ParameterType::IntRange);
+        verifyParamReadOnly("sensor_masked_top", ParameterType::IntRange);
+        verifyParamReadOnly("sensor_masked_bottom", ParameterType::IntRange);
+        verifyParamReadOnly("sensor_secondary_masked_height", ParameterType::IntRange);
+        verifyParamReadOnly("sensor_type", ParameterType::StringCollection);
+        verifyParamReadOnly("ccd_chars", ParameterType::StringCollection);
+        verifyParamReadOnly("orientation", ParameterType::StringCollection);
+        verifyParamReadOnly("readout_orientation", ParameterType::StringCollection);
+        verifyParamReadOnly("pixel_width", ParameterType::FloatRange);
+        verifyParamReadOnly("pixel_height", ParameterType::FloatRange);
+    }
+
+    //==========================================================================
+    // Cooling — Temperature Status
+    //==========================================================================
+    void test_param_temperature_status()
+    {
+        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
+        verifyParamReadOnly("temperature_status", ParameterType::StringCollection);
+    }
+
+    //==========================================================================
+    // Core — ADC Bit Depth
+    //==========================================================================
+    void test_param_adc_bit_depth()
+    {
+        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
+        ParameterDefinition def = m_driver->parameter("adc_bit_depth");
+        if (!def.isValid()) {
+            qDebug() << "adc_bit_depth definition is invalid, skipping";
+            return;
+        }
+        testIntRangeParam("adc_bit_depth");
+    }
+
+    //==========================================================================
+    // Core — Readout, Trigger, Output Signal
+    //==========================================================================
+    void test_param_readout_trigger()
+    {
+        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
+
+        QStringList names = {"readout_mode", "trigger_response", "output_signal"};
+        for (const QString &name : names) {
+            if (!m_params.contains(name)) {
+                qDebug() << name << "not available, skipping";
+                continue;
+            }
+            ParameterDefinition def = m_driver->parameter(name);
+            if (!def.isValid()) {
+                qDebug() << name << "definition is invalid (constraint not loaded), skipping";
+                continue;
+            }
+            verifyParamReadWrite(name, ParameterType::StringCollection);
+            bool ok = m_driver->setParameter(name, def.constraint.validValues.first());
+            QVERIFY2(ok, qPrintable(QString("Should set '%1' to first value").arg(name)));
+            if (!m_driver->commitParameters()) {
+                qDebug() << name << "commit failed — demo camera may have SDK limitations";
+            }
+        }
+    }
+
+    //==========================================================================
+    // Advanced Parameters
+    //==========================================================================
+    void test_param_advanced()
+    {
+        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
+
+        QStringList enumNames = {"shutter_mode"};
+        for (const QString &name : enumNames) {
+            if (!m_params.contains(name)) continue;
+            ParameterDefinition def = m_driver->parameter(name);
+            if (!def.isValid()) {
+                qDebug() << name << "definition is invalid, skipping";
+                continue;
+            }
+            testCollectionParam(name, ParameterType::StringCollection);
+        }
+
+        QStringList floatNames = {"shutter_delay", "vertical_shift_rate"};
+        for (const QString &name : floatNames) {
+            if (!m_params.contains(name)) continue;
+            ParameterDefinition def = m_driver->parameter(name);
+            if (!def.isValid()) {
+                qDebug() << name << "definition is invalid, skipping";
+                continue;
+            }
+            testFloatRangeParam(name);
+        }
+
+        QStringList intNames = {"active_width", "active_height",
+                                "active_left", "active_right",
+                                "active_top", "active_bottom"};
+        for (const QString &name : intNames) {
+            if (!m_params.contains(name)) continue;
+            ParameterDefinition def = m_driver->parameter(name);
+            if (!def.isValid()) {
+                qDebug() << name << "definition is invalid, skipping";
+                continue;
+            }
+            verifyParamReadWrite(name, ParameterType::IntRange);
+            bool ok = m_driver->setParameter(name, static_cast<int>(def.constraint.minValue));
+            QVERIFY2(ok, qPrintable(QString("Should set '%1' to min").arg(name)));
+            if (!m_driver->commitParameters()) {
+                qDebug() << name << "commit failed — demo camera may have SDK limitations";
+            }
         }
     }
 
