@@ -1,6 +1,10 @@
 # GUI application
 find_package(OpenMP REQUIRED)
-qt_add_executable(ezspeccam_gui WIN32)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    qt_add_executable(ezspeccam_gui)
+else()
+    qt_add_executable(ezspeccam_gui WIN32)
+endif()
 
 target_link_libraries(ezspeccam_gui PRIVATE
     ezspeccam_core
