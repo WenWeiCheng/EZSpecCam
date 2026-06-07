@@ -42,6 +42,8 @@ target_link_libraries(test_picam_driver_PIXIS100B PRIVATE
     "${PICAM_LIBRARY_DIR}/${PICAM_LIB_NAME}"
 )
 
+target_compile_definitions(test_picam_driver_PIXIS100B PRIVATE EZSPECCAM_PICAM_DEMO)
+
 target_include_directories(test_picam_driver_PIXIS100B PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/plugins/picam

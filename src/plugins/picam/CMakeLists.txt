@@ -74,6 +74,10 @@ target_sources(picam_camera_driver PRIVATE
     picam.json
 )
 
+if(EZSPECCAM_PICAM_DEMO)
+    target_compile_definitions(picam_camera_driver PRIVATE EZSPECCAM_PICAM_DEMO)
+endif()
+
 # —— Post-build deploy ——
 
 # Plugin DLL → plugins/drivers/

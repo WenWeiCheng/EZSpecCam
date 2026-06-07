@@ -24,7 +24,8 @@
                 "EZSPECCAM_BUILD_GUI": "ON",
                 "EZSPECCAM_BUILD_CLI": "OFF",
                 "EZSPECCAM_BUILD_PLUGINS": "ON",
-                "EZSPECCAM_BUILD_TESTS": "ON"
+                "EZSPECCAM_BUILD_TESTS": "ON",
+                "EZSPECCAM_PICAM_DEMO": "ON"
             }
         },
         {
