@@ -878,11 +878,10 @@ void ImageViewWidget::resetZoomToFit()
         return;
     }
 
-    m_plot->xAxis->setRange(0, m_originalImage.width());
-    m_plot->yAxis->setRange(0, m_originalImage.height());
-    m_plot->replot(QCustomPlot::rpQueuedReplot);
-    updatePlotGeometry();
     m_userHasZoomed = false;
+    m_displayImage = QImage();
+    updateDisplayData();
+    updatePlotGeometry();
 }
 
 QVector<double> ImageViewWidget::extractColumnAsVector(int x) const
