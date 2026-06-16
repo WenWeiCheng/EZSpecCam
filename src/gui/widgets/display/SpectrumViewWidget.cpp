@@ -343,10 +343,15 @@ void SpectrumViewWidget::mouseMoveEvent(QMouseEvent *event)
     }
 
     double dataX = widgetToDataX(event->pos().x());
-    updateCursor(dataX);
+    int idx = qRound(dataX);
+    if (idx < 0) idx = 0;
+    if (idx >= m_xData.size()) idx = m_xData.size() - 1;
+    double snappedX = m_xData[idx];
+    double snappedY = m_yData[idx];
 
-    double intensity = intensityAt(dataX);
-    emit cursorPosition(dataX, intensity);
+    updateCursor(snappedX, snappedY);
+
+    emit cursorPosition(snappedX, snappedY);
 
     QWidget::mouseMoveEvent(event);
 }
@@ -431,7 +436,7 @@ bool SpectrumViewWidget::eventFilter(QObject *obj, QEvent *event)
     return QWidget::eventFilter(obj, event);
 }
 
-void SpectrumViewWidget::updateCursor(double x)
+void SpectrumViewWidget::updateCursor(double x, double y)
 {
     if (!m_dataValid) {
         return;
@@ -446,7 +451,7 @@ void SpectrumViewWidget::updateCursor(double x)
 
     QString labelText = QString("X: %1\nI: %2")
         .arg(x, 0, 'f', 1)
-        .arg(intensityAt(x), 0, 'f', 0);
+        .arg(y, 0, 'f', 0);
 
     m_cursorLabel->setText(labelText);
 

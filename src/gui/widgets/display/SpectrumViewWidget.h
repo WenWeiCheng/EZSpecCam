@@ -89,7 +89,7 @@ protected:
 
 private:
     void setupPlot();
-    void updateCursor(double x);
+    void updateCursor(double x, double y);
     double widgetToDataX(int widgetX) const;
     QVector<double> extractRowData(const QImage &image) const;
     void applyXAxisRange();
