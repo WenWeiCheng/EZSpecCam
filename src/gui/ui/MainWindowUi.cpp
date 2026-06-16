@@ -28,6 +28,7 @@ MainWindowUi::MainWindowUi(QObject *parent)
     , imageViewWidget(nullptr)
     , spectrumViewWidget(nullptr)
     , menuActionShowAxes(nullptr)
+    , menuActionFillWindow(nullptr)
     , menuActionProfile(nullptr)
     , menuActionStatistics(nullptr)
     , menuActionPostProcess(nullptr)
@@ -103,6 +104,11 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     menuActionShowAxes->setCheckable(true);
     menuActionShowAxes->setChecked(false);
     menuView->addAction(menuActionShowAxes);
+
+    menuActionFillWindow = new QAction("Fill Window", mainWindow);
+    menuActionFillWindow->setCheckable(true);
+    menuActionFillWindow->setChecked(false);
+    menuView->addAction(menuActionFillWindow);
 
     menuActionScale = new QAction("&Scale...", mainWindow);
     menuView->addAction(menuActionScale);

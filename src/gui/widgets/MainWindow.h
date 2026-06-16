@@ -46,6 +46,7 @@ private slots:
     void on_scale_triggered();
 
     void on_showAxes_triggered(bool checked);
+    void on_fillWindow_triggered(bool checked);
     void on_statistics_triggered();
     void on_verticalBinning_triggered();
     void on_rowRange_triggered();

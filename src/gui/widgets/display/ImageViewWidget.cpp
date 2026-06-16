@@ -34,12 +34,7 @@ void ImageViewWidget::setupPlot()
     m_colorMap->setInterpolate(false);
     m_colorMap->setTightBoundary(false);
 
-    QCPColorGradient gradient;
-    gradient.setLevelCount(256);
-    gradient.setColorStopAt(0, QColor(0, 0, 0));
-    gradient.setColorStopAt(0.5, QColor(128, 128, 128));
-    gradient.setColorStopAt(1, QColor(255, 255, 255));
-    m_colorMap->setGradient(gradient);
+    applyColorMap();
 
     m_plot->xAxis->setLabel("X (pixels)");
     m_plot->yAxis->setLabel("Y (pixels)");
@@ -182,6 +177,57 @@ void ImageViewWidget::applyColorScaleMode()
         case ColorScaleMode::Fixed16Bit:
             m_colorMap->setDataRange(QCPRange(0, 65535));
             break;
+    }
+}
+
+void ImageViewWidget::setColorMap(ColorMap map)
+{
+    if (m_colorMapPreset == map) {
+        return;
+    }
+
+    m_colorMapPreset = map;
+
+    if (m_imageValid && !m_currentImage.isNull()) {
+        applyColorMap();
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
+    }
+}
+
+void ImageViewWidget::applyColorMap()
+{
+    static const QCPColorGradient::GradientPreset presets[] = {
+        QCPColorGradient::gpGrayscale,
+        QCPColorGradient::gpHot,
+        QCPColorGradient::gpCold,
+        QCPColorGradient::gpNight,
+        QCPColorGradient::gpCandy,
+        QCPColorGradient::gpGeography,
+        QCPColorGradient::gpIon,
+        QCPColorGradient::gpThermal,
+        QCPColorGradient::gpPolar,
+        QCPColorGradient::gpSpectrum,
+        QCPColorGradient::gpJet
+    };
+
+    int index = static_cast<int>(m_colorMapPreset);
+    if (index >= 0 && index < static_cast<int>(sizeof(presets) / sizeof(presets[0]))) {
+        m_colorMap->setGradient(QCPColorGradient(presets[index]));
+    }
+}
+
+void ImageViewWidget::setFitMode(FitMode mode)
+{
+    if (m_fitMode == mode) {
+        return;
+    }
+
+    m_fitMode = mode;
+
+    if (m_imageValid && !m_originalImage.isNull()) {
+        m_userHasZoomed = false;
+        resetZoomToFit();
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
     }
 }
 
@@ -436,6 +482,14 @@ void ImageViewWidget::updatePlotGeometry()
 
     QSize availableSize = size();
     if (availableSize.width() <= 0 || availableSize.height() <= 0) {
+        return;
+    }
+
+    if (m_fitMode == FitMode::FillWindow) {
+        m_plot->setGeometry(0, 0, availableSize.width(), availableSize.height());
+        m_plot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
+        m_plot->axisRect()->setMinimumSize(0, 0);
+        m_plot->axisRect()->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
         return;
     }
 

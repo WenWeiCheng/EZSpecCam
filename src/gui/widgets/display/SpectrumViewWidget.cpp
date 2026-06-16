@@ -39,11 +39,13 @@ void SpectrumViewWidget::setupPlot()
     m_plot->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     m_graph = m_plot->addGraph(m_plot->xAxis, m_plot->yAxis);
-    m_graph->setLineStyle(QCPGraph::lsLine);
-    m_graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssNone));
     m_graph->setPen(QPen(Qt::blue, 1.0));
 
     m_graph->setAdaptiveSampling(true);
+
+    m_lineStyle = LineStyle::Line;
+    m_graph->setLineStyle(QCPGraph::lsLine);
+    m_graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssNone));
 
     m_plot->xAxis->setLabel(m_xAxisLabel);
     m_plot->yAxis->setLabel(m_yAxisLabel);
@@ -170,6 +172,34 @@ void SpectrumViewWidget::clearData()
     m_cursorLabel->setVisible(false);
 
     m_plot->replot(QCustomPlot::rpQueuedReplot);
+}
+
+void SpectrumViewWidget::setLineStyle(LineStyle style)
+{
+    if (m_lineStyle == style) {
+        return;
+    }
+
+    m_lineStyle = style;
+
+    switch (style) {
+        case LineStyle::Line:
+            m_graph->setLineStyle(QCPGraph::lsLine);
+            m_graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssNone));
+            break;
+        case LineStyle::LineAndPoints:
+            m_graph->setLineStyle(QCPGraph::lsLine);
+            m_graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 4.0));
+            break;
+        case LineStyle::Points:
+            m_graph->setLineStyle(QCPGraph::lsNone);
+            m_graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 4.0));
+            break;
+    }
+
+    if (m_dataValid && !m_xData.isEmpty()) {
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
+    }
 }
 
 double SpectrumViewWidget::intensityAt(double x) const

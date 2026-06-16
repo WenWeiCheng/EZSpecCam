@@ -20,6 +20,27 @@ class ImageViewWidget : public QWidget
 {
     Q_OBJECT
 public:
+    enum class FitMode {
+        KeepAspectRatio,
+        FillWindow
+    };
+    Q_ENUM(FitMode)
+
+    enum class ColorMap {
+        Grayscale,
+        Hot,
+        Cold,
+        Night,
+        Candy,
+        Geography,
+        Ion,
+        Thermal,
+        Polar,
+        Spectrum,
+        Jet
+    };
+    Q_ENUM(ColorMap)
+
     enum class ColorScaleMode {
         Auto,
         Fixed8Bit,
@@ -39,6 +60,12 @@ public:
     void setImage(const QImage &image);
     QImage image() const;
     bool hasImage() const;
+
+    ColorMap colorMap() const { return m_colorMapPreset; }
+    void setColorMap(ColorMap map);
+
+    FitMode fitMode() const { return m_fitMode; }
+    void setFitMode(FitMode mode);
 
     ColorScaleMode colorScaleMode() const { return m_colorScaleMode; }
     void setColorScaleMode(ColorScaleMode mode);
@@ -85,6 +112,7 @@ private:
     void setupPlot();
     void updateColorMap(const QImage &image);
     void checkOverexposure(const QImage &image);
+    void applyColorMap();
     void applyColorScaleMode();
     QPointF widgetToImageCoords(int widgetX, int widgetY) const;
     void updateDisplayData();
@@ -99,6 +127,8 @@ private:
     QList<QPair<QCPItemLine *, QCPItemLine *>> m_crosshairs;
     QPointF m_currentCrosshairPos;
     bool m_imageValid;
+    ColorMap m_colorMapPreset = ColorMap::Grayscale;
+    FitMode m_fitMode = FitMode::KeepAspectRatio;
     ColorScaleMode m_colorScaleMode = ColorScaleMode::Auto;
     IntensityScaleType m_intensityScaleType = IntensityScaleType::Linear;
     bool m_axesVisible = false;

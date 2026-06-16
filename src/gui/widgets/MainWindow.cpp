@@ -95,12 +95,27 @@ MainWindow::MainWindow(QWidget *parent)
                 }
             });
 
+    connect(m_scaleDialog, &ScaleControlDialog::imageColorMapChanged,
+            this, [this](int map) {
+                if (m_imageViewWidget) {
+                    m_imageViewWidget->setColorMap(static_cast<ImageViewWidget::ColorMap>(map));
+                }
+            });
+
     connect(m_scaleDialog, &ScaleControlDialog::spectrumScaleTypeChanged,
             this, [this](int type) {
                 if (m_spectrumViewWidget) {
                     m_spectrumViewWidget->setIntensityScaleType(
                         type == 0 ? SpectrumViewWidget::IntensityScaleType::Auto
                                   : SpectrumViewWidget::IntensityScaleType::Log);
+                }
+            });
+
+    connect(m_scaleDialog, &ScaleControlDialog::spectrumLineStyleChanged,
+            this, [this](int style) {
+                if (m_spectrumViewWidget) {
+                    m_spectrumViewWidget->setLineStyle(
+                        static_cast<SpectrumViewWidget::LineStyle>(style));
                 }
             });
 
@@ -161,6 +176,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->menuActionShowAxes, &QAction::toggled,
             this, &MainWindow::on_showAxes_triggered);
+
+    connect(ui->menuActionFillWindow, &QAction::toggled,
+            this, &MainWindow::on_fillWindow_triggered);
 
     connect(ui->menuActionStatistics, &QAction::triggered,
             this, &MainWindow::on_statistics_triggered);
@@ -386,6 +404,15 @@ void MainWindow::on_showAxes_triggered(bool checked)
 {
     if (m_imageViewWidget) {
         m_imageViewWidget->setAxesVisible(checked);
+    }
+}
+
+void MainWindow::on_fillWindow_triggered(bool checked)
+{
+    if (m_imageViewWidget) {
+        m_imageViewWidget->setFitMode(
+            checked ? ImageViewWidget::FitMode::FillWindow
+                    : ImageViewWidget::FitMode::KeepAspectRatio);
     }
 }
 
