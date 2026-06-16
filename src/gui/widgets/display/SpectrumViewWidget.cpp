@@ -75,6 +75,9 @@ void SpectrumViewWidget::setupPlot()
     m_cursorLabel->setPositionAlignment(Qt::AlignTop | Qt::AlignLeft);
     m_cursorLabel->position->setCoords(0, 0);
 
+    m_cursorLine->setLayer(QLatin1String("overlay"));
+    m_cursorLabel->setLayer(QLatin1String("overlay"));
+
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
@@ -352,7 +355,7 @@ void SpectrumViewWidget::leaveEvent(QEvent *event)
 {
     m_cursorLine->setVisible(false);
     m_cursorLabel->setVisible(false);
-    m_plot->replot(QCustomPlot::rpQueuedReplot);
+    m_plot->layer(QLatin1String("overlay"))->replot();
 
     emit cursorLeft();
 
@@ -452,7 +455,7 @@ void SpectrumViewWidget::updateCursor(double x)
     m_cursorLabel->position->setCoords(labelX, maxY - (maxY - minY) * 0.05);
     m_cursorLabel->setVisible(true);
 
-    m_plot->replot(QCustomPlot::rpQueuedReplot);
+    m_plot->layer(QLatin1String("overlay"))->replot();
 }
 
 double SpectrumViewWidget::widgetToDataX(int widgetX) const
