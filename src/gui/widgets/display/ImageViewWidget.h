@@ -118,7 +118,7 @@ private:
     void checkOverexposure(const QImage &image);
     void applyColorMap();
     void applyColorScaleMode();
-    void updateColorScaleLayout();
+    void setupColorScalePlot();
     QPointF widgetToImageCoords(int widgetX, int widgetY) const;
     void updateDisplayData();
     void calculateDownsampleFactors();
@@ -128,6 +128,7 @@ private:
 
     QCustomPlot *m_plot;
     QCPColorMap *m_colorMap;
+    QCustomPlot *m_colorScalePlot = nullptr;
     QCPColorScale *m_colorScale = nullptr;
     QImage m_currentImage;
     QList<QPair<QCPItemLine *, QCPItemLine *>> m_crosshairs;

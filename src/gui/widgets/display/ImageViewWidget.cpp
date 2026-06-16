@@ -11,6 +11,8 @@ ImageViewWidget::ImageViewWidget(QWidget *parent)
     : QWidget(parent)
     , m_plot(nullptr)
     , m_colorMap(nullptr)
+    , m_colorScalePlot(nullptr)
+    , m_colorScale(nullptr)
     , m_imageValid(false)
     , m_resizeTimer(new QTimer(this))
     , m_rubberBand(nullptr)
@@ -21,9 +23,13 @@ ImageViewWidget::ImageViewWidget(QWidget *parent)
     m_plot->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
     m_plot->installEventFilter(this);
 
+    m_colorScalePlot = new QCustomPlot(this);
+    m_colorScalePlot->setVisible(false);
+
     connect(m_resizeTimer, &QTimer::timeout, this, &ImageViewWidget::onResizeTimeout);
 
     setupPlot();
+    setupColorScalePlot();
 }
 
 ImageViewWidget::~ImageViewWidget() = default;
@@ -35,15 +41,6 @@ void ImageViewWidget::setupPlot()
     m_colorMap->setTightBoundary(false);
 
     applyColorMap();
-
-    m_colorScale = new QCPColorScale(m_plot);
-    m_colorScale->setType(QCPAxis::atRight);
-    m_colorScale->setGradient(m_colorMap->gradient());
-    m_colorScale->setDataRange(m_colorMap->dataRange());
-    m_colorScale->setVisible(false);
-    m_plot->plotLayout()->addElement(0, 1, m_colorScale);
-    m_plot->plotLayout()->setColumnStretchFactor(0, 1);
-    m_plot->plotLayout()->setColumnStretchFactor(1, 0);
 
     m_plot->xAxis->setLabel("X (pixels)");
     m_plot->yAxis->setLabel("Y (pixels)");
@@ -64,6 +61,22 @@ void ImageViewWidget::setupPlot()
     m_plot->axisRect()->setMargins(QMargins(3, 3, 3, 3));
 
     m_plot->replot(QCustomPlot::rpQueuedReplot);
+}
+
+void ImageViewWidget::setupColorScalePlot()
+{
+    m_colorScalePlot->plotLayout()->clear();
+
+    m_colorScale = new QCPColorScale(m_colorScalePlot);
+    m_colorScale->setType(QCPAxis::atRight);
+    m_colorScale->setMargins(QMargins(2, 2, 2, 2));
+
+    m_colorScalePlot->plotLayout()->addElement(0, 0, m_colorScale);
+    m_colorScalePlot->plotLayout()->setRowSpacing(0);
+    m_colorScalePlot->plotLayout()->setColumnSpacing(0);
+    m_colorScalePlot->plotLayout()->setMargins(QMargins(0, 0, 0, 0));
+
+    m_colorScalePlot->setBackground(Qt::white);
 }
 
 void ImageViewWidget::setImage(const QImage &image)
@@ -303,31 +316,15 @@ void ImageViewWidget::setColorScaleVisible(bool visible)
 
     m_colorScaleVisible = visible;
 
-    if (m_colorScale) {
-        m_colorScale->setVisible(visible);
-        updateColorScaleLayout();
-        updatePlotGeometry();
-    }
+    m_colorScalePlot->setVisible(visible);
 
+    updatePlotGeometry();
+
+    if (m_colorScale && m_imageValid) {
+        m_colorScalePlot->replot(QCustomPlot::rpQueuedReplot);
+    }
     if (m_imageValid && !m_currentImage.isNull()) {
         m_plot->replot(QCustomPlot::rpQueuedReplot);
-    }
-}
-
-void ImageViewWidget::updateColorScaleLayout()
-{
-    if (!m_colorScale) {
-        return;
-    }
-
-    if (m_colorScaleVisible) {
-        m_colorScale->setMinimumSize(QSize(20, 0));
-        m_colorScale->setMaximumSize(QSize(80, QWIDGETSIZE_MAX));
-        m_plot->plotLayout()->setColumnStretchFactor(0, 1);
-        m_plot->plotLayout()->setColumnStretchFactor(1, 0);
-    } else {
-        m_colorScale->setMinimumSize(QSize(0, 0));
-        m_colorScale->setMaximumSize(QSize(0, QWIDGETSIZE_MAX));
     }
 }
 
@@ -538,7 +535,17 @@ void ImageViewWidget::updatePlotGeometry()
         return;
     }
 
-    m_plot->setGeometry(0, 0, availableSize.width(), availableSize.height());
+    int colorScaleW = 0;
+    if (m_colorScalePlot && m_colorScaleVisible) {
+        colorScaleW = 60;
+        m_colorScalePlot->setGeometry(0, 0, colorScaleW, availableSize.height());
+    }
+
+    int imageX = colorScaleW;
+    int imageW = availableSize.width() - colorScaleW;
+    if (imageW <= 0) imageW = 1;
+
+    m_plot->setGeometry(imageX, 0, imageW, availableSize.height());
 
     if (m_fitMode == FitMode::FillWindow) {
         m_plot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
@@ -551,16 +558,8 @@ void ImageViewWidget::updatePlotGeometry()
     double yRange = m_plot->yAxis->range().upper - m_plot->yAxis->range().lower;
     double currentAspect = (yRange > 0) ? (xRange / yRange) : 1.0;
 
-    int colorScaleW = 0;
-    if (m_colorScale && m_colorScaleVisible) {
-        QCPLayoutElement *csElement = m_plot->plotLayout()->element(0, 1);
-        if (csElement) {
-            colorScaleW = csElement->rect().width();
-        }
-    }
-
     int margin = 5;
-    int availWidth = availableSize.width() - margin * 2 - colorScaleW;
+    int availWidth = imageW - margin * 2;
     int availHeight = availableSize.height() - margin * 2;
 
     if (availWidth <= 0) availWidth = 1;
