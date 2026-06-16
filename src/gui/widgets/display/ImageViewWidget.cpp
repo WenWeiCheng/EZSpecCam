@@ -662,6 +662,7 @@ bool ImageViewWidget::eventFilter(QObject *obj, QEvent *event)
                             m_plot->replot(QCustomPlot::rpQueuedReplot);
                             updatePlotGeometry();
                             m_userHasZoomed = true;
+                            updateDisplayData();
                         }
                     }
                 }
