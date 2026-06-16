@@ -71,6 +71,7 @@ target_include_directories(picam_camera_driver PRIVATE
 
 target_sources(picam_camera_driver PRIVATE
     PicamDriver.h PicamDriver.cpp
+    PicamParameterRegistry.h PicamParameterRegistry.cpp
     picam.json
 )
 

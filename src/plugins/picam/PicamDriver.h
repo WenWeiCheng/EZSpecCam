@@ -13,6 +13,7 @@
 
 #include "core/ICameraDriver.h"
 #include "core/CameraTypes.h"
+#include "PicamParameterRegistry.h"
 
 #include <QObject>
 #include <QMutex>
@@ -102,35 +103,10 @@ private:
 
     void initializeRoisSubParameters();
 
-    /**
-     * @brief Categorize a Picam parameter into a ParameterCategory
-     * @param param Picam parameter enum
-     * @return ParameterCategory enum
-     */
-    ParameterCategory categorizeParameter(PicamParameter param) const;
-
-    /**
-     * @brief Map a Picam parameter enum to an EZSpecCam parameter name
-     * @param param Picam parameter enum
-     * @return EZSpecCam parameter name string
-     */
-    QString mapParameterName(PicamParameter param) const;
-
-    /**
-     * @brief Get the PicamValueType for a stored parameter
-     * @param name EZSpecCam parameter name
-     * @return PicamValueType enum
-     */
     PicamValueType getValueType(const QString &name) const;
 
     ParameterType mapValueType(PicamValueType vt) const;
 
-    /**
-     * @brief Sync all current parameter values from hardware
-     *
-     * Called after connectToCamera() and commitParameters(). For ROI,
-     * this caches the composite PicamRois value for sub-param access.
-     */
     void syncAllValuesFromHardware();
 
     // ——— ROI Sub-Parameter Helpers ———
@@ -165,11 +141,10 @@ private:
     void onCaptureLoop();
     void processFrame(const PicamAvailableData& data);
     PicamError setEnumeratedParameter(PicamParameter param, const QString &value);
-    QString mapParameterNameReverse(PicamParameter param) const;
 
     // ——— SDK Lifecycle ———
 
-    static void initializeSDK();
+    static bool initializeSDK();
     static void shutdownSDK();
 
     //==========================================================================

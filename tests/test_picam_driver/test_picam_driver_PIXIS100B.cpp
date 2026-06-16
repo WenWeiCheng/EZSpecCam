@@ -61,6 +61,24 @@ private:
         QVERIFY2(def.type == expectedType,
                  qPrintable(QString("Parameter '%1' type should be %2, got %3")
                      .arg(name).arg(static_cast<int>(expectedType)).arg(static_cast<int>(def.type))));
+
+        QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+        QVariant value = m_driver->parameterValue(name);
+        QVERIFY2(value.isValid(),
+                 qPrintable(QString("Should read value for '%1'").arg(name)));
+        QVERIFY2(errorSpy.isEmpty() || errorSpy.at(0).at(0).value<CameraError>().code == CameraError::Code::None,
+                 qPrintable(QString("Reading '%1' should not produce error").arg(name)));
+
+        if (expectedType == ParameterType::IntRange) {
+            QVERIFY2(value.toInt() > 0,
+                     qPrintable(QString("'%1' value should be > 0, got %2").arg(name).arg(value.toString())));
+        } else if (expectedType == ParameterType::FloatRange) {
+            QVERIFY2(value.toDouble() > 0.0,
+                     qPrintable(QString("'%1' value should be > 0, got %2").arg(name).arg(value.toString())));
+        } else if (expectedType == ParameterType::StringCollection) {
+            QVERIFY2(!value.toString().isEmpty(),
+                     qPrintable(QString("'%1' value should not be empty").arg(name)));
+        }
     }
 
     void verifyParamReadWrite(const QString &name, ParameterType expectedType)
@@ -76,6 +94,13 @@ private:
         QVERIFY2(def.type == expectedType,
                  qPrintable(QString("Parameter '%1' type should be %2, got %3")
                      .arg(name).arg(static_cast<int>(expectedType)).arg(static_cast<int>(def.type))));
+
+        QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+        QVariant value = m_driver->parameterValue(name);
+        QVERIFY2(value.isValid(),
+                 qPrintable(QString("Should read value for '%1'").arg(name)));
+        QVERIFY2(errorSpy.isEmpty() || errorSpy.at(0).at(0).value<CameraError>().code == CameraError::Code::None,
+                 qPrintable(QString("Reading '%1' should not produce error").arg(name)));
     }
 
     void testFloatRangeParam(const QString &name)
@@ -94,17 +119,38 @@ private:
         QVERIFY2(ok, qPrintable(QString("Should set '%1' to min").arg(name)));
         QVERIFY2(m_driver->commitParameters(),
                  qPrintable(QString("Should commit '%1' = min").arg(name)));
+        {
+            QVariant readVal = m_driver->parameterValue(name);
+            QVERIFY2(readVal.isValid(), qPrintable(QString("Should read back '%1' after min").arg(name)));
+            QVERIFY2(qAbs(readVal.toDouble() - def.constraint.minValue) < 0.001,
+                     qPrintable(QString("'%1' readback should match min: expected %2, got %3")
+                         .arg(name).arg(def.constraint.minValue).arg(readVal.toDouble())));
+        }
 
         ok = m_driver->setParameter(name, def.constraint.maxValue);
         QVERIFY2(ok, qPrintable(QString("Should set '%1' to max").arg(name)));
         QVERIFY2(m_driver->commitParameters(),
                  qPrintable(QString("Should commit '%1' = max").arg(name)));
+        {
+            QVariant readVal = m_driver->parameterValue(name);
+            QVERIFY2(readVal.isValid(), qPrintable(QString("Should read back '%1' after max").arg(name)));
+            QVERIFY2(qAbs(readVal.toDouble() - def.constraint.maxValue) < 0.001,
+                     qPrintable(QString("'%1' readback should match max: expected %2, got %3")
+                         .arg(name).arg(def.constraint.maxValue).arg(readVal.toDouble())));
+        }
 
         double mid = (def.constraint.minValue + def.constraint.maxValue) / 2.0;
         ok = m_driver->setParameter(name, mid);
         QVERIFY2(ok, qPrintable(QString("Should set '%1' to midpoint").arg(name)));
         QVERIFY2(m_driver->commitParameters(),
                  qPrintable(QString("Should commit '%1' = midpoint").arg(name)));
+        {
+            QVariant readVal = m_driver->parameterValue(name);
+            QVERIFY2(readVal.isValid(), qPrintable(QString("Should read back '%1' after midpoint").arg(name)));
+            QVERIFY2(qAbs(readVal.toDouble() - mid) < 0.001,
+                     qPrintable(QString("'%1' readback should match midpoint: expected %2, got %3")
+                         .arg(name).arg(mid).arg(readVal.toDouble())));
+        }
     }
 
     void testIntRangeParam(const QString &name)
@@ -119,15 +165,32 @@ private:
         qDebug() << "Testing IntRange:" << name << "min=" << def.constraint.minValue
                  << "max=" << def.constraint.maxValue;
 
-        bool ok = m_driver->setParameter(name, static_cast<int>(def.constraint.minValue));
+        int minVal = static_cast<int>(def.constraint.minValue);
+        int maxVal = static_cast<int>(def.constraint.maxValue);
+
+        bool ok = m_driver->setParameter(name, minVal);
         QVERIFY2(ok, qPrintable(QString("Should set '%1' to min").arg(name)));
         QVERIFY2(m_driver->commitParameters(),
                  qPrintable(QString("Should commit '%1' = min").arg(name)));
+        {
+            QVariant readVal = m_driver->parameterValue(name);
+            QVERIFY2(readVal.isValid(), qPrintable(QString("Should read back '%1' after min").arg(name)));
+            QVERIFY2(readVal.toInt() == minVal,
+                     qPrintable(QString("'%1' readback should match min: expected %2, got %3")
+                         .arg(name).arg(minVal).arg(readVal.toInt())));
+        }
 
-        ok = m_driver->setParameter(name, static_cast<int>(def.constraint.maxValue));
+        ok = m_driver->setParameter(name, maxVal);
         QVERIFY2(ok, qPrintable(QString("Should set '%1' to max").arg(name)));
         QVERIFY2(m_driver->commitParameters(),
                  qPrintable(QString("Should commit '%1' = max").arg(name)));
+        {
+            QVariant readVal = m_driver->parameterValue(name);
+            QVERIFY2(readVal.isValid(), qPrintable(QString("Should read back '%1' after max").arg(name)));
+            QVERIFY2(readVal.toInt() == maxVal,
+                     qPrintable(QString("'%1' readback should match max: expected %2, got %3")
+                         .arg(name).arg(maxVal).arg(readVal.toInt())));
+        }
     }
 
     void testCollectionParam(const QString &name, ParameterType expectedType)
@@ -149,6 +212,19 @@ private:
             QVERIFY2(ok, qPrintable(QString("Should set '%1' to '%2'").arg(name).arg(v.toString())));
             QVERIFY2(m_driver->commitParameters(),
                      qPrintable(QString("Should commit '%1' = '%2'").arg(name).arg(v.toString())));
+
+            QVariant readVal = m_driver->parameterValue(name);
+            QVERIFY2(readVal.isValid(),
+                     qPrintable(QString("Should read back '%1' after '%2'").arg(name).arg(v.toString())));
+            if (expectedType == ParameterType::StringCollection) {
+                QVERIFY2(readVal.toString() == v.toString(),
+                         qPrintable(QString("'%1' readback should match: expected '%2', got '%3'")
+                             .arg(name).arg(v.toString()).arg(readVal.toString())));
+            } else {
+                QVERIFY2(readVal.toInt() == v.toInt(),
+                         qPrintable(QString("'%1' readback should match: expected %2, got %3")
+                             .arg(name).arg(v.toInt()).arg(readVal.toInt())));
+            }
         }
     }
 
@@ -310,10 +386,8 @@ private slots:
                  << "isValid:" << def.isValid()
                  << "validValues:" << def.constraint.validValues.size();
 
-        if (!def.isValid()) {
-            qDebug() << "analog_gain definition is invalid (constraint not loaded), skipping";
-            return;
-        }
+        QVERIFY2(def.isValid(),
+                 qPrintable(QString("analog_gain definition should be valid")));
 
         if (def.type == ParameterType::FloatRange) {
             testFloatRangeParam("analog_gain");
@@ -344,10 +418,8 @@ private slots:
                  << "isValid:" << def.isValid()
                  << "validValues:" << def.constraint.validValues.size();
 
-        if (!def.isValid()) {
-            qDebug() << "adc_quality definition is invalid (constraint not loaded), skipping";
-            return;
-        }
+        QVERIFY2(def.isValid(),
+                 qPrintable(QString("adc_quality definition should be valid")));
 
         if (def.type == ParameterType::StringCollection) {
             testCollectionParam("adc_quality", ParameterType::StringCollection);
@@ -369,17 +441,47 @@ private slots:
                  << "isValid:" << def.isValid()
                  << "validValues:" << def.constraint.validValues.size();
 
-        if (!def.isValid()) {
-            qDebug() << "adc_speed definition is invalid (constraint not loaded), skipping";
-            return;
-        }
+        QVERIFY2(def.isValid(),
+                 qPrintable(QString("adc_speed definition should be valid")));
 
         if (def.type == ParameterType::StringCollection) {
             testCollectionParam("adc_speed", ParameterType::StringCollection);
         } else if (def.type == ParameterType::IntRange) {
             testIntRangeParam("adc_speed");
+        } else if (def.type == ParameterType::FloatRange) {
+            testFloatRangeParam("adc_speed");
+        } else if (def.type == ParameterType::FloatCollection) {
+            testCollectionParam("adc_speed", ParameterType::FloatCollection);
+        } else if (def.type == ParameterType::IntCollection) {
+            testCollectionParam("adc_speed", ParameterType::IntCollection);
         } else {
             qDebug() << "adc_speed has unsupported type, skipping";
+        }
+    }
+
+    //==========================================================================
+    // Pixel Format Parameter
+    //==========================================================================
+    void test_param_pixel_format()
+    {
+        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
+        if (!m_params.contains("pixel_format")) {
+            qDebug() << "pixel_format not available, skipping";
+            return;
+        }
+
+        ParameterDefinition def = m_driver->parameter("pixel_format");
+        qDebug() << "pixel_format type:" << static_cast<int>(def.type)
+                 << "isValid:" << def.isValid()
+                 << "validValues:" << def.constraint.validValues.size();
+
+        QVERIFY2(def.isValid(),
+                 qPrintable(QString("pixel_format definition should be valid")));
+
+        if (def.type == ParameterType::StringCollection) {
+            testCollectionParam("pixel_format", ParameterType::StringCollection);
+        } else {
+            qDebug() << "pixel_format has unsupported type, skipping";
         }
     }
 
@@ -521,12 +623,21 @@ private slots:
         }
 
         ParameterDefinition def = m_driver->parameter("sensor_temperature");
+        QVERIFY2(def.isValid(), "sensor_temperature definition should be valid");
+        QVERIFY2(def.isReadOnly, "sensor_temperature should be read-only");
         qDebug() << "sensor_temperature type:" << static_cast<int>(def.type);
 
-        if (m_params.contains("sensor_temperature_target")) {
-            testFloatRangeParam("sensor_temperature_target");
-            QVariant currentTemp = m_driver->parameterValue("sensor_temperature");
-            qDebug() << "Current sensor temperature:" << currentTemp.toString();
+        QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+        QVariant currentTemp = m_driver->parameterValue("sensor_temperature");
+        QVERIFY2(currentTemp.isValid(), "sensor_temperature value should be readable");
+        QVERIFY2(errorSpy.isEmpty() || errorSpy.at(0).at(0).value<CameraError>().code == CameraError::Code::None,
+                 "Reading sensor_temperature should not produce error");
+        qDebug() << "Current sensor temperature:" << currentTemp.toString();
+        QVERIFY2(currentTemp.toDouble() != 0.0,
+                 qPrintable(QString("sensor_temperature should not be 0, got %1").arg(currentTemp.toString())));
+
+        if (m_params.contains("temperature_setpoint")) {
+            testFloatRangeParam("temperature_setpoint");
         }
     }
 
@@ -537,22 +648,43 @@ private slots:
     {
         if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
 
-        verifyParamReadOnly("sensor_extended_height", ParameterType::IntRange);
-        verifyParamReadOnly("sensor_secondary_height", ParameterType::IntRange);
-        verifyParamReadOnly("sensor_left_margin", ParameterType::IntRange);
-        verifyParamReadOnly("sensor_right_margin", ParameterType::IntRange);
-        verifyParamReadOnly("sensor_top_margin", ParameterType::IntRange);
-        verifyParamReadOnly("sensor_bottom_margin", ParameterType::IntRange);
-        verifyParamReadOnly("sensor_masked_height", ParameterType::IntRange);
-        verifyParamReadOnly("sensor_masked_top", ParameterType::IntRange);
-        verifyParamReadOnly("sensor_masked_bottom", ParameterType::IntRange);
-        verifyParamReadOnly("sensor_secondary_masked_height", ParameterType::IntRange);
+        verifyParamReadOnly("pixel_width", ParameterType::FloatRange);
+        verifyParamReadOnly("pixel_height", ParameterType::FloatRange);
+
+        QStringList intParams = {
+            "sensor_extended_height", "sensor_secondary_height",
+            "sensor_left_margin", "sensor_right_margin",
+            "sensor_top_margin", "sensor_bottom_margin",
+            "sensor_masked_height", "sensor_masked_top",
+            "sensor_masked_bottom", "sensor_secondary_masked_height"
+        };
+        for (const QString &name : intParams) {
+            if (!m_params.contains(name)) {
+                qDebug() << "Skipping" << name << "- not available";
+                continue;
+            }
+            verifyParamExists(name);
+            ParameterDefinition def = m_driver->parameter(name);
+            QVERIFY2(def.isReadOnly,
+                     qPrintable(QString("Parameter '%1' should be read-only").arg(name)));
+            QVERIFY2(def.type == ParameterType::IntRange,
+                     qPrintable(QString("Parameter '%1' type should be IntRange, got %2")
+                         .arg(name).arg(static_cast<int>(def.type))));
+
+            QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+            QVariant value = m_driver->parameterValue(name);
+            QVERIFY2(value.isValid(),
+                     qPrintable(QString("Should read value for '%1'").arg(name)));
+            QVERIFY2(errorSpy.isEmpty() || errorSpy.at(0).at(0).value<CameraError>().code == CameraError::Code::None,
+                     qPrintable(QString("Reading '%1' should not produce error").arg(name)));
+            QVERIFY2(value.toInt() >= 0,
+                     qPrintable(QString("'%1' value should be >= 0, got %2").arg(name).arg(value.toString())));
+        }
+
         verifyParamReadOnly("sensor_type", ParameterType::StringCollection);
         verifyParamReadOnly("ccd_chars", ParameterType::StringCollection);
         verifyParamReadOnly("orientation", ParameterType::StringCollection);
         verifyParamReadOnly("readout_orientation", ParameterType::StringCollection);
-        verifyParamReadOnly("pixel_width", ParameterType::FloatRange);
-        verifyParamReadOnly("pixel_height", ParameterType::FloatRange);
     }
 
     //==========================================================================
@@ -571,11 +703,15 @@ private slots:
     {
         if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
         ParameterDefinition def = m_driver->parameter("adc_bit_depth");
-        if (!def.isValid()) {
-            qDebug() << "adc_bit_depth definition is invalid, skipping";
-            return;
+        QVERIFY2(def.isValid(),
+                 qPrintable(QString("adc_bit_depth definition should be valid")));
+        if (def.type == ParameterType::IntRange) {
+            testIntRangeParam("adc_bit_depth");
+        } else if (def.type == ParameterType::IntCollection) {
+            testCollectionParam("adc_bit_depth", ParameterType::IntCollection);
+        } else {
+            qDebug() << "adc_bit_depth has unsupported type, skipping";
         }
-        testIntRangeParam("adc_bit_depth");
     }
 
     //==========================================================================
@@ -592,10 +728,8 @@ private slots:
                 continue;
             }
             ParameterDefinition def = m_driver->parameter(name);
-            if (!def.isValid()) {
-                qDebug() << name << "definition is invalid (constraint not loaded), skipping";
-                continue;
-            }
+            QVERIFY2(def.isValid(),
+                     qPrintable(QString("'%1' definition should be valid").arg(name)));
             verifyParamReadWrite(name, ParameterType::StringCollection);
             bool ok = m_driver->setParameter(name, def.constraint.validValues.first());
             QVERIFY2(ok, qPrintable(QString("Should set '%1' to first value").arg(name)));
@@ -616,10 +750,8 @@ private slots:
         for (const QString &name : enumNames) {
             if (!m_params.contains(name)) continue;
             ParameterDefinition def = m_driver->parameter(name);
-            if (!def.isValid()) {
-                qDebug() << name << "definition is invalid, skipping";
-                continue;
-            }
+            QVERIFY2(def.isValid(),
+                     qPrintable(QString("'%1' definition should be valid").arg(name)));
             testCollectionParam(name, ParameterType::StringCollection);
         }
 
@@ -627,11 +759,15 @@ private slots:
         for (const QString &name : floatNames) {
             if (!m_params.contains(name)) continue;
             ParameterDefinition def = m_driver->parameter(name);
-            if (!def.isValid()) {
-                qDebug() << name << "definition is invalid, skipping";
-                continue;
+            QVERIFY2(def.isValid(),
+                     qPrintable(QString("'%1' definition should be valid").arg(name)));
+            if (def.type == ParameterType::FloatRange) {
+                testFloatRangeParam(name);
+            } else if (def.type == ParameterType::FloatCollection) {
+                testCollectionParam(name, ParameterType::FloatCollection);
+            } else {
+                qDebug() << name << "has unsupported type, skipping";
             }
-            testFloatRangeParam(name);
         }
 
         QStringList intNames = {"active_width", "active_height",
@@ -640,17 +776,112 @@ private slots:
         for (const QString &name : intNames) {
             if (!m_params.contains(name)) continue;
             ParameterDefinition def = m_driver->parameter(name);
-            if (!def.isValid()) {
-                qDebug() << name << "definition is invalid, skipping";
-                continue;
-            }
-            verifyParamReadWrite(name, ParameterType::IntRange);
-            bool ok = m_driver->setParameter(name, static_cast<int>(def.constraint.minValue));
-            QVERIFY2(ok, qPrintable(QString("Should set '%1' to min").arg(name)));
-            if (!m_driver->commitParameters()) {
-                qDebug() << name << "commit failed — demo camera may have SDK limitations";
+            QVERIFY2(def.isValid(),
+                     qPrintable(QString("'%1' definition should be valid").arg(name)));
+            if (def.type == ParameterType::IntRange) {
+                verifyParamReadWrite(name, ParameterType::IntRange);
+                bool ok = m_driver->setParameter(name, static_cast<int>(def.constraint.minValue));
+                QVERIFY2(ok, qPrintable(QString("Should set '%1' to min").arg(name)));
+                if (!m_driver->commitParameters()) {
+                    qDebug() << name << "commit failed — demo camera may have SDK limitations";
+                }
+            } else if (def.type == ParameterType::IntCollection) {
+                testCollectionParam(name, ParameterType::IntCollection);
+            } else {
+                qDebug() << name << "has unsupported type, skipping";
             }
         }
+
+        // Test invalid value rejection on StringCollection parameter
+        QStringList invalidCandidates = {"readout_mode", "shutter_mode"};
+        QString invalidTarget;
+        ParameterDefinition invalidDef;
+        for (const QString &name : invalidCandidates) {
+            if (!m_params.contains(name)) continue;
+            invalidDef = m_driver->parameter(name);
+            if (invalidDef.isValid() && !invalidDef.isReadOnly
+                && invalidDef.type == ParameterType::StringCollection
+                && !invalidDef.constraint.validValues.isEmpty()) {
+                invalidTarget = name;
+                break;
+            }
+        }
+        if (!invalidTarget.isEmpty()) {
+            QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+            m_driver->setParameter(invalidTarget, "InvalidValue_XYZ_999");
+            m_driver->commitParameters();
+            bool gotError = !errorSpy.isEmpty()
+                && errorSpy.at(0).at(0).value<CameraError>().code != CameraError::Code::None;
+            qDebug() << "Invalid value for" << invalidTarget << "produced error:" << gotError;
+            QVERIFY2(gotError,
+                     qPrintable(QString("Invalid value for '%1' should be rejected").arg(invalidTarget)));
+        } else {
+            qDebug() << "No suitable writable StringCollection param for invalid value test, skipping";
+        }
+    }
+
+    //==========================================================================
+    // Writable Parameters — Default Value Commit Test
+    //==========================================================================
+    void test_param_all_writable_default_commit()
+    {
+        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
+
+        QStringList roiSubParams = {"roi_x", "roi_y", "roi_width", "roi_height",
+                                    "roi_x_binning", "roi_y_binning"};
+
+        int failureCount = 0;
+        QStringList failedParams;
+
+        for (const QString &name : m_params) {
+            ParameterDefinition def = m_driver->parameter(name);
+            QVERIFY2(def.isValid(),
+                     qPrintable(QString("'%1' definition should be valid").arg(name)));
+            if (def.isReadOnly) {
+                continue;
+            }
+
+            if (roiSubParams.contains(name)) {
+                continue;
+            }
+
+            if (!def.defaultValue.isValid()) {
+                qDebug() << "Skipping" << name << "- no default value";
+                continue;
+            }
+
+            QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+
+            bool setOk = m_driver->setParameter(name, def.defaultValue);
+            if (!setOk) {
+                failureCount++;
+                failedParams.append(name + " (setParameter rejected)");
+                continue;
+            }
+
+            bool commitOk = m_driver->commitParameters();
+            bool hasError = !errorSpy.isEmpty()
+                && errorSpy.at(0).at(0).value<CameraError>().code != CameraError::Code::None;
+
+            if (!commitOk || hasError) {
+                failureCount++;
+                QString detail = name;
+                if (!commitOk) detail += " (commit failed)";
+                if (hasError) {
+                    CameraError err = errorSpy.at(0).at(0).value<CameraError>();
+                    detail += QString(" (error: %1)").arg(err.description);
+                }
+                failedParams.append(detail);
+            }
+        }
+
+        if (!failedParams.isEmpty()) {
+            qWarning() << "Writable params that failed default commit:" << failedParams;
+        }
+
+        QVERIFY2(failureCount == 0,
+                 qPrintable(QString("%1 writable parameter(s) failed to commit with default value: %2")
+                     .arg(failureCount).arg(failedParams.join(", "))));
     }
 
     //==========================================================================

@@ -227,8 +227,8 @@ inline bool validate(const QVariant &value,
 }
 
 inline QString validateReason(const QVariant &value,
-                               const ParameterConstraint &constraint,
-                               ParameterType type)
+                                const ParameterConstraint &constraint,
+                                ParameterType type)
 {
     switch (type) {
     case ParameterType::FloatRange: {

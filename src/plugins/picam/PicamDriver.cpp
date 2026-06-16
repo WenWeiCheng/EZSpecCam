@@ -12,190 +12,6 @@ Q_LOGGING_CATEGORY(displayCategory, "Display")
 Q_LOGGING_CATEGORY(captureCategory, "Capture")
 Q_LOGGING_CATEGORY(driverCategory, "Driver")
 
-namespace {
-
-struct PicamParameterMetadata {
-    QString displayName;
-    QString description;
-    QVariant defaultValue;
-    float order;
-};
-
-PicamParameterMetadata picamParameterMetadata(PicamParameter param)
-{
-    using M = PicamParameterMetadata;
-    switch (param) {
-    case PicamParameter_ExposureTime:
-        return M{QStringLiteral("Exposure Time"),
-                 QStringLiteral("Camera exposure time in seconds"),
-                 QVariant(0.1), 100.0f};
-    case PicamParameter_AdcBitDepth:
-        return M{QStringLiteral("ADC Bit Depth"),
-                 QStringLiteral("ADC conversion bit depth"),
-                 QVariant(0), 250.0f};
-    case PicamParameter_AdcAnalogGain:
-        return M{QStringLiteral("Analog Gain"),
-                 QStringLiteral("Camera analog gain setting"),
-                 QVariant(), 300.0f};
-    case PicamParameter_AdcSpeed:
-        return M{QStringLiteral("ADC Speed"),
-                 QStringLiteral("ADC readout speed"),
-                 QVariant(), 400.0f};
-    case PicamParameter_AdcQuality:
-        return M{QStringLiteral("ADC Quality"),
-                 QStringLiteral("ADC quality vs speed tradeoff"),
-                 QVariant(), 500.0f};
-    case PicamParameter_PixelFormat:
-        return M{QStringLiteral("Pixel Format"),
-                 QStringLiteral("Image pixel format"),
-                 QVariant(), 600.0f};
-    case PicamParameter_PixelBitDepth:
-        return M{QStringLiteral("Pixel Bit Depth"),
-                 QStringLiteral("Image bit depth"),
-                 QVariant(0), 68.0f};
-    case PicamParameter_SensorTemperatureReading:
-        return M{QStringLiteral("Sensor Temperature"),
-                 QStringLiteral("Current sensor temperature in Celsius"),
-                 QVariant(0.0), 800.0f};
-    case PicamParameter_SensorTemperatureSetPoint:
-        return M{QStringLiteral("Temperature Setpoint"),
-                 QStringLiteral("Target sensor temperature in Celsius"),
-                 QVariant(-75.0), 810.0f};
-    case PicamParameter_SensorTemperatureStatus:
-        return M{QStringLiteral("Temperature Status"),
-                 QStringLiteral("Cooler status"),
-                 QVariant(), 820.0f};
-    case PicamParameter_SensorActiveWidth:
-        return M{QStringLiteral("Sensor Width"),
-                 QStringLiteral("Sensor width in pixels"),
-                 QVariant(0), 50.0f};
-    case PicamParameter_SensorActiveHeight:
-        return M{QStringLiteral("Sensor Height"),
-                 QStringLiteral("Sensor height in pixels"),
-                 QVariant(0), 51.0f};
-    case PicamParameter_SensorActiveExtendedHeight:
-        return M{QStringLiteral("Sensor Extended Height"),
-                 QStringLiteral("Sensor active extended height in pixels"),
-                 QVariant(0), 52.0f};
-    case PicamParameter_SensorSecondaryActiveHeight:
-        return M{QStringLiteral("Sensor Secondary Height"),
-                 QStringLiteral("Sensor secondary active height in pixels"),
-                 QVariant(0), 53.0f};
-    case PicamParameter_SensorActiveLeftMargin:
-        return M{QStringLiteral("Sensor Left Margin"),
-                 QStringLiteral("Sensor active left margin in pixels"),
-                 QVariant(0), 54.0f};
-    case PicamParameter_SensorActiveRightMargin:
-        return M{QStringLiteral("Sensor Right Margin"),
-                 QStringLiteral("Sensor active right margin in pixels"),
-                 QVariant(0), 55.0f};
-    case PicamParameter_SensorActiveTopMargin:
-        return M{QStringLiteral("Sensor Top Margin"),
-                 QStringLiteral("Sensor active top margin in pixels"),
-                 QVariant(0), 56.0f};
-    case PicamParameter_SensorActiveBottomMargin:
-        return M{QStringLiteral("Sensor Bottom Margin"),
-                 QStringLiteral("Sensor active bottom margin in pixels"),
-                 QVariant(0), 57.0f};
-    case PicamParameter_SensorMaskedHeight:
-        return M{QStringLiteral("Sensor Masked Height"),
-                 QStringLiteral("Sensor masked height in pixels"),
-                 QVariant(0), 58.0f};
-    case PicamParameter_SensorMaskedTopMargin:
-        return M{QStringLiteral("Sensor Masked Top"),
-                 QStringLiteral("Sensor masked top margin in pixels"),
-                 QVariant(0), 59.0f};
-    case PicamParameter_SensorMaskedBottomMargin:
-        return M{QStringLiteral("Sensor Masked Bottom"),
-                 QStringLiteral("Sensor masked bottom margin in pixels"),
-                 QVariant(0), 60.0f};
-    case PicamParameter_SensorSecondaryMaskedHeight:
-        return M{QStringLiteral("Sensor Secondary Masked Height"),
-                 QStringLiteral("Sensor secondary masked height in pixels"),
-                 QVariant(0), 61.0f};
-    case PicamParameter_SensorType:
-        return M{QStringLiteral("Sensor Type"),
-                 QStringLiteral("Camera sensor type"),
-                 QVariant(), 62.0f};
-    case PicamParameter_CcdCharacteristics:
-        return M{QStringLiteral("CCD Characteristics"),
-                 QStringLiteral("CCD sensor characteristics"),
-                 QVariant(), 63.0f};
-    case PicamParameter_Orientation:
-        return M{QStringLiteral("Orientation"),
-                 QStringLiteral("Physical sensor orientation"),
-                 QVariant(), 64.0f};
-    case PicamParameter_ReadoutOrientation:
-        return M{QStringLiteral("Readout Orientation"),
-                 QStringLiteral("Readout port orientation"),
-                 QVariant(), 65.0f};
-    case PicamParameter_PixelWidth:
-        return M{QStringLiteral("Pixel Width"),
-                 QStringLiteral("Pixel width in microns"),
-                 QVariant(0.0), 66.0f};
-    case PicamParameter_PixelHeight:
-        return M{QStringLiteral("Pixel Height"),
-                 QStringLiteral("Pixel height in microns"),
-                 QVariant(0.0), 67.0f};
-    case PicamParameter_ReadoutControlMode:
-        return M{QStringLiteral("Readout Mode"),
-                 QStringLiteral("Camera readout mode"),
-                 QVariant(), 800.0f};
-    case PicamParameter_TriggerResponse:
-        return M{QStringLiteral("Trigger Response"),
-                 QStringLiteral("Trigger response mode"),
-                 QVariant(), 900.0f};
-    case PicamParameter_TriggerDetermination:
-        return M{QStringLiteral("Trigger Determination"),
-                 QStringLiteral("Trigger signal polarity"),
-                 QVariant(), 910.0f};
-    case PicamParameter_OutputSignal:
-        return M{QStringLiteral("Output Signal"),
-                 QStringLiteral("Output signal selection"),
-                 QVariant(), 920.0f};
-    case PicamParameter_ShutterTimingMode:
-        return M{QStringLiteral("Shutter Mode"),
-                 QStringLiteral("Shutter timing mode"),
-                 QVariant(), 1010.0f};
-    case PicamParameter_ShutterClosingDelay:
-        return M{QStringLiteral("Shutter Delay"),
-                 QStringLiteral("Shutter closing delay in ms"),
-                 QVariant(0.0), 1020.0f};
-    case PicamParameter_VerticalShiftRate:
-        return M{QStringLiteral("Vertical Shift Rate"),
-                 QStringLiteral("Vertical shift speed in us/row"),
-                 QVariant(0.0), 1030.0f};
-    case PicamParameter_ActiveWidth:
-        return M{QStringLiteral("Active Width"),
-                 QStringLiteral("Sensor readout active width in pixels"),
-                 QVariant(0), 1040.0f};
-    case PicamParameter_ActiveHeight:
-        return M{QStringLiteral("Active Height"),
-                 QStringLiteral("Sensor readout active height in pixels"),
-                 QVariant(0), 1050.0f};
-    case PicamParameter_ActiveLeftMargin:
-        return M{QStringLiteral("Active Left"),
-                 QStringLiteral("Active area left margin in pixels"),
-                 QVariant(0), 1060.0f};
-    case PicamParameter_ActiveRightMargin:
-        return M{QStringLiteral("Active Right"),
-                 QStringLiteral("Active area right margin in pixels"),
-                 QVariant(0), 1070.0f};
-    case PicamParameter_ActiveTopMargin:
-        return M{QStringLiteral("Active Top"),
-                 QStringLiteral("Active area top margin in pixels"),
-                 QVariant(0), 1080.0f};
-    case PicamParameter_ActiveBottomMargin:
-        return M{QStringLiteral("Active Bottom"),
-                 QStringLiteral("Active area bottom margin in pixels"),
-                 QVariant(0), 1090.0f};
-    default:
-        return M{QString(), QString(), QVariant(), 10000000.0f};
-    }
-}
-
-}
-
 //==============================================================================
 // Static Members
 //==============================================================================
@@ -223,17 +39,18 @@ PicamDriver::~PicamDriver()
 // SDK Lifecycle (Static)
 //==============================================================================
 
-void PicamDriver::initializeSDK()
+bool PicamDriver::initializeSDK()
 {
     if (!s_sdkInitialized.load()) {
         PicamError err = Picam_InitializeLibrary();
         if (err != PicamError_None) {
             qCCritical(driverCategory) << "Picam_InitializeLibrary failed:" << err;
-            return;
+            return false;
         }
         s_sdkInitialized.store(true);
     }
     s_sdkRefCount.fetch_add(1);
+    return true;
 }
 
 void PicamDriver::shutdownSDK()
@@ -254,7 +71,13 @@ void PicamDriver::shutdownSDK()
 QStringList PicamDriver::enumerate()
 {
     QMutexLocker locker(&m_mutex);
-    initializeSDK();
+    if (!initializeSDK()) {
+        m_lastError = CameraError::makeError(
+            CameraError::Code::DriverError,
+            "Failed to initialize PICam SDK");
+        emit errorOccurred(m_lastError);
+        return QStringList();
+    }
 
     QStringList cameras;
 
@@ -303,7 +126,14 @@ bool PicamDriver::connectToCamera(const QString &cameraId)
 
     m_state.store(CameraState::Connecting);
 
-    initializeSDK();
+    if (!initializeSDK()) {
+        m_lastError = CameraError::makeError(
+            CameraError::Code::DriverError,
+            "Failed to initialize PICam SDK");
+        emit errorOccurred(m_lastError);
+        m_state.store(CameraState::Disconnected);
+        return false;
+    }
 
     // Try to find the requested camera in the list of open cameras
     const PicamHandle* handles = nullptr;
@@ -451,6 +281,7 @@ bool PicamDriver::setParameter(const QString &name, const QVariant &value)
         m_lastError = CameraError::makeError(
             CameraError::Code::InvalidParameter,
             QString("Unknown parameter: %1").arg(name));
+        emit errorOccurred(m_lastError);
         return false;
     }
 
@@ -464,6 +295,7 @@ bool PicamDriver::setParameter(const QString &name, const QVariant &value)
         m_lastError = CameraError::makeError(
             CameraError::Code::InvalidParameter,
             QString("Invalid value for %1").arg(name));
+        emit errorOccurred(m_lastError);
         return false;
     }
 
@@ -514,13 +346,16 @@ bool PicamDriver::commitParameters()
         PicamError err = Picam_SetParameterRoisValue(
             m_handle, PicamParameter_Rois, &rois);
         if (err != PicamError_None) {
-        m_lastError = CameraError::makeError(
-            CameraError::Code::CommitFailed,
-            QString("Failed to set ROI: %1").arg(err));
+            m_lastError = CameraError::makeError(
+                CameraError::Code::CommitFailed,
+                QString("Failed to set ROI: %1").arg(err));
+            emit errorOccurred(m_lastError);
             return false;
         }
         m_roiDirty = false;
     }
+
+    bool hasPendingError = false;
 
     for (auto it = m_pendingParameters.constBegin(); it != m_pendingParameters.constEnd(); ++it) {
         const QString& name = it.key();
@@ -561,6 +396,12 @@ bool PicamDriver::commitParameters()
 
         if (err != PicamError_None) {
             qCWarning(parameterCategory) << "Failed to set" << name << ":" << err;
+            m_lastError = CameraError::makeError(
+                CameraError::Code::CommitFailed,
+                QString("Failed to set parameter %1: %2").arg(name).arg(err),
+                CameraError::Severity::Warning);
+            emit errorOccurred(m_lastError);
+            hasPendingError = true;
         }
     }
 
@@ -576,6 +417,7 @@ bool PicamDriver::commitParameters()
         m_lastError = CameraError::makeError(
             CameraError::Code::CommitFailed,
             QString("Commit failed: %1 (%2 params failed)").arg(err).arg(failedCount));
+        emit errorOccurred(m_lastError);
         return false;
     }
 
@@ -586,7 +428,7 @@ bool PicamDriver::commitParameters()
 
     syncAllValuesFromHardware();
 
-    return true;
+    return !hasPendingError;
 }
 
 //==============================================================================
@@ -601,6 +443,7 @@ bool PicamDriver::startCapture(int captureCount)
         m_lastError = CameraError::makeError(
             CameraError::Code::StateInvalid,
             "Camera not connected");
+        emit errorOccurred(m_lastError);
         return false;
     }
 
@@ -654,8 +497,11 @@ void PicamDriver::onCaptureLoop()
 
     PicamError err = Picam_StartAcquisition(m_handle);
     if (err != PicamError_None) {
-        qCWarning(captureCategory) << "Picam_StartAcquisition failed:" << err;
-        QMetaObject::invokeMethod(this, [this]() {
+        QMetaObject::invokeMethod(this, [this, err]() {
+            m_lastError = CameraError::makeError(
+                CameraError::Code::CaptureFailed,
+                QString("Failed to start acquisition: %1").arg(err));
+            emit errorOccurred(m_lastError);
             m_capturing.store(false);
             m_state.store(CameraState::Connected);
             emit captureStopped(m_connectedCameraId);
@@ -687,12 +533,23 @@ void PicamDriver::onCaptureLoop()
         }
 
         if (err != PicamError_None) {
-            qCWarning(captureCategory) << "Picam_WaitForAcquisitionUpdate failed:" << err;
+            QMetaObject::invokeMethod(this, [this, err]() {
+                m_lastError = CameraError::makeError(
+                    CameraError::Code::CaptureFailed,
+                    QString("Acquisition update failed: %1").arg(err));
+                emit errorOccurred(m_lastError);
+            }, Qt::QueuedConnection);
             break;
         }
 
         if (status.errors != PicamAcquisitionErrorsMask_None) {
-            qCWarning(captureCategory) << "Acquisition errors:" << status.errors;
+            QMetaObject::invokeMethod(this, [this, errors = status.errors]() {
+                m_lastError = CameraError::makeError(
+                    CameraError::Code::CaptureFailed,
+                    QString("Acquisition errors: %1").arg(errors),
+                    CameraError::Severity::Warning);
+                emit errorOccurred(m_lastError);
+            }, Qt::QueuedConnection);
         }
 
         if (data.readout_count > 0) {
@@ -751,7 +608,13 @@ void PicamDriver::processFrame(const PicamAvailableData& data)
                      QImage::Format_Grayscale16);
 
         if (image.isNull()) {
-            qCWarning(captureCategory) << "Failed to create QImage from frame data, trying Format_Grayscale8";
+            QMetaObject::invokeMethod(this, [this]() {
+                m_lastError = CameraError::makeError(
+                    CameraError::Code::CaptureFailed,
+                    "Failed to create 16-bit QImage from frame data, falling back to 8-bit",
+                    CameraError::Severity::Warning);
+                emit errorOccurred(m_lastError);
+            }, Qt::QueuedConnection);
             // Fall back to 8-bit if 16-bit fails
             QImage image8(static_cast<const uchar*>(frameData),
                           static_cast<int>(frameWidth),
@@ -759,7 +622,13 @@ void PicamDriver::processFrame(const PicamAvailableData& data)
                           static_cast<int>(frameWidth),
                           QImage::Format_Grayscale8);
             if (image8.isNull()) {
-                qCWarning(captureCategory) << "Failed to create 8-bit grayscale image either";
+                QMetaObject::invokeMethod(this, [this]() {
+                    m_lastError = CameraError::makeError(
+                        CameraError::Code::CaptureFailed,
+                        "Failed to create 8-bit QImage from frame data",
+                        CameraError::Severity::Warning);
+                    emit errorOccurred(m_lastError);
+                }, Qt::QueuedConnection);
                 continue;
             }
             int frameNum = m_framesCaptured.fetch_add(1);
@@ -819,6 +688,10 @@ void PicamDriver::initializeParameterDefinitions()
 
     if (err != PicamError_None || params == nullptr) {
         qCCritical(parameterCategory) << "Picam_GetParameters failed:" << err;
+        m_lastError = CameraError::makeError(
+            CameraError::Code::DriverError,
+            QString("Failed to get camera parameters: %1").arg(err));
+        emit errorOccurred(m_lastError);
         return;
     }
 
@@ -851,17 +724,20 @@ void PicamDriver::initializeParameterDefinitions()
 ParameterDefinition PicamDriver::buildParameterDefinition(PicamParameter param)
 {
     ParameterDefinition def;
-    def.name = mapParameterName(param);
+    def.name = picamParamName(param);
     if (def.name.isEmpty()) {
         return def;
     }
 
-    auto meta = picamParameterMetadata(param);
-    def.displayName = meta.displayName;
-    def.description = meta.description;
-    def.order = meta.order;
-
-    def.category = categorizeParameter(param);
+    const PicamParameterRecord *rec = findByPicamParam(param);
+    if (rec) {
+        def.displayName = rec->displayName;
+        def.description = rec->description;
+        def.order = rec->order;
+        def.category = rec->category;
+    } else {
+        def.category = ParameterCategory::Core;
+    }
 
     PicamValueType vt;
     if (Picam_GetParameterValueType(m_handle, param, &vt) != PicamError_None) {
@@ -874,21 +750,9 @@ ParameterDefinition PicamDriver::buildParameterDefinition(PicamParameter param)
         def.isReadOnly = (access == PicamValueAccess_ReadOnly);
     }
 
-    if (vt == PicamValueType_Integer || vt == PicamValueType_LargeInteger) {
-        const PicamRangeConstraint* range = nullptr;
-        if (Picam_GetParameterRangeConstraint(m_handle, param, PicamConstraintCategory_Capable, &range) == PicamError_None && range != nullptr) {
-            def.constraint.minValue = range->minimum;
-            def.constraint.maxValue = range->maximum;
-            def.constraint.step = range->increment;
-        }
-    } else if (vt == PicamValueType_FloatingPoint) {
-        const PicamRangeConstraint* range = nullptr;
-        if (Picam_GetParameterRangeConstraint(m_handle, param, PicamConstraintCategory_Capable, &range) == PicamError_None && range != nullptr) {
-            def.constraint.minValue = range->minimum;
-            def.constraint.maxValue = range->maximum;
-            def.constraint.step = range->increment;
-        }
-    } else if (vt == PicamValueType_Enumeration) {
+    bool constraintLoaded = false;
+
+    if (vt == PicamValueType_Enumeration) {
         const PicamCollectionConstraint* constraint = nullptr;
         if (Picam_GetParameterCollectionConstraint(m_handle, param, PicamConstraintCategory_Capable, &constraint) == PicamError_None && constraint != nullptr) {
             PicamEnumeratedType etype;
@@ -901,6 +765,32 @@ ParameterDefinition PicamDriver::buildParameterDefinition(PicamParameter param)
                 }
             }
             Picam_DestroyCollectionConstraints(constraint);
+            constraintLoaded = true;
+        }
+    } else {
+        const PicamRangeConstraint* range = nullptr;
+        if (Picam_GetParameterRangeConstraint(m_handle, param, PicamConstraintCategory_Capable, &range) == PicamError_None && range != nullptr) {
+            def.constraint.minValue = range->minimum;
+            def.constraint.maxValue = range->maximum;
+            def.constraint.step = range->increment;
+            constraintLoaded = true;
+        }
+
+        if (!constraintLoaded) {
+            const PicamCollectionConstraint* collection = nullptr;
+            if (Picam_GetParameterCollectionConstraint(m_handle, param, PicamConstraintCategory_Capable, &collection) == PicamError_None && collection != nullptr) {
+                for (piint i = 0; i < collection->values_count; ++i) {
+                    def.constraint.validValues.append(static_cast<double>(collection->values_array[i]));
+                }
+                Picam_DestroyCollectionConstraints(collection);
+                constraintLoaded = true;
+
+                if (vt == PicamValueType_FloatingPoint) {
+                    def.type = ParameterType::FloatCollection;
+                } else {
+                    def.type = ParameterType::IntCollection;
+                }
+            }
         }
     }
 
@@ -945,8 +835,8 @@ ParameterDefinition PicamDriver::buildParameterDefinition(PicamParameter param)
             break;
     }
 
-    if (!def.defaultValue.isValid() && meta.defaultValue.isValid()) {
-        def.defaultValue = meta.defaultValue;
+    if (!def.defaultValue.isValid() && rec && rec->fallbackDefault.isValid()) {
+        def.defaultValue = rec->fallbackDefault;
     }
 
     if (!def.defaultValue.isValid()
@@ -1006,101 +896,6 @@ ParameterDefinition PicamDriver::buildParameterDefinition(PicamParameter param)
     DRIVER_DEBUG << "Default value for" << def.name << "is" << def.defaultValue;
 
     return def;
-}
-
-ParameterCategory PicamDriver::categorizeParameter(PicamParameter param) const
-{
-    switch (param) {
-    case PicamParameter_SensorActiveWidth:
-    case PicamParameter_SensorActiveHeight:
-    case PicamParameter_SensorActiveExtendedHeight:
-    case PicamParameter_SensorActiveLeftMargin:
-    case PicamParameter_SensorActiveRightMargin:
-    case PicamParameter_SensorActiveTopMargin:
-    case PicamParameter_SensorActiveBottomMargin:
-    case PicamParameter_SensorSecondaryActiveHeight:
-    case PicamParameter_SensorMaskedHeight:
-    case PicamParameter_SensorSecondaryMaskedHeight:
-    case PicamParameter_SensorMaskedTopMargin:
-    case PicamParameter_SensorMaskedBottomMargin:
-    case PicamParameter_SensorType:
-    case PicamParameter_CcdCharacteristics:
-    case PicamParameter_Orientation:
-    case PicamParameter_ReadoutOrientation:
-    case PicamParameter_PixelWidth:
-    case PicamParameter_PixelHeight:
-    case PicamParameter_PixelBitDepth:
-        return ParameterCategory::Info;
-
-    case PicamParameter_SensorTemperatureStatus:
-        return ParameterCategory::Info;
-
-    case PicamParameter_SensorTemperatureReading:
-    case PicamParameter_SensorTemperatureSetPoint:
-        return ParameterCategory::Cooling;
-
-    case PicamParameter_ShutterTimingMode:
-    case PicamParameter_ShutterClosingDelay:
-    case PicamParameter_VerticalShiftRate:
-    case PicamParameter_ActiveWidth:
-    case PicamParameter_ActiveHeight:
-    case PicamParameter_ActiveLeftMargin:
-    case PicamParameter_ActiveRightMargin:
-    case PicamParameter_ActiveTopMargin:
-    case PicamParameter_ActiveBottomMargin:
-        return ParameterCategory::Advanced;
-
-    default:
-        return ParameterCategory::Core;
-    }
-}
-
-QString PicamDriver::mapParameterName(PicamParameter param) const
-{
-    switch (param) {
-    case PicamParameter_ExposureTime: return "exposure";
-    case PicamParameter_AdcAnalogGain: return "analog_gain";
-    case PicamParameter_AdcSpeed: return "adc_speed";
-    case PicamParameter_AdcQuality: return "adc_quality";
-    case PicamParameter_AdcBitDepth: return "adc_bit_depth";
-    case PicamParameter_PixelFormat: return "pixel_format";
-    case PicamParameter_PixelBitDepth: return "bit_depth";
-    case PicamParameter_SensorTemperatureReading: return "sensor_temperature";
-    case PicamParameter_SensorTemperatureSetPoint: return "temperature_setpoint";
-    case PicamParameter_SensorTemperatureStatus: return "temperature_status";
-    case PicamParameter_SensorActiveWidth: return "sensor_width";
-    case PicamParameter_SensorActiveHeight: return "sensor_height";
-    case PicamParameter_SensorActiveExtendedHeight: return "sensor_extended_height";
-    case PicamParameter_SensorActiveLeftMargin: return "sensor_left_margin";
-    case PicamParameter_SensorActiveRightMargin: return "sensor_right_margin";
-    case PicamParameter_SensorActiveTopMargin: return "sensor_top_margin";
-    case PicamParameter_SensorActiveBottomMargin: return "sensor_bottom_margin";
-    case PicamParameter_SensorSecondaryActiveHeight: return "sensor_secondary_height";
-    case PicamParameter_SensorMaskedHeight: return "sensor_masked_height";
-    case PicamParameter_SensorSecondaryMaskedHeight: return "sensor_secondary_masked_height";
-    case PicamParameter_SensorMaskedTopMargin: return "sensor_masked_top";
-    case PicamParameter_SensorMaskedBottomMargin: return "sensor_masked_bottom";
-    case PicamParameter_SensorType: return "sensor_type";
-    case PicamParameter_CcdCharacteristics: return "ccd_chars";
-    case PicamParameter_Orientation: return "orientation";
-    case PicamParameter_ReadoutOrientation: return "readout_orientation";
-    case PicamParameter_PixelWidth: return "pixel_width";
-    case PicamParameter_PixelHeight: return "pixel_height";
-    case PicamParameter_ReadoutControlMode: return "readout_mode";
-    case PicamParameter_TriggerResponse: return "trigger_response";
-    case PicamParameter_TriggerDetermination: return "trigger_determination";
-    case PicamParameter_OutputSignal: return "output_signal";
-    case PicamParameter_ShutterTimingMode: return "shutter_mode";
-    case PicamParameter_ShutterClosingDelay: return "shutter_delay";
-    case PicamParameter_VerticalShiftRate: return "vertical_shift_rate";
-    case PicamParameter_ActiveWidth: return "active_width";
-    case PicamParameter_ActiveHeight: return "active_height";
-    case PicamParameter_ActiveLeftMargin: return "active_left";
-    case PicamParameter_ActiveRightMargin: return "active_right";
-    case PicamParameter_ActiveTopMargin: return "active_top";
-    case PicamParameter_ActiveBottomMargin: return "active_bottom";
-    default: return QString();
-    }
 }
 
 void PicamDriver::initializeRoisSubParameters()
@@ -1401,7 +1196,7 @@ void PicamDriver::assembleRois(PicamRois &rois) const
 
 PicamError PicamDriver::setEnumeratedParameter(PicamParameter param, const QString &value)
 {
-    QString name = mapParameterNameReverse(param);
+    QString name = picamParamName(param);
     if (name.isEmpty()) {
         return PicamError_InvalidParameterValue;
     }
@@ -1430,21 +1225,4 @@ PicamError PicamDriver::setEnumeratedParameter(PicamParameter param, const QStri
 
     Picam_DestroyCollectionConstraints(constraint);
     return err;
-}
-
-QString PicamDriver::mapParameterNameReverse(PicamParameter param) const
-{
-    switch (param) {
-    case PicamParameter_ExposureTime: return "exposure";
-    case PicamParameter_AdcAnalogGain: return "analog_gain";
-    case PicamParameter_AdcSpeed: return "adc_speed";
-    case PicamParameter_AdcQuality: return "adc_quality";
-    case PicamParameter_PixelFormat: return "pixel_format";
-    case PicamParameter_PixelBitDepth: return "bit_depth";
-    case PicamParameter_SensorTemperatureReading: return "sensor_temperature";
-    case PicamParameter_SensorTemperatureSetPoint: return "temperature_setpoint";
-    case PicamParameter_SensorActiveWidth: return "sensor_width";
-    case PicamParameter_SensorActiveHeight: return "sensor_height";
-    default: return QString();
-    }
 }

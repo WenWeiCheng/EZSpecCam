@@ -34,6 +34,7 @@ add_executable(test_picam_driver_PIXIS100B)
 target_sources(test_picam_driver_PIXIS100B PRIVATE
     test_picam_driver_PIXIS100B.cpp
     ${CMAKE_SOURCE_DIR}/src/plugins/picam/PicamDriver.cpp
+    ${CMAKE_SOURCE_DIR}/src/plugins/picam/PicamParameterRegistry.cpp
 )
 
 target_link_libraries(test_picam_driver_PIXIS100B PRIVATE
