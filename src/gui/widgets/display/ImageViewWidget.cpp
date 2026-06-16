@@ -91,9 +91,19 @@ void ImageViewWidget::updateColorMap(const QImage &image)
     const int dataWidth = image.width();
     const int dataHeight = image.height();
 
+    QCPRange keyRange;
+    QCPRange valueRange;
+    if (m_userHasZoomed) {
+        keyRange = m_plot->xAxis->range();
+        valueRange = m_plot->yAxis->range();
+    } else {
+        keyRange = QCPRange(0, origWidth);
+        valueRange = QCPRange(0, origHeight);
+    }
+
     QCPColorMapData *newMapData = new QCPColorMapData(dataWidth, dataHeight,
-                                                       QCPRange(0, origWidth),
-                                                       QCPRange(0, origHeight));
+                                                       keyRange,
+                                                       valueRange);
 
     if (image.format() == QImage::Format_Grayscale16) {
         for (int y = 0; y < dataHeight; ++y) {
@@ -122,8 +132,8 @@ void ImageViewWidget::updateColorMap(const QImage &image)
     if (!m_userHasZoomed) {
         m_plot->xAxis->setRange(0, origWidth);
         m_plot->yAxis->setRange(0, origHeight);
-        m_plot->replot(QCustomPlot::rpQueuedReplot);
     }
+    m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
 void ImageViewWidget::checkOverexposure(const QImage &image)
@@ -639,6 +649,44 @@ void ImageViewWidget::updateDisplayData()
         return;
     }
 
+    m_originalPixelCount = m_originalImage.width() * m_originalImage.height();
+
+    if (m_userHasZoomed) {
+        QCPRange xRange = m_plot->xAxis->range();
+        QCPRange yRange = m_plot->yAxis->range();
+
+        int x0 = qMax(0, static_cast<int>(qFloor(xRange.lower)));
+        int y0 = qMax(0, static_cast<int>(qFloor(yRange.lower)));
+        int x1 = qMin(m_originalImage.width(), static_cast<int>(qCeil(xRange.upper)));
+        int y1 = qMin(m_originalImage.height(), static_cast<int>(qCeil(yRange.upper)));
+
+        int cropW = x1 - x0;
+        int cropH = y1 - y0;
+        if (cropW <= 0 || cropH <= 0) {
+            return;
+        }
+
+        QImage crop = m_originalImage.copy(x0, y0, cropW, cropH);
+
+        int viewWidth = m_plot->axisRect()->width();
+        int viewHeight = m_plot->axisRect()->height();
+        if (viewWidth <= 0 || viewHeight <= 0) {
+            viewWidth = m_plot->width() - 100;
+            viewHeight = m_plot->height() - 70;
+        }
+        if (viewWidth <= 0) viewWidth = 600;
+        if (viewHeight <= 0) viewHeight = 400;
+
+        int factorX = qMax(1, cropW / viewWidth);
+        int factorY = qMax(1, cropH / viewHeight);
+
+        m_displayImage = downsampleImage(crop, factorX, factorY);
+        m_displayPixelCount = m_displayImage.width() * m_displayImage.height();
+
+        updateColorMap(m_displayImage);
+        return;
+    }
+
     int prevDownsampleX = m_downsampleX;
     int prevDownsampleY = m_downsampleY;
 
@@ -649,8 +697,6 @@ void ImageViewWidget::updateDisplayData()
         !m_displayImage.isNull()) {
         return;
     }
-
-    m_originalPixelCount = m_originalImage.width() * m_originalImage.height();
 
     m_displayImage = downsampleImage(m_originalImage, m_downsampleX, m_downsampleY);
     m_displayPixelCount = m_displayImage.width() * m_displayImage.height();

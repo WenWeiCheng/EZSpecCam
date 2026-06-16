@@ -657,6 +657,19 @@ void MainWindow::updateDisplay(const ImageData &frame)
         }
     } else {
         m_imageViewWidget->setImage(frame.image);
+
+        if (m_profileWindow && m_profileWindow->isVisible()
+            && m_imageViewWidget->crosshairCount() > 0) {
+            QList<QPointF> positions = m_imageViewWidget->crosshairPositions();
+            if (!positions.isEmpty()) {
+                QPointF pos = positions.first();
+                int x = static_cast<int>(pos.x());
+                int y = static_cast<int>(pos.y());
+                QVector<double> rowData = m_imageViewWidget->extractRowAsVector(y);
+                QVector<double> colData = m_imageViewWidget->extractColumnAsVector(x);
+                m_profileWindow->updateProfile(x, y, rowData, colData);
+            }
+        }
     }
 }
 
