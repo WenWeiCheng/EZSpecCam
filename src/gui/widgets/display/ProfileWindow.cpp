@@ -38,6 +38,7 @@ void ProfileWindow::setupUi()
     QVBoxLayout *verticalLayout = new QVBoxLayout();
     m_verticalLabel = new QLabel("Vertical Profile (Column X)", this);
     m_verticalProfile = new SpectrumViewWidget(this);
+    m_verticalProfile->setXAxisLabel("Y (pixels)");
     verticalLayout->addWidget(m_verticalLabel);
     verticalLayout->addWidget(m_verticalProfile);
 

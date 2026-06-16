@@ -29,6 +29,13 @@ public:
     };
     Q_ENUM(XAxisRangeMode)
 
+    enum class LineStyle {
+        Line,
+        LineAndPoints,
+        Points
+    };
+    Q_ENUM(LineStyle)
+
     enum class IntensityScaleType {
         Auto,
         Log
@@ -46,6 +53,9 @@ public:
     QVector<double> yData() const;
     bool hasData() const;
     void clearData();
+
+    LineStyle lineStyle() const { return m_lineStyle; }
+    void setLineStyle(LineStyle style);
 
     double intensityAt(double x) const;
 
@@ -79,7 +89,7 @@ protected:
 
 private:
     void setupPlot();
-    void updateCursor(double x);
+    void updateCursor(double x, double y);
     double widgetToDataX(int widgetX) const;
     QVector<double> extractRowData(const QImage &image) const;
     void applyXAxisRange();
@@ -95,6 +105,7 @@ private:
     QString m_xAxisLabel;
     QString m_yAxisLabel;
     XAxisRangeMode m_xAxisRangeMode = XAxisRangeMode::Auto;
+    LineStyle m_lineStyle = LineStyle::Line;
     IntensityScaleType m_intensityScaleType = IntensityScaleType::Auto;
     double m_customXMin = 0;
     double m_customXMax = 100;

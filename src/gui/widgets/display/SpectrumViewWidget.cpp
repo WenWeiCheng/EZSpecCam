@@ -39,11 +39,13 @@ void SpectrumViewWidget::setupPlot()
     m_plot->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     m_graph = m_plot->addGraph(m_plot->xAxis, m_plot->yAxis);
-    m_graph->setLineStyle(QCPGraph::lsLine);
-    m_graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssNone));
     m_graph->setPen(QPen(Qt::blue, 1.0));
 
     m_graph->setAdaptiveSampling(true);
+
+    m_lineStyle = LineStyle::Line;
+    m_graph->setLineStyle(QCPGraph::lsLine);
+    m_graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssNone));
 
     m_plot->xAxis->setLabel(m_xAxisLabel);
     m_plot->yAxis->setLabel(m_yAxisLabel);
@@ -72,6 +74,9 @@ void SpectrumViewWidget::setupPlot()
     m_cursorLabel->setVisible(false);
     m_cursorLabel->setPositionAlignment(Qt::AlignTop | Qt::AlignLeft);
     m_cursorLabel->position->setCoords(0, 0);
+
+    m_cursorLine->setLayer(QLatin1String("overlay"));
+    m_cursorLabel->setLayer(QLatin1String("overlay"));
 
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
@@ -170,6 +175,34 @@ void SpectrumViewWidget::clearData()
     m_cursorLabel->setVisible(false);
 
     m_plot->replot(QCustomPlot::rpQueuedReplot);
+}
+
+void SpectrumViewWidget::setLineStyle(LineStyle style)
+{
+    if (m_lineStyle == style) {
+        return;
+    }
+
+    m_lineStyle = style;
+
+    switch (style) {
+        case LineStyle::Line:
+            m_graph->setLineStyle(QCPGraph::lsLine);
+            m_graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssNone));
+            break;
+        case LineStyle::LineAndPoints:
+            m_graph->setLineStyle(QCPGraph::lsLine);
+            m_graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 4.0));
+            break;
+        case LineStyle::Points:
+            m_graph->setLineStyle(QCPGraph::lsNone);
+            m_graph->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, 4.0));
+            break;
+    }
+
+    if (m_dataValid && !m_xData.isEmpty()) {
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
+    }
 }
 
 double SpectrumViewWidget::intensityAt(double x) const
@@ -310,10 +343,15 @@ void SpectrumViewWidget::mouseMoveEvent(QMouseEvent *event)
     }
 
     double dataX = widgetToDataX(event->pos().x());
-    updateCursor(dataX);
+    int idx = qRound(dataX);
+    if (idx < 0) idx = 0;
+    if (idx >= m_xData.size()) idx = m_xData.size() - 1;
+    double snappedX = m_xData[idx];
+    double snappedY = m_yData[idx];
 
-    double intensity = intensityAt(dataX);
-    emit cursorPosition(dataX, intensity);
+    updateCursor(snappedX, snappedY);
+
+    emit cursorPosition(snappedX, snappedY);
 
     QWidget::mouseMoveEvent(event);
 }
@@ -322,7 +360,7 @@ void SpectrumViewWidget::leaveEvent(QEvent *event)
 {
     m_cursorLine->setVisible(false);
     m_cursorLabel->setVisible(false);
-    m_plot->replot(QCustomPlot::rpQueuedReplot);
+    m_plot->layer(QLatin1String("overlay"))->replot();
 
     emit cursorLeft();
 
@@ -398,7 +436,7 @@ bool SpectrumViewWidget::eventFilter(QObject *obj, QEvent *event)
     return QWidget::eventFilter(obj, event);
 }
 
-void SpectrumViewWidget::updateCursor(double x)
+void SpectrumViewWidget::updateCursor(double x, double y)
 {
     if (!m_dataValid) {
         return;
@@ -413,7 +451,7 @@ void SpectrumViewWidget::updateCursor(double x)
 
     QString labelText = QString("X: %1\nI: %2")
         .arg(x, 0, 'f', 1)
-        .arg(intensityAt(x), 0, 'f', 0);
+        .arg(y, 0, 'f', 0);
 
     m_cursorLabel->setText(labelText);
 
@@ -422,7 +460,7 @@ void SpectrumViewWidget::updateCursor(double x)
     m_cursorLabel->position->setCoords(labelX, maxY - (maxY - minY) * 0.05);
     m_cursorLabel->setVisible(true);
 
-    m_plot->replot(QCustomPlot::rpQueuedReplot);
+    m_plot->layer(QLatin1String("overlay"))->replot();
 }
 
 double SpectrumViewWidget::widgetToDataX(int widgetX) const

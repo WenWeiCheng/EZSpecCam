@@ -17,6 +17,7 @@ class ImageViewWidget;
 class SpectrumViewWidget;
 class ProfileWindow;
 class ScaleControlDialog;
+class DisplayStyleDialog;
 class FileSaverWorker;
 struct ImageData;
 
@@ -46,6 +47,8 @@ private slots:
     void on_scale_triggered();
 
     void on_showAxes_triggered(bool checked);
+    void on_display_style_triggered();
+    void on_fillWindow_triggered(bool checked);
     void on_statistics_triggered();
     void on_verticalBinning_triggered();
     void on_rowRange_triggered();
@@ -98,6 +101,7 @@ private:
     CameraConfigDialog *m_configDialog = nullptr;
     ProfileWindow *m_profileWindow = nullptr;
     ScaleControlDialog *m_scaleDialog = nullptr;
+    DisplayStyleDialog *m_displayStyleDialog = nullptr;
 
     int m_frameCount = 0;
     int m_autoSaveFrameCounter = 0;

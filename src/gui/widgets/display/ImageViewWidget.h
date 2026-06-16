@@ -13,6 +13,7 @@
 
 class QCustomPlot;
 class QCPColorMap;
+class QCPColorScale;
 class QCPItemLine;
 class QCPItemText;
 
@@ -20,6 +21,27 @@ class ImageViewWidget : public QWidget
 {
     Q_OBJECT
 public:
+    enum class FitMode {
+        KeepAspectRatio,
+        FillWindow
+    };
+    Q_ENUM(FitMode)
+
+    enum class ColorMap {
+        Grayscale,
+        Hot,
+        Cold,
+        Night,
+        Candy,
+        Geography,
+        Ion,
+        Thermal,
+        Polar,
+        Spectrum,
+        Jet
+    };
+    Q_ENUM(ColorMap)
+
     enum class ColorScaleMode {
         Auto,
         Fixed8Bit,
@@ -40,6 +62,12 @@ public:
     QImage image() const;
     bool hasImage() const;
 
+    ColorMap colorMap() const { return m_colorMapPreset; }
+    void setColorMap(ColorMap map);
+
+    FitMode fitMode() const { return m_fitMode; }
+    void setFitMode(FitMode mode);
+
     ColorScaleMode colorScaleMode() const { return m_colorScaleMode; }
     void setColorScaleMode(ColorScaleMode mode);
 
@@ -48,6 +76,9 @@ public:
 
     bool axesVisible() const { return m_axesVisible; }
     void setAxesVisible(bool visible);
+
+    bool isColorScaleVisible() const { return m_colorScaleVisible; }
+    void setColorScaleVisible(bool visible);
 
     QList<QPointF> crosshairPositions() const;
     int crosshairCount() const;
@@ -85,7 +116,9 @@ private:
     void setupPlot();
     void updateColorMap(const QImage &image);
     void checkOverexposure(const QImage &image);
+    void applyColorMap();
     void applyColorScaleMode();
+    void setupColorScalePlot();
     QPointF widgetToImageCoords(int widgetX, int widgetY) const;
     void updateDisplayData();
     void calculateDownsampleFactors();
@@ -95,13 +128,18 @@ private:
 
     QCustomPlot *m_plot;
     QCPColorMap *m_colorMap;
+    QCustomPlot *m_colorScalePlot = nullptr;
+    QCPColorScale *m_colorScale = nullptr;
     QImage m_currentImage;
     QList<QPair<QCPItemLine *, QCPItemLine *>> m_crosshairs;
     QPointF m_currentCrosshairPos;
     bool m_imageValid;
+    ColorMap m_colorMapPreset = ColorMap::Grayscale;
+    FitMode m_fitMode = FitMode::KeepAspectRatio;
     ColorScaleMode m_colorScaleMode = ColorScaleMode::Auto;
     IntensityScaleType m_intensityScaleType = IntensityScaleType::Linear;
     bool m_axesVisible = false;
+    bool m_colorScaleVisible = true;
 
     QImage m_originalImage;
     QImage m_displayImage;

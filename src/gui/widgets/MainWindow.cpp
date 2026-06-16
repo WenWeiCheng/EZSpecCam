@@ -10,6 +10,7 @@
 #include "dialogs/RowRangeDialog.h"
 #include "dialogs/CustomRangeDialog.h"
 #include "dialogs/ScaleControlDialog.h"
+#include "dialogs/DisplayStyleDialog.h"
 #include "config/CameraConfigDialog.h"
 #include "PostProcess.h"
 #include "../workers/FileSaverWorker.h"
@@ -104,6 +105,32 @@ MainWindow::MainWindow(QWidget *parent)
                 }
             });
 
+    m_displayStyleDialog = new DisplayStyleDialog(this);
+    m_displayStyleDialog->setImageColorMap(0);
+    m_displayStyleDialog->setSpectrumLineStyle(0);
+
+    connect(m_displayStyleDialog, &DisplayStyleDialog::colorScaleToggled,
+            this, [this](bool visible) {
+                if (m_imageViewWidget) {
+                    m_imageViewWidget->setColorScaleVisible(visible);
+                }
+            });
+
+    connect(m_displayStyleDialog, &DisplayStyleDialog::imageColorMapChanged,
+            this, [this](int map) {
+                if (m_imageViewWidget) {
+                    m_imageViewWidget->setColorMap(static_cast<ImageViewWidget::ColorMap>(map));
+                }
+            });
+
+    connect(m_displayStyleDialog, &DisplayStyleDialog::spectrumLineStyleChanged,
+            this, [this](int style) {
+                if (m_spectrumViewWidget) {
+                    m_spectrumViewWidget->setLineStyle(
+                        static_cast<SpectrumViewWidget::LineStyle>(style));
+                }
+            });
+
     connect(m_imageViewWidget, &ImageViewWidget::crosshairsCleared,
             this, &MainWindow::onCrosshairCleared);
     connect(m_imageViewWidget, &ImageViewWidget::crosshairMoved,
@@ -162,6 +189,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->menuActionShowAxes, &QAction::toggled,
             this, &MainWindow::on_showAxes_triggered);
 
+    connect(ui->menuActionFillWindow, &QAction::toggled,
+            this, &MainWindow::on_fillWindow_triggered);
+
     connect(ui->menuActionStatistics, &QAction::triggered,
             this, &MainWindow::on_statistics_triggered);
 
@@ -175,6 +205,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->menuActionScale, &QAction::triggered,
             this, &MainWindow::on_scale_triggered);
+
+    connect(ui->menuActionDisplayStyle, &QAction::triggered,
+            this, &MainWindow::on_display_style_triggered);
 
     connect(ui->toolbarActionConfig, &QAction::triggered,
             this, &MainWindow::on_actionConfig_triggered);
@@ -257,6 +290,12 @@ void MainWindow::on_actionSaveFrameAs_triggered()
     QString defaultName = QString("%1img_%2%3.%4").arg(prefixStr).arg(now.toString("yyyyMMdd_hhmmss_zzz")).arg(suffixStr).arg(ext);
     dialog.selectFile(defaultName);
 
+    if (imageFormat == QStringLiteral("TIFF")) {
+        dialog.selectNameFilter(QStringLiteral("TIFF Image (*.tiff *.tif)"));
+    } else if (imageFormat == QStringLiteral("CSV")) {
+        dialog.selectNameFilter(QStringLiteral("CSV File (*.csv)"));
+    }
+
     if (!dialog.exec() || dialog.selectedFiles().isEmpty()) {
         return;
     }
@@ -307,7 +346,11 @@ void MainWindow::on_actionAutoSaveToggle_triggered(bool checked)
 
 void MainWindow::on_actionChangeAutoSaveDir_triggered()
 {
-    QString currentDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    QSettings settings;
+    QString currentDir = settings.value("data/autoSaveDirectory").toString();
+    if (currentDir.isEmpty() || !QDir(currentDir).exists()) {
+        currentDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    }
 
     QString dir = QFileDialog::getExistingDirectory(this,
         tr("Select Auto-Save Directory"), currentDir);
@@ -316,7 +359,6 @@ void MainWindow::on_actionChangeAutoSaveDir_triggered()
         return;
     }
 
-    QSettings settings;
     settings.setValue("data/autoSaveDirectory", dir);
     showStatusMessage(tr("Auto-save directory set to: %1").arg(dir), 3000);
 }
@@ -382,10 +424,28 @@ void MainWindow::on_scale_triggered()
     }
 }
 
+void MainWindow::on_display_style_triggered()
+{
+    if (m_displayStyleDialog) {
+        m_displayStyleDialog->show();
+        m_displayStyleDialog->raise();
+        m_displayStyleDialog->activateWindow();
+    }
+}
+
 void MainWindow::on_showAxes_triggered(bool checked)
 {
     if (m_imageViewWidget) {
         m_imageViewWidget->setAxesVisible(checked);
+    }
+}
+
+void MainWindow::on_fillWindow_triggered(bool checked)
+{
+    if (m_imageViewWidget) {
+        m_imageViewWidget->setFitMode(
+            checked ? ImageViewWidget::FitMode::FillWindow
+                    : ImageViewWidget::FitMode::KeepAspectRatio);
     }
 }
 
@@ -568,7 +628,6 @@ void MainWindow::on_profile_triggered()
 {
     if (!m_profileWindow) {
         m_profileWindow = new ProfileWindow(this);
-        m_profileWindow->setAttribute(Qt::WA_DeleteOnClose);
     }
 
     if (m_imageViewWidget->hasImage()) {
@@ -657,6 +716,19 @@ void MainWindow::updateDisplay(const ImageData &frame)
         }
     } else {
         m_imageViewWidget->setImage(frame.image);
+
+        if (m_profileWindow && m_profileWindow->isVisible()
+            && m_imageViewWidget->crosshairCount() > 0) {
+            QList<QPointF> positions = m_imageViewWidget->crosshairPositions();
+            if (!positions.isEmpty()) {
+                QPointF pos = positions.first();
+                int x = static_cast<int>(pos.x());
+                int y = static_cast<int>(pos.y());
+                QVector<double> rowData = m_imageViewWidget->extractRowAsVector(y);
+                QVector<double> colData = m_imageViewWidget->extractColumnAsVector(x);
+                m_profileWindow->updateProfile(x, y, rowData, colData);
+            }
+        }
     }
 }
 

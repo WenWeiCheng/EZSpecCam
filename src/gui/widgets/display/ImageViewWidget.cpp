@@ -11,6 +11,8 @@ ImageViewWidget::ImageViewWidget(QWidget *parent)
     : QWidget(parent)
     , m_plot(nullptr)
     , m_colorMap(nullptr)
+    , m_colorScalePlot(nullptr)
+    , m_colorScale(nullptr)
     , m_imageValid(false)
     , m_resizeTimer(new QTimer(this))
     , m_rubberBand(nullptr)
@@ -21,9 +23,13 @@ ImageViewWidget::ImageViewWidget(QWidget *parent)
     m_plot->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
     m_plot->installEventFilter(this);
 
+    m_colorScalePlot = new QCustomPlot(this);
+    m_colorScalePlot->setVisible(true);
+
     connect(m_resizeTimer, &QTimer::timeout, this, &ImageViewWidget::onResizeTimeout);
 
     setupPlot();
+    setupColorScalePlot();
 }
 
 ImageViewWidget::~ImageViewWidget() = default;
@@ -34,12 +40,7 @@ void ImageViewWidget::setupPlot()
     m_colorMap->setInterpolate(false);
     m_colorMap->setTightBoundary(false);
 
-    QCPColorGradient gradient;
-    gradient.setLevelCount(256);
-    gradient.setColorStopAt(0, QColor(0, 0, 0));
-    gradient.setColorStopAt(0.5, QColor(128, 128, 128));
-    gradient.setColorStopAt(1, QColor(255, 255, 255));
-    m_colorMap->setGradient(gradient);
+    applyColorMap();
 
     m_plot->xAxis->setLabel("X (pixels)");
     m_plot->yAxis->setLabel("Y (pixels)");
@@ -62,6 +63,26 @@ void ImageViewWidget::setupPlot()
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
+void ImageViewWidget::setupColorScalePlot()
+{
+    m_colorScalePlot->plotLayout()->clear();
+
+    m_colorScale = new QCPColorScale(m_colorScalePlot);
+    m_colorScale->setType(QCPAxis::atRight);
+    m_colorScale->setMargins(QMargins(2, 2, 2, 2));
+
+    m_colorScalePlot->plotLayout()->addElement(0, 0, m_colorScale);
+    m_colorScalePlot->plotLayout()->setRowSpacing(0);
+    m_colorScalePlot->plotLayout()->setColumnSpacing(0);
+    m_colorScalePlot->plotLayout()->setMargins(QMargins(0, 0, 0, 0));
+
+    m_colorScalePlot->setBackground(Qt::white);
+
+    m_colorScale->setGradient(m_colorMap->gradient());
+    m_colorScale->setDataRange(m_colorMap->dataRange());
+    m_colorScale->setDataScaleType(m_colorMap->dataScaleType());
+}
+
 void ImageViewWidget::setImage(const QImage &image)
 {
     if (image.isNull()) {
@@ -77,6 +98,13 @@ void ImageViewWidget::setImage(const QImage &image)
     updateDisplayData();
 
     updatePlotGeometry();
+
+    if (!m_crosshairs.isEmpty()) {
+        int x = static_cast<int>(m_currentCrosshairPos.x());
+        int y = static_cast<int>(m_currentCrosshairPos.y());
+        int value = pixelValue(x, y);
+        emit crosshairMoved(QPointF(x, y), value);
+    }
 }
 
 void ImageViewWidget::updateColorMap(const QImage &image)
@@ -91,9 +119,19 @@ void ImageViewWidget::updateColorMap(const QImage &image)
     const int dataWidth = image.width();
     const int dataHeight = image.height();
 
+    QCPRange keyRange;
+    QCPRange valueRange;
+    if (m_userHasZoomed) {
+        keyRange = m_plot->xAxis->range();
+        valueRange = m_plot->yAxis->range();
+    } else {
+        keyRange = QCPRange(0, origWidth);
+        valueRange = QCPRange(0, origHeight);
+    }
+
     QCPColorMapData *newMapData = new QCPColorMapData(dataWidth, dataHeight,
-                                                       QCPRange(0, origWidth),
-                                                       QCPRange(0, origHeight));
+                                                       keyRange,
+                                                       valueRange);
 
     if (image.format() == QImage::Format_Grayscale16) {
         for (int y = 0; y < dataHeight; ++y) {
@@ -122,8 +160,8 @@ void ImageViewWidget::updateColorMap(const QImage &image)
     if (!m_userHasZoomed) {
         m_plot->xAxis->setRange(0, origWidth);
         m_plot->yAxis->setRange(0, origHeight);
-        m_plot->replot(QCustomPlot::rpQueuedReplot);
     }
+    m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
 void ImageViewWidget::checkOverexposure(const QImage &image)
@@ -183,6 +221,71 @@ void ImageViewWidget::applyColorScaleMode()
             m_colorMap->setDataRange(QCPRange(0, 65535));
             break;
     }
+
+    if (m_colorScale) {
+        m_colorScale->setDataRange(m_colorMap->dataRange());
+        m_colorScale->setDataScaleType(m_colorMap->dataScaleType());
+        if (m_colorScaleVisible) {
+            m_colorScalePlot->replot(QCustomPlot::rpQueuedReplot);
+        }
+    }
+}
+
+void ImageViewWidget::setColorMap(ColorMap map)
+{
+    if (m_colorMapPreset == map) {
+        return;
+    }
+
+    m_colorMapPreset = map;
+
+    if (m_imageValid && !m_currentImage.isNull()) {
+        applyColorMap();
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
+    }
+}
+
+void ImageViewWidget::applyColorMap()
+{
+    static const QCPColorGradient::GradientPreset presets[] = {
+        QCPColorGradient::gpGrayscale,
+        QCPColorGradient::gpHot,
+        QCPColorGradient::gpCold,
+        QCPColorGradient::gpNight,
+        QCPColorGradient::gpCandy,
+        QCPColorGradient::gpGeography,
+        QCPColorGradient::gpIon,
+        QCPColorGradient::gpThermal,
+        QCPColorGradient::gpPolar,
+        QCPColorGradient::gpSpectrum,
+        QCPColorGradient::gpJet
+    };
+
+    int index = static_cast<int>(m_colorMapPreset);
+    if (index >= 0 && index < static_cast<int>(sizeof(presets) / sizeof(presets[0]))) {
+        QCPColorGradient gradient(presets[index]);
+        m_colorMap->setGradient(gradient);
+        if (m_colorScale) {
+            m_colorScale->setGradient(gradient);
+            if (m_colorScaleVisible) {
+                m_colorScalePlot->replot(QCustomPlot::rpQueuedReplot);
+            }
+        }
+    }
+}
+
+void ImageViewWidget::setFitMode(FitMode mode)
+{
+    if (m_fitMode == mode) {
+        return;
+    }
+
+    m_fitMode = mode;
+
+    if (m_imageValid && !m_originalImage.isNull()) {
+        updatePlotGeometry();
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
+    }
 }
 
 void ImageViewWidget::setColorScaleMode(ColorScaleMode mode)
@@ -232,6 +335,26 @@ void ImageViewWidget::setAxesVisible(bool visible)
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
+void ImageViewWidget::setColorScaleVisible(bool visible)
+{
+    if (m_colorScaleVisible == visible) {
+        return;
+    }
+
+    m_colorScaleVisible = visible;
+
+    m_colorScalePlot->setVisible(visible);
+
+    updatePlotGeometry();
+
+    if (m_colorScale && m_imageValid) {
+        m_colorScalePlot->replot(QCustomPlot::rpQueuedReplot);
+    }
+    if (m_imageValid && !m_currentImage.isNull()) {
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
+    }
+}
+
 QImage ImageViewWidget::image() const
 {
     return m_currentImage;
@@ -245,9 +368,8 @@ bool ImageViewWidget::hasImage() const
 QList<QPointF> ImageViewWidget::crosshairPositions() const
 {
     QList<QPointF> positions;
-    for (const auto &pair : m_crosshairs) {
-        QPointF pos(pair.first->start->key(), pair.first->start->value());
-        positions.append(pos);
+    if (!m_crosshairs.isEmpty()) {
+        positions.append(m_currentCrosshairPos);
     }
     return positions;
 }
@@ -285,14 +407,14 @@ void ImageViewWidget::addCrosshair(int x, int y)
     QCPItemLine *verticalLine = new QCPItemLine(m_plot);
     verticalLine->setPen(crosshairPen);
     verticalLine->setSelectable(false);
-    verticalLine->start->setCoords(x, 0);
-    verticalLine->end->setCoords(x, m_originalImage.height());
+    verticalLine->start->setCoords(x + 0.5, 0);
+    verticalLine->end->setCoords(x + 0.5, m_originalImage.height());
 
     QCPItemLine *horizontalLine = new QCPItemLine(m_plot);
     horizontalLine->setPen(crosshairPen);
     horizontalLine->setSelectable(false);
-    horizontalLine->start->setCoords(0, y);
-    horizontalLine->end->setCoords(m_originalImage.width(), y);
+    horizontalLine->start->setCoords(0, y + 0.5);
+    horizontalLine->end->setCoords(m_originalImage.width(), y + 0.5);
 
     m_crosshairs.append(qMakePair(verticalLine, horizontalLine));
     m_currentCrosshairPos = QPointF(x, y);
@@ -376,10 +498,10 @@ void ImageViewWidget::keyPressEvent(QKeyEvent *event)
     if (y >= m_originalImage.height()) y = m_originalImage.height() - 1;
 
     auto &pair = m_crosshairs.first();
-    pair.first->start->setCoords(x, 0);
-    pair.first->end->setCoords(x, m_originalImage.height());
-    pair.second->start->setCoords(0, y);
-    pair.second->end->setCoords(m_originalImage.width(), y);
+    pair.first->start->setCoords(x + 0.5, 0);
+    pair.first->end->setCoords(x + 0.5, m_originalImage.height());
+    pair.second->start->setCoords(0, y + 0.5);
+    pair.second->end->setCoords(m_originalImage.width(), y + 0.5);
 
     m_currentCrosshairPos = QPointF(x, y);
     m_plot->replot(QCustomPlot::rpQueuedReplot);
@@ -439,37 +561,46 @@ void ImageViewWidget::updatePlotGeometry()
         return;
     }
 
-    int margin = 5;
+    int colorScaleW = 0;
+    if (m_colorScalePlot && m_colorScaleVisible) {
+        colorScaleW = 60;
+    }
+
+    int imageW = availableSize.width() - colorScaleW;
+    if (imageW <= 0) imageW = 1;
+
+    m_plot->setGeometry(0, 0, imageW, availableSize.height());
+
+    if (m_colorScalePlot && m_colorScaleVisible) {
+        m_colorScalePlot->setGeometry(imageW, 0, colorScaleW, availableSize.height());
+    }
+
+    if (m_fitMode == FitMode::FillWindow) {
+        m_plot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
+        m_plot->axisRect()->setMinimumSize(0, 0);
+        m_plot->axisRect()->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+        return;
+    }
 
     double xRange = m_plot->xAxis->range().upper - m_plot->xAxis->range().lower;
     double yRange = m_plot->yAxis->range().upper - m_plot->yAxis->range().lower;
     double currentAspect = (yRange > 0) ? (xRange / yRange) : 1.0;
 
-    int availWidth = availableSize.width() - margin * 2;
-    int availHeight = availableSize.height() - margin * 2;
-
     int plotWidth, plotHeight;
-    if (currentAspect > static_cast<double>(availWidth) / availHeight) {
-        plotWidth = availWidth;
-        plotHeight = static_cast<int>(availWidth / currentAspect);
+    if (currentAspect > static_cast<double>(imageW) / availableSize.height()) {
+        plotWidth = imageW;
+        plotHeight = qMax(1, static_cast<int>(imageW / currentAspect));
     } else {
-        plotHeight = availHeight;
-        plotWidth = static_cast<int>(availHeight * currentAspect);
+        plotHeight = availableSize.height();
+        plotWidth = qMax(1, static_cast<int>(availableSize.height() * currentAspect));
     }
 
-    if (plotWidth <= 0) plotWidth = 1;
-    if (plotHeight <= 0) plotHeight = 1;
+    int hmargin = qMax(0, (imageW - plotWidth) / 2);
+    int vmargin = qMax(0, (availableSize.height() - plotHeight) / 2);
 
-    int totalWidth = plotWidth + margin * 2;
-    int totalHeight = plotHeight + margin * 2;
-
-    int x = (availableSize.width() - totalWidth) / 2;
-    int y = (availableSize.height() - totalHeight) / 2;
-    m_plot->setGeometry(x, y, totalWidth, totalHeight);
-
-    m_plot->axisRect()->setMargins(QMargins(margin, margin, margin, margin));
-    m_plot->axisRect()->setMinimumSize(plotWidth, plotHeight);
-    m_plot->axisRect()->setMaximumSize(plotWidth, plotHeight);
+    m_plot->axisRect()->setMargins(QMargins(hmargin, vmargin, hmargin, vmargin));
+    m_plot->axisRect()->setMinimumSize(0, 0);
+    m_plot->axisRect()->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
 }
 
 void ImageViewWidget::onResizeTimeout()
@@ -518,6 +649,7 @@ bool ImageViewWidget::eventFilter(QObject *obj, QEvent *event)
                 m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, me->pos()).normalized());
                 return true;
             }
+            mouseMoveEvent(me);
             return true;
         } else if (event->type() == QEvent::MouseButtonRelease) {
             auto *me = static_cast<QMouseEvent *>(event);
@@ -537,6 +669,7 @@ bool ImageViewWidget::eventFilter(QObject *obj, QEvent *event)
                             m_plot->replot(QCustomPlot::rpQueuedReplot);
                             updatePlotGeometry();
                             m_userHasZoomed = true;
+                            updateDisplayData();
                         }
                     }
                 }
@@ -639,6 +772,44 @@ void ImageViewWidget::updateDisplayData()
         return;
     }
 
+    m_originalPixelCount = m_originalImage.width() * m_originalImage.height();
+
+    if (m_userHasZoomed) {
+        QCPRange xRange = m_plot->xAxis->range();
+        QCPRange yRange = m_plot->yAxis->range();
+
+        int x0 = qMax(0, static_cast<int>(qFloor(xRange.lower)));
+        int y0 = qMax(0, static_cast<int>(qFloor(yRange.lower)));
+        int x1 = qMin(m_originalImage.width(), static_cast<int>(qCeil(xRange.upper)));
+        int y1 = qMin(m_originalImage.height(), static_cast<int>(qCeil(yRange.upper)));
+
+        int cropW = x1 - x0;
+        int cropH = y1 - y0;
+        if (cropW <= 0 || cropH <= 0) {
+            return;
+        }
+
+        QImage crop = m_originalImage.copy(x0, y0, cropW, cropH);
+
+        int viewWidth = m_plot->axisRect()->width();
+        int viewHeight = m_plot->axisRect()->height();
+        if (viewWidth <= 0 || viewHeight <= 0) {
+            viewWidth = m_plot->width() - 100;
+            viewHeight = m_plot->height() - 70;
+        }
+        if (viewWidth <= 0) viewWidth = 600;
+        if (viewHeight <= 0) viewHeight = 400;
+
+        int factorX = qMax(1, cropW / viewWidth);
+        int factorY = qMax(1, cropH / viewHeight);
+
+        m_displayImage = downsampleImage(crop, factorX, factorY);
+        m_displayPixelCount = m_displayImage.width() * m_displayImage.height();
+
+        updateColorMap(m_displayImage);
+        return;
+    }
+
     int prevDownsampleX = m_downsampleX;
     int prevDownsampleY = m_downsampleY;
 
@@ -649,8 +820,6 @@ void ImageViewWidget::updateDisplayData()
         !m_displayImage.isNull()) {
         return;
     }
-
-    m_originalPixelCount = m_originalImage.width() * m_originalImage.height();
 
     m_displayImage = downsampleImage(m_originalImage, m_downsampleX, m_downsampleY);
     m_displayPixelCount = m_displayImage.width() * m_displayImage.height();
@@ -717,11 +886,12 @@ void ImageViewWidget::resetZoomToFit()
         return;
     }
 
+    m_userHasZoomed = false;
+    m_displayImage = QImage();
     m_plot->xAxis->setRange(0, m_originalImage.width());
     m_plot->yAxis->setRange(0, m_originalImage.height());
-    m_plot->replot(QCustomPlot::rpQueuedReplot);
     updatePlotGeometry();
-    m_userHasZoomed = false;
+    updateDisplayData();
 }
 
 QVector<double> ImageViewWidget::extractColumnAsVector(int x) const

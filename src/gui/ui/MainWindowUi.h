@@ -40,6 +40,8 @@ public:
     QAction *menuActionScale;
 
     QAction *menuActionShowAxes;
+    QAction *menuActionFillWindow;
+    QAction *menuActionDisplayStyle;
     QAction *menuActionProfile;
 
     QAction *menuActionStatistics;

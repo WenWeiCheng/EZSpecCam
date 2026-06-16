@@ -1,6 +1,10 @@
 # GUI application
 find_package(OpenMP REQUIRED)
-qt_add_executable(ezspeccam_gui WIN32)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    qt_add_executable(ezspeccam_gui)
+else()
+    qt_add_executable(ezspeccam_gui WIN32)
+endif()
 
 target_link_libraries(ezspeccam_gui PRIVATE
     ezspeccam_core
@@ -34,6 +38,7 @@ target_sources(ezspeccam_gui PRIVATE
     widgets/dialogs/CustomRangeDialog.h widgets/dialogs/CustomRangeDialog.cpp
     widgets/dialogs/RowRangeDialog.h widgets/dialogs/RowRangeDialog.cpp
     widgets/dialogs/ScaleControlDialog.h widgets/dialogs/ScaleControlDialog.cpp
+    widgets/dialogs/DisplayStyleDialog.h widgets/dialogs/DisplayStyleDialog.cpp
     workers/FileSaverWorker.h workers/FileSaverWorker.cpp
     workers/SaveTypes.h
     workers/IImageFormatHandler.h
