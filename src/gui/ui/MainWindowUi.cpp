@@ -111,11 +111,11 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     menuActionFillWindow->setChecked(false);
     menuView->addAction(menuActionFillWindow);
 
-    menuActionDisplayStyle = new QAction("Display Style...", mainWindow);
-    menuView->addAction(menuActionDisplayStyle);
-
     menuActionScale = new QAction("&Scale...", mainWindow);
     menuView->addAction(menuActionScale);
+
+    menuActionDisplayStyle = new QAction("Display Style...", mainWindow);
+    menuView->addAction(menuActionDisplayStyle);
 
     menuActionProfile = new QAction("&Profile", mainWindow);
     menuActionProfile->setShortcut(QKeySequence(Qt::Key_P));
