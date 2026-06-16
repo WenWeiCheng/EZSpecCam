@@ -361,9 +361,8 @@ bool ImageViewWidget::hasImage() const
 QList<QPointF> ImageViewWidget::crosshairPositions() const
 {
     QList<QPointF> positions;
-    for (const auto &pair : m_crosshairs) {
-        QPointF pos(pair.first->start->key(), pair.first->start->value());
-        positions.append(pos);
+    if (!m_crosshairs.isEmpty()) {
+        positions.append(m_currentCrosshairPos);
     }
     return positions;
 }
