@@ -400,14 +400,14 @@ void ImageViewWidget::addCrosshair(int x, int y)
     QCPItemLine *verticalLine = new QCPItemLine(m_plot);
     verticalLine->setPen(crosshairPen);
     verticalLine->setSelectable(false);
-    verticalLine->start->setCoords(x, 0);
-    verticalLine->end->setCoords(x, m_originalImage.height());
+    verticalLine->start->setCoords(x + 0.5, 0);
+    verticalLine->end->setCoords(x + 0.5, m_originalImage.height());
 
     QCPItemLine *horizontalLine = new QCPItemLine(m_plot);
     horizontalLine->setPen(crosshairPen);
     horizontalLine->setSelectable(false);
-    horizontalLine->start->setCoords(0, y);
-    horizontalLine->end->setCoords(m_originalImage.width(), y);
+    horizontalLine->start->setCoords(0, y + 0.5);
+    horizontalLine->end->setCoords(m_originalImage.width(), y + 0.5);
 
     m_crosshairs.append(qMakePair(verticalLine, horizontalLine));
     m_currentCrosshairPos = QPointF(x, y);
@@ -491,10 +491,10 @@ void ImageViewWidget::keyPressEvent(QKeyEvent *event)
     if (y >= m_originalImage.height()) y = m_originalImage.height() - 1;
 
     auto &pair = m_crosshairs.first();
-    pair.first->start->setCoords(x, 0);
-    pair.first->end->setCoords(x, m_originalImage.height());
-    pair.second->start->setCoords(0, y);
-    pair.second->end->setCoords(m_originalImage.width(), y);
+    pair.first->start->setCoords(x + 0.5, 0);
+    pair.first->end->setCoords(x + 0.5, m_originalImage.height());
+    pair.second->start->setCoords(0, y + 0.5);
+    pair.second->end->setCoords(m_originalImage.width(), y + 0.5);
 
     m_currentCrosshairPos = QPointF(x, y);
     m_plot->replot(QCustomPlot::rpQueuedReplot);
