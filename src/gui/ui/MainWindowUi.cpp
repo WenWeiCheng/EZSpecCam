@@ -29,7 +29,7 @@ MainWindowUi::MainWindowUi(QObject *parent)
     , spectrumViewWidget(nullptr)
     , menuActionShowAxes(nullptr)
     , menuActionFillWindow(nullptr)
-    , menuActionColorScale(nullptr)
+    , menuActionDisplayStyle(nullptr)
     , menuActionProfile(nullptr)
     , menuActionStatistics(nullptr)
     , menuActionPostProcess(nullptr)
@@ -111,10 +111,8 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     menuActionFillWindow->setChecked(false);
     menuView->addAction(menuActionFillWindow);
 
-    menuActionColorScale = new QAction("Show Color Scale", mainWindow);
-    menuActionColorScale->setCheckable(true);
-    menuActionColorScale->setChecked(true);
-    menuView->addAction(menuActionColorScale);
+    menuActionDisplayStyle = new QAction("Display Style...", mainWindow);
+    menuView->addAction(menuActionDisplayStyle);
 
     menuActionScale = new QAction("&Scale...", mainWindow);
     menuView->addAction(menuActionScale);
