@@ -290,6 +290,12 @@ void MainWindow::on_actionSaveFrameAs_triggered()
     QString defaultName = QString("%1img_%2%3.%4").arg(prefixStr).arg(now.toString("yyyyMMdd_hhmmss_zzz")).arg(suffixStr).arg(ext);
     dialog.selectFile(defaultName);
 
+    if (imageFormat == QStringLiteral("TIFF")) {
+        dialog.selectNameFilter(QStringLiteral("TIFF Image (*.tiff *.tif)"));
+    } else if (imageFormat == QStringLiteral("CSV")) {
+        dialog.selectNameFilter(QStringLiteral("CSV File (*.csv)"));
+    }
+
     if (!dialog.exec() || dialog.selectedFiles().isEmpty()) {
         return;
     }
@@ -340,7 +346,11 @@ void MainWindow::on_actionAutoSaveToggle_triggered(bool checked)
 
 void MainWindow::on_actionChangeAutoSaveDir_triggered()
 {
-    QString currentDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    QSettings settings;
+    QString currentDir = settings.value("data/autoSaveDirectory").toString();
+    if (currentDir.isEmpty() || !QDir(currentDir).exists()) {
+        currentDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    }
 
     QString dir = QFileDialog::getExistingDirectory(this,
         tr("Select Auto-Save Directory"), currentDir);
@@ -349,7 +359,6 @@ void MainWindow::on_actionChangeAutoSaveDir_triggered()
         return;
     }
 
-    QSettings settings;
     settings.setValue("data/autoSaveDirectory", dir);
     showStatusMessage(tr("Auto-save directory set to: %1").arg(dir), 3000);
 }
