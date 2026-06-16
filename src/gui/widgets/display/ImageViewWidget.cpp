@@ -225,8 +225,7 @@ void ImageViewWidget::setFitMode(FitMode mode)
     m_fitMode = mode;
 
     if (m_imageValid && !m_originalImage.isNull()) {
-        m_userHasZoomed = false;
-        resetZoomToFit();
+        updatePlotGeometry();
         m_plot->replot(QCustomPlot::rpQueuedReplot);
     }
 }
