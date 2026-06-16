@@ -36,6 +36,15 @@ void ImageViewWidget::setupPlot()
 
     applyColorMap();
 
+    m_colorScale = new QCPColorScale(m_plot);
+    m_colorScale->setType(QCPAxis::atRight);
+    m_colorScale->setGradient(m_colorMap->gradient());
+    m_colorScale->setDataRange(m_colorMap->dataRange());
+    m_colorScale->setVisible(false);
+    m_plot->plotLayout()->addElement(0, 1, m_colorScale);
+    m_plot->plotLayout()->setColumnStretchFactor(0, 1);
+    m_plot->plotLayout()->setColumnStretchFactor(1, 0);
+
     m_plot->xAxis->setLabel("X (pixels)");
     m_plot->yAxis->setLabel("Y (pixels)");
     m_plot->xAxis->setRange(0, 100);
@@ -178,6 +187,11 @@ void ImageViewWidget::applyColorScaleMode()
             m_colorMap->setDataRange(QCPRange(0, 65535));
             break;
     }
+
+    if (m_colorScale) {
+        m_colorScale->setDataRange(m_colorMap->dataRange());
+        m_colorScale->setDataScaleType(m_colorMap->dataScaleType());
+    }
 }
 
 void ImageViewWidget::setColorMap(ColorMap map)
@@ -212,7 +226,11 @@ void ImageViewWidget::applyColorMap()
 
     int index = static_cast<int>(m_colorMapPreset);
     if (index >= 0 && index < static_cast<int>(sizeof(presets) / sizeof(presets[0]))) {
-        m_colorMap->setGradient(QCPColorGradient(presets[index]));
+        QCPColorGradient gradient(presets[index]);
+        m_colorMap->setGradient(gradient);
+        if (m_colorScale) {
+            m_colorScale->setGradient(gradient);
+        }
     }
 }
 
@@ -275,6 +293,42 @@ void ImageViewWidget::setAxesVisible(bool visible)
     }
 
     m_plot->replot(QCustomPlot::rpQueuedReplot);
+}
+
+void ImageViewWidget::setColorScaleVisible(bool visible)
+{
+    if (m_colorScaleVisible == visible) {
+        return;
+    }
+
+    m_colorScaleVisible = visible;
+
+    if (m_colorScale) {
+        m_colorScale->setVisible(visible);
+        updateColorScaleLayout();
+        updatePlotGeometry();
+    }
+
+    if (m_imageValid && !m_currentImage.isNull()) {
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
+    }
+}
+
+void ImageViewWidget::updateColorScaleLayout()
+{
+    if (!m_colorScale) {
+        return;
+    }
+
+    if (m_colorScaleVisible) {
+        m_colorScale->setMinimumSize(QSize(20, 0));
+        m_colorScale->setMaximumSize(QSize(80, QWIDGETSIZE_MAX));
+        m_plot->plotLayout()->setColumnStretchFactor(0, 1);
+        m_plot->plotLayout()->setColumnStretchFactor(1, 0);
+    } else {
+        m_colorScale->setMinimumSize(QSize(0, 0));
+        m_colorScale->setMaximumSize(QSize(0, QWIDGETSIZE_MAX));
+    }
 }
 
 QImage ImageViewWidget::image() const
@@ -484,41 +538,41 @@ void ImageViewWidget::updatePlotGeometry()
         return;
     }
 
+    m_plot->setGeometry(0, 0, availableSize.width(), availableSize.height());
+
     if (m_fitMode == FitMode::FillWindow) {
-        m_plot->setGeometry(0, 0, availableSize.width(), availableSize.height());
         m_plot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
         m_plot->axisRect()->setMinimumSize(0, 0);
         m_plot->axisRect()->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
         return;
     }
 
-    int margin = 5;
-
     double xRange = m_plot->xAxis->range().upper - m_plot->xAxis->range().lower;
     double yRange = m_plot->yAxis->range().upper - m_plot->yAxis->range().lower;
     double currentAspect = (yRange > 0) ? (xRange / yRange) : 1.0;
 
-    int availWidth = availableSize.width() - margin * 2;
+    int colorScaleW = 0;
+    if (m_colorScale && m_colorScaleVisible) {
+        QCPLayoutElement *csElement = m_plot->plotLayout()->element(0, 1);
+        if (csElement) {
+            colorScaleW = csElement->rect().width();
+        }
+    }
+
+    int margin = 5;
+    int availWidth = availableSize.width() - margin * 2 - colorScaleW;
     int availHeight = availableSize.height() - margin * 2;
+
+    if (availWidth <= 0) availWidth = 1;
 
     int plotWidth, plotHeight;
     if (currentAspect > static_cast<double>(availWidth) / availHeight) {
         plotWidth = availWidth;
-        plotHeight = static_cast<int>(availWidth / currentAspect);
+        plotHeight = qMax(1, static_cast<int>(availWidth / currentAspect));
     } else {
         plotHeight = availHeight;
-        plotWidth = static_cast<int>(availHeight * currentAspect);
+        plotWidth = qMax(1, static_cast<int>(availHeight * currentAspect));
     }
-
-    if (plotWidth <= 0) plotWidth = 1;
-    if (plotHeight <= 0) plotHeight = 1;
-
-    int totalWidth = plotWidth + margin * 2;
-    int totalHeight = plotHeight + margin * 2;
-
-    int x = (availableSize.width() - totalWidth) / 2;
-    int y = (availableSize.height() - totalHeight) / 2;
-    m_plot->setGeometry(x, y, totalWidth, totalHeight);
 
     m_plot->axisRect()->setMargins(QMargins(margin, margin, margin, margin));
     m_plot->axisRect()->setMinimumSize(plotWidth, plotHeight);

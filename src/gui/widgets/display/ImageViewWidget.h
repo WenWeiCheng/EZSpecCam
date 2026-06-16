@@ -13,6 +13,7 @@
 
 class QCustomPlot;
 class QCPColorMap;
+class QCPColorScale;
 class QCPItemLine;
 class QCPItemText;
 
@@ -76,6 +77,9 @@ public:
     bool axesVisible() const { return m_axesVisible; }
     void setAxesVisible(bool visible);
 
+    bool isColorScaleVisible() const { return m_colorScaleVisible; }
+    void setColorScaleVisible(bool visible);
+
     QList<QPointF> crosshairPositions() const;
     int crosshairCount() const;
     void clearCrosshairs();
@@ -114,6 +118,7 @@ private:
     void checkOverexposure(const QImage &image);
     void applyColorMap();
     void applyColorScaleMode();
+    void updateColorScaleLayout();
     QPointF widgetToImageCoords(int widgetX, int widgetY) const;
     void updateDisplayData();
     void calculateDownsampleFactors();
@@ -123,6 +128,7 @@ private:
 
     QCustomPlot *m_plot;
     QCPColorMap *m_colorMap;
+    QCPColorScale *m_colorScale = nullptr;
     QImage m_currentImage;
     QList<QPair<QCPItemLine *, QCPItemLine *>> m_crosshairs;
     QPointF m_currentCrosshairPos;
@@ -132,6 +138,7 @@ private:
     ColorScaleMode m_colorScaleMode = ColorScaleMode::Auto;
     IntensityScaleType m_intensityScaleType = IntensityScaleType::Linear;
     bool m_axesVisible = false;
+    bool m_colorScaleVisible = false;
 
     QImage m_originalImage;
     QImage m_displayImage;

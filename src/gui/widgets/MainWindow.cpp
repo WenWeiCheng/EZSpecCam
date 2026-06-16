@@ -180,6 +180,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->menuActionFillWindow, &QAction::toggled,
             this, &MainWindow::on_fillWindow_triggered);
 
+    connect(ui->menuActionColorScale, &QAction::toggled,
+            this, &MainWindow::on_colorScale_triggered);
+
     connect(ui->menuActionStatistics, &QAction::triggered,
             this, &MainWindow::on_statistics_triggered);
 
@@ -413,6 +416,13 @@ void MainWindow::on_fillWindow_triggered(bool checked)
         m_imageViewWidget->setFitMode(
             checked ? ImageViewWidget::FitMode::FillWindow
                     : ImageViewWidget::FitMode::KeepAspectRatio);
+    }
+}
+
+void MainWindow::on_colorScale_triggered(bool checked)
+{
+    if (m_imageViewWidget) {
+        m_imageViewWidget->setColorScaleVisible(checked);
     }
 }
 
