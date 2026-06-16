@@ -643,6 +643,7 @@ bool ImageViewWidget::eventFilter(QObject *obj, QEvent *event)
                 m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, me->pos()).normalized());
                 return true;
             }
+            mouseMoveEvent(me);
             return true;
         } else if (event->type() == QEvent::MouseButtonRelease) {
             auto *me = static_cast<QMouseEvent *>(event);
