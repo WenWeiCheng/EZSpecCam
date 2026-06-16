@@ -24,7 +24,7 @@ ImageViewWidget::ImageViewWidget(QWidget *parent)
     m_plot->installEventFilter(this);
 
     m_colorScalePlot = new QCustomPlot(this);
-    m_colorScalePlot->setVisible(false);
+    m_colorScalePlot->setVisible(true);
 
     connect(m_resizeTimer, &QTimer::timeout, this, &ImageViewWidget::onResizeTimeout);
 
@@ -77,6 +77,10 @@ void ImageViewWidget::setupColorScalePlot()
     m_colorScalePlot->plotLayout()->setMargins(QMargins(0, 0, 0, 0));
 
     m_colorScalePlot->setBackground(Qt::white);
+
+    m_colorScale->setGradient(m_colorMap->gradient());
+    m_colorScale->setDataRange(m_colorMap->dataRange());
+    m_colorScale->setDataScaleType(m_colorMap->dataScaleType());
 }
 
 void ImageViewWidget::setImage(const QImage &image)
@@ -204,6 +208,9 @@ void ImageViewWidget::applyColorScaleMode()
     if (m_colorScale) {
         m_colorScale->setDataRange(m_colorMap->dataRange());
         m_colorScale->setDataScaleType(m_colorMap->dataScaleType());
+        if (m_colorScaleVisible) {
+            m_colorScalePlot->replot(QCustomPlot::rpQueuedReplot);
+        }
     }
 }
 
@@ -243,6 +250,9 @@ void ImageViewWidget::applyColorMap()
         m_colorMap->setGradient(gradient);
         if (m_colorScale) {
             m_colorScale->setGradient(gradient);
+            if (m_colorScaleVisible) {
+                m_colorScalePlot->replot(QCustomPlot::rpQueuedReplot);
+            }
         }
     }
 }
@@ -560,24 +570,21 @@ void ImageViewWidget::updatePlotGeometry()
     double yRange = m_plot->yAxis->range().upper - m_plot->yAxis->range().lower;
     double currentAspect = (yRange > 0) ? (xRange / yRange) : 1.0;
 
-    int margin = 5;
-    int availWidth = imageW - margin * 2;
-    int availHeight = availableSize.height() - margin * 2;
-
-    if (availWidth <= 0) availWidth = 1;
-
     int plotWidth, plotHeight;
-    if (currentAspect > static_cast<double>(availWidth) / availHeight) {
-        plotWidth = availWidth;
-        plotHeight = qMax(1, static_cast<int>(availWidth / currentAspect));
+    if (currentAspect > static_cast<double>(imageW) / availableSize.height()) {
+        plotWidth = imageW;
+        plotHeight = qMax(1, static_cast<int>(imageW / currentAspect));
     } else {
-        plotHeight = availHeight;
-        plotWidth = qMax(1, static_cast<int>(availHeight * currentAspect));
+        plotHeight = availableSize.height();
+        plotWidth = qMax(1, static_cast<int>(availableSize.height() * currentAspect));
     }
 
-    m_plot->axisRect()->setMargins(QMargins(margin, margin, margin, margin));
-    m_plot->axisRect()->setMinimumSize(plotWidth, plotHeight);
-    m_plot->axisRect()->setMaximumSize(plotWidth, plotHeight);
+    int hmargin = qMax(0, (imageW - plotWidth) / 2);
+    int vmargin = qMax(0, (availableSize.height() - plotHeight) / 2);
+
+    m_plot->axisRect()->setMargins(QMargins(hmargin, vmargin, hmargin, vmargin));
+    m_plot->axisRect()->setMinimumSize(0, 0);
+    m_plot->axisRect()->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
 }
 
 void ImageViewWidget::onResizeTimeout()

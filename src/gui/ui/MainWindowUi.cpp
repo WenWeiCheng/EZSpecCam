@@ -113,7 +113,7 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
 
     menuActionColorScale = new QAction("Show Color Scale", mainWindow);
     menuActionColorScale->setCheckable(true);
-    menuActionColorScale->setChecked(false);
+    menuActionColorScale->setChecked(true);
     menuView->addAction(menuActionColorScale);
 
     menuActionScale = new QAction("&Scale...", mainWindow);

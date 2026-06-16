@@ -139,7 +139,7 @@ private:
     ColorScaleMode m_colorScaleMode = ColorScaleMode::Auto;
     IntensityScaleType m_intensityScaleType = IntensityScaleType::Linear;
     bool m_axesVisible = false;
-    bool m_colorScaleVisible = false;
+    bool m_colorScaleVisible = true;
 
     QImage m_originalImage;
     QImage m_displayImage;
