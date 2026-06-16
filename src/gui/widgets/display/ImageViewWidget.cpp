@@ -538,14 +538,16 @@ void ImageViewWidget::updatePlotGeometry()
     int colorScaleW = 0;
     if (m_colorScalePlot && m_colorScaleVisible) {
         colorScaleW = 60;
-        m_colorScalePlot->setGeometry(0, 0, colorScaleW, availableSize.height());
     }
 
-    int imageX = colorScaleW;
     int imageW = availableSize.width() - colorScaleW;
     if (imageW <= 0) imageW = 1;
 
-    m_plot->setGeometry(imageX, 0, imageW, availableSize.height());
+    m_plot->setGeometry(0, 0, imageW, availableSize.height());
+
+    if (m_colorScalePlot && m_colorScaleVisible) {
+        m_colorScalePlot->setGeometry(imageW, 0, colorScaleW, availableSize.height());
+    }
 
     if (m_fitMode == FitMode::FillWindow) {
         m_plot->axisRect()->setMargins(QMargins(0, 0, 0, 0));
