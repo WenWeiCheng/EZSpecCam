@@ -888,8 +888,10 @@ void ImageViewWidget::resetZoomToFit()
 
     m_userHasZoomed = false;
     m_displayImage = QImage();
-    updateDisplayData();
+    m_plot->xAxis->setRange(0, m_originalImage.width());
+    m_plot->yAxis->setRange(0, m_originalImage.height());
     updatePlotGeometry();
+    updateDisplayData();
 }
 
 QVector<double> ImageViewWidget::extractColumnAsVector(int x) const
