@@ -135,6 +135,10 @@ QVariant ParameterWidgetFactory::getWidgetValue(QWidget *widget, ParameterType t
         if (QSlider *slider = widget->findChild<QSlider *>("slider")) {
             return static_cast<int>(slider->value());
         }
+        QSpinBox *spinBox = qobject_cast<QSpinBox *>(widget);
+        if (spinBox) {
+            return spinBox->value();
+        }
         break;
     }
     case ParameterType::IntCollection:

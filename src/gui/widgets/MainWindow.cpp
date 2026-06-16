@@ -619,7 +619,6 @@ void MainWindow::on_profile_triggered()
 {
     if (!m_profileWindow) {
         m_profileWindow = new ProfileWindow(this);
-        m_profileWindow->setAttribute(Qt::WA_DeleteOnClose);
     }
 
     if (m_imageViewWidget->hasImage()) {
