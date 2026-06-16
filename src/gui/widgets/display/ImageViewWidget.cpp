@@ -98,6 +98,13 @@ void ImageViewWidget::setImage(const QImage &image)
     updateDisplayData();
 
     updatePlotGeometry();
+
+    if (!m_crosshairs.isEmpty()) {
+        int x = static_cast<int>(m_currentCrosshairPos.x());
+        int y = static_cast<int>(m_currentCrosshairPos.y());
+        int value = pixelValue(x, y);
+        emit crosshairMoved(QPointF(x, y), value);
+    }
 }
 
 void ImageViewWidget::updateColorMap(const QImage &image)
