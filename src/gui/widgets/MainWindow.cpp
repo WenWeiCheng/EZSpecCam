@@ -10,6 +10,7 @@
 #include "dialogs/RowRangeDialog.h"
 #include "dialogs/CustomRangeDialog.h"
 #include "dialogs/ScaleControlDialog.h"
+#include "dialogs/DisplayStyleDialog.h"
 #include "config/CameraConfigDialog.h"
 #include "PostProcess.h"
 #include "../workers/FileSaverWorker.h"
@@ -95,13 +96,6 @@ MainWindow::MainWindow(QWidget *parent)
                 }
             });
 
-    connect(m_scaleDialog, &ScaleControlDialog::imageColorMapChanged,
-            this, [this](int map) {
-                if (m_imageViewWidget) {
-                    m_imageViewWidget->setColorMap(static_cast<ImageViewWidget::ColorMap>(map));
-                }
-            });
-
     connect(m_scaleDialog, &ScaleControlDialog::spectrumScaleTypeChanged,
             this, [this](int type) {
                 if (m_spectrumViewWidget) {
@@ -111,7 +105,25 @@ MainWindow::MainWindow(QWidget *parent)
                 }
             });
 
-    connect(m_scaleDialog, &ScaleControlDialog::spectrumLineStyleChanged,
+    m_displayStyleDialog = new DisplayStyleDialog(this);
+    m_displayStyleDialog->setImageColorMap(0);
+    m_displayStyleDialog->setSpectrumLineStyle(0);
+
+    connect(m_displayStyleDialog, &DisplayStyleDialog::colorScaleToggled,
+            this, [this](bool visible) {
+                if (m_imageViewWidget) {
+                    m_imageViewWidget->setColorScaleVisible(visible);
+                }
+            });
+
+    connect(m_displayStyleDialog, &DisplayStyleDialog::imageColorMapChanged,
+            this, [this](int map) {
+                if (m_imageViewWidget) {
+                    m_imageViewWidget->setColorMap(static_cast<ImageViewWidget::ColorMap>(map));
+                }
+            });
+
+    connect(m_displayStyleDialog, &DisplayStyleDialog::spectrumLineStyleChanged,
             this, [this](int style) {
                 if (m_spectrumViewWidget) {
                     m_spectrumViewWidget->setLineStyle(
@@ -180,9 +192,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->menuActionFillWindow, &QAction::toggled,
             this, &MainWindow::on_fillWindow_triggered);
 
-    connect(ui->menuActionColorScale, &QAction::toggled,
-            this, &MainWindow::on_colorScale_triggered);
-
     connect(ui->menuActionStatistics, &QAction::triggered,
             this, &MainWindow::on_statistics_triggered);
 
@@ -196,6 +205,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->menuActionScale, &QAction::triggered,
             this, &MainWindow::on_scale_triggered);
+
+    connect(ui->menuActionDisplayStyle, &QAction::triggered,
+            this, &MainWindow::on_display_style_triggered);
 
     connect(ui->toolbarActionConfig, &QAction::triggered,
             this, &MainWindow::on_actionConfig_triggered);
@@ -403,6 +415,15 @@ void MainWindow::on_scale_triggered()
     }
 }
 
+void MainWindow::on_display_style_triggered()
+{
+    if (m_displayStyleDialog) {
+        m_displayStyleDialog->show();
+        m_displayStyleDialog->raise();
+        m_displayStyleDialog->activateWindow();
+    }
+}
+
 void MainWindow::on_showAxes_triggered(bool checked)
 {
     if (m_imageViewWidget) {
@@ -416,13 +437,6 @@ void MainWindow::on_fillWindow_triggered(bool checked)
         m_imageViewWidget->setFitMode(
             checked ? ImageViewWidget::FitMode::FillWindow
                     : ImageViewWidget::FitMode::KeepAspectRatio);
-    }
-}
-
-void MainWindow::on_colorScale_triggered(bool checked)
-{
-    if (m_imageViewWidget) {
-        m_imageViewWidget->setColorScaleVisible(checked);
     }
 }
 
