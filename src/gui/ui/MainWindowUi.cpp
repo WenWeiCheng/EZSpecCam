@@ -38,6 +38,7 @@ MainWindowUi::MainWindowUi(QObject *parent)
     , menuActionSaveFrameAs(nullptr)
     , menuActionAutoSaveToggle(nullptr)
     , menuActionChangeAutoSaveDir(nullptr)
+    , menuActionOpenFrame(nullptr)
     , menuActionScale(nullptr)
 {
 }
@@ -66,6 +67,12 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     QMenuBar *menuBar = mainWindow->menuBar();
 
     QMenu *menuFile = menuBar->addMenu("&File");
+
+    menuActionOpenFrame = new QAction("&Open Frame...", mainWindow);
+    menuActionOpenFrame->setShortcut(QKeySequence::Open);
+    menuFile->addAction(menuActionOpenFrame);
+
+    menuFile->addSeparator();
 
     menuActionSaveFrameAs = new QAction("Save Frame As...", mainWindow);
     menuActionSaveFrameAs->setShortcut(QKeySequence(Qt::ALT | Qt::Key_S));

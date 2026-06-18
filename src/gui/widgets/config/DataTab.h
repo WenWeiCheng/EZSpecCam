@@ -14,14 +14,11 @@ public:
 
     QString prefix() const;
     QString suffix() const;
-    bool saveMetadata() const;
 
 protected slots:
     void onBrowseClicked();
     void onAutoSaveToggled(bool checked);
     void onImageFormatChanged(const QString &format);
-    void onSaveOriginalToggled(bool checked);
-    void onSaveMetadataToggled(bool checked);
     void onPrefixChanged(const QString &prefix);
     void onSuffixChanged(const QString &suffix);
 

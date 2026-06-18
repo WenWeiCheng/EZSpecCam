@@ -13,7 +13,7 @@
  * @class TiffFormatHandler
  * @brief TIFF 格式处理器 - 处理 TIFF 图像保存
  *
- * 修复: saveOriginal 在 TIFF 路径下失效的问题
+ * 新格式：始终将 original 2D 图作为主图像，并写 _metadata.json 边车。
  */
 class TiffFormatHandler : public IImageFormatHandler
 {
@@ -31,7 +31,6 @@ public:
 private:
     bool saveImage(const QImage &img, const QString &path);
     bool saveMetadataJson(const QString &imgPath, const SaveRequest &request);
-    QString insertSuffix(const QString &filePath, const QString &suffix) const;
 };
 
 #endif // TIFFORMATHANDLER_H

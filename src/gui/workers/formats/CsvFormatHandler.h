@@ -21,9 +21,7 @@ public:
     QString displayName() const override;
 
 private:
-    bool exportSpectrumCsv(const QVector<quint64> &spectrum, const QString &path);
     bool exportImageCsv(const QImage &img, const QString &path);
-    QString insertSuffix(const QString &filePath, const QString &suffix) const;
     bool saveMetadataJson(const QString &imgPath, const SaveRequest &request);
 };
 

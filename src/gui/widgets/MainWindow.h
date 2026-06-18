@@ -9,6 +9,7 @@
 #include <QThread>
 
 #include "../AppController.h"
+#include "../workers/FileLoaderWorker.h"
 
 class MainWindowUi;
 class CameraTab;
@@ -43,6 +44,9 @@ private slots:
     void on_actionAbout_triggered();
     void on_actionStart_triggered();
     void on_actionStop_triggered();
+    void on_actionOpenFrame_triggered();
+    void onFrameLoaded(const LoadResult &result, const QString &filePath);
+    void onFrameLoadFailed(const QString &error, const QString &filePath);
 
     void on_scale_triggered();
 
@@ -94,7 +98,9 @@ private:
     AppController *m_appController;
     QThread *m_controllerThread = nullptr;
     QThread *m_fileSaverThread = nullptr;
+    QThread *m_fileLoaderThread = nullptr;
     FileSaverWorker *m_fileSaverWorker = nullptr;
+    FileLoaderWorker *m_fileLoaderWorker = nullptr;
     CameraTab *m_cameraTab;
     ImageViewWidget *m_imageViewWidget;
     SpectrumViewWidget *m_spectrumViewWidget;

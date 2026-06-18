@@ -27,11 +27,11 @@ bool SequenceRunner::loadFromFile(const QString &filePath)
     if (root.contains("settings"))
     {
         QJsonObject s = root["settings"].toObject();
-        if (s.contains("output"))        defaultOutputDir = s["output"].toString();
-        if (s.contains("format"))        defaultFormat = s["format"].toString();
-        if (s.contains("prefix"))        defaultPrefix = s["prefix"].toString();
-        if (s.contains("suffix"))        defaultSuffix = s["suffix"].toString();
-        if (s.contains("save_metadata")) defaultSaveMetadata = s["save_metadata"].toBool(true);
+        if (s.contains("output")) defaultOutputDir = s["output"].toString();
+        if (s.contains("format")) defaultFormat = s["format"].toString();
+        if (s.contains("prefix")) defaultPrefix = s["prefix"].toString();
+        if (s.contains("suffix")) defaultSuffix = s["suffix"].toString();
+        // save_metadata 字段已废弃，被忽略（metadata 总是随帧一起保存）
     }
 
     QJsonArray stepsArray = root["steps"].toArray();
@@ -43,7 +43,6 @@ bool SequenceRunner::loadFromFile(const QString &filePath)
         step.format = defaultFormat;
         step.prefix = defaultPrefix;
         step.suffix = defaultSuffix;
-        step.saveMetadata = defaultSaveMetadata;
 
         if (stepObj.contains("configure"))
         {
@@ -56,12 +55,12 @@ bool SequenceRunner::loadFromFile(const QString &filePath)
         {
             step.type = SequenceStep::Capture;
             QJsonObject cap = stepObj["capture"].toObject();
-            if (cap.contains("frames"))        step.frames = cap["frames"].toInt(1);
-            if (cap.contains("output"))        step.outputDir = cap["output"].toString();
-            if (cap.contains("format"))        step.format = cap["format"].toString();
-            if (cap.contains("prefix"))        step.prefix = cap["prefix"].toString();
-            if (cap.contains("suffix"))        step.suffix = cap["suffix"].toString();
-            if (cap.contains("save_metadata")) step.saveMetadata = cap["save_metadata"].toBool(true);
+            if (cap.contains("frames")) step.frames = cap["frames"].toInt(1);
+            if (cap.contains("output")) step.outputDir = cap["output"].toString();
+            if (cap.contains("format")) step.format = cap["format"].toString();
+            if (cap.contains("prefix")) step.prefix = cap["prefix"].toString();
+            if (cap.contains("suffix")) step.suffix = cap["suffix"].toString();
+            // save_metadata 字段已废弃，被忽略
         }
         else if (stepObj.contains("wait_stable"))
         {

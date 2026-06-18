@@ -47,6 +47,25 @@ void RowRangeDialog::setImageHeight(int height)
 {
     m_imageHeight = height;
 
+    if (height <= 0) {
+        m_startSpinBox->setMinimum(0);
+        m_startSpinBox->setMaximum(0);
+        m_startSpinBox->setValue(0);
+        m_startSpinBox->setEnabled(false);
+        m_endSpinBox->setMinimum(0);
+        m_endSpinBox->setMaximum(0);
+        m_endSpinBox->setValue(0);
+        m_endSpinBox->setEnabled(false);
+        m_okButton->setEnabled(false);
+        m_applyButton->setEnabled(false);
+        return;
+    }
+
+    m_startSpinBox->setEnabled(true);
+    m_endSpinBox->setEnabled(true);
+    m_okButton->setEnabled(true);
+    m_applyButton->setEnabled(true);
+
     m_startSpinBox->setMinimum(1);
     m_startSpinBox->setMaximum(height);
     m_endSpinBox->setMinimum(1);
@@ -59,6 +78,9 @@ void RowRangeDialog::setImageHeight(int height)
 
 void RowRangeDialog::setRange(int start, int end)
 {
+    if (m_imageHeight <= 0) {
+        return;
+    }
     m_startSpinBox->setValue(qBound(1, start + 1, m_imageHeight));
     m_endSpinBox->setValue(qBound(1, end + 1, m_imageHeight));
 }

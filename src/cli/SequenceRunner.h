@@ -22,7 +22,6 @@ struct SequenceStep
     QString format;
     QString prefix;
     QString suffix;
-    bool saveMetadata = true;
 };
 
 /**
@@ -40,6 +39,8 @@ struct SequenceStep
  *   ]
  * }
  * @endcode
+ *
+ * 注：save_metadata 字段已废弃（被忽略），metadata 总是随帧一起保存。
  */
 class SequenceRunner
 {
@@ -53,7 +54,6 @@ public:
     QString defaultFormat;
     QString defaultPrefix;
     QString defaultSuffix;
-    bool defaultSaveMetadata = true;
 
 private:
     QVector<SequenceStep> m_steps;

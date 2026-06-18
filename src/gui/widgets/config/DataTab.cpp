@@ -21,10 +21,6 @@ DataTab::DataTab(QWidget *parent)
             this, &DataTab::onAutoSaveToggled);
     connect(ui->imageFormatComboBox, QOverload<const QString &>::of(&QComboBox::currentTextChanged),
             this, &DataTab::onImageFormatChanged);
-    connect(ui->saveOriginalDataCheckBox, &QCheckBox::toggled,
-            this, &DataTab::onSaveOriginalToggled);
-    connect(ui->saveMetadataCheckBox, &QCheckBox::toggled,
-            this, &DataTab::onSaveMetadataToggled);
     connect(ui->prefixLineEdit, &QLineEdit::textChanged,
             this, &DataTab::onPrefixChanged);
     connect(ui->suffixLineEdit, &QLineEdit::textChanged,
@@ -43,11 +39,6 @@ QString DataTab::prefix() const
 QString DataTab::suffix() const
 {
     return m_suffix;
-}
-
-bool DataTab::saveMetadata() const
-{
-    return ui->saveMetadataCheckBox->isChecked();
 }
 
 void DataTab::onBrowseClicked()
@@ -69,21 +60,8 @@ void DataTab::onAutoSaveToggled(bool checked)
 
 void DataTab::onImageFormatChanged(const QString &format)
 {
-    Q_UNUSED(format);
     QSettings settings;
     settings.setValue(QStringLiteral("data/imageFormat"), format);
-}
-
-void DataTab::onSaveOriginalToggled(bool checked)
-{
-    QSettings settings;
-    settings.setValue(QStringLiteral("data/saveOriginalData"), checked);
-}
-
-void DataTab::onSaveMetadataToggled(bool checked)
-{
-    QSettings settings;
-    settings.setValue(QStringLiteral("data/saveMetadata"), checked);
 }
 
 void DataTab::onPrefixChanged(const QString &prefix)

@@ -43,7 +43,6 @@ ezspeccam_cli --camera mock-001 --set exposure=500 --set gain=5.5 --frames 5
 | `--format <fmt>` | `tiff` | Output format: `tiff` or `csv` |
 | `--prefix <str>` | `""` | Filename prefix |
 | `--suffix <str>` | `""` | Filename suffix |
-| `--no-metadata` | off | Skip saving `_metadata.json` sidecar files |
 
 ### Sequence
 
@@ -75,6 +74,10 @@ Filenames follow the convention (underscores auto-inserted):
 
 ### Metadata JSON
 
+A `_metadata.json` sidecar is **always** written alongside each image. The original 2D
+image is the source of truth; spectrum can be re-derived from the original + the row
+range recorded in `softwareSettings`.
+
 ```json
 {
     "cameraId": "mock-001",
@@ -85,7 +88,8 @@ Filenames follow the convention (underscores auto-inserted):
         "gain": 1,
         "cooling_sensor_temp": 25,
         ...
-    }
+    },
+    "softwareSettings": {}
 }
 ```
 
@@ -97,13 +101,12 @@ For workflows requiring multiple configurations or stabilized conditions, use `-
 
 ```json
 {
-    "settings": {
-        "output": "./data",
-        "format": "tiff",
-        "prefix": "run1_",
-        "suffix": "",
-        "save_metadata": true
-    },
+  "settings": {
+    "output": "./data",
+    "format": "tiff",
+    "prefix": "run1_",
+    "suffix": ""
+  },
     "steps": [
         {
             "configure": {
@@ -158,8 +161,7 @@ For workflows requiring multiple configurations or stabilized conditions, use `-
         "frames": 10,
         "output": "./subdir",
         "format": "csv",
-        "prefix": "scan_",
-        "save_metadata": false
+        "prefix": "scan_"
     }
 }
 ```
@@ -178,7 +180,7 @@ The parameter is polled every 500ms. Stability is reached when all readings in t
 
 ### CLI Overrides
 
-When using `--sequence`, CLI arguments for `--output`, `--format`, `--prefix`, `--suffix`, and `--no-metadata` act as fallbacks for any `settings` fields not specified in the JSON.
+When using `--sequence`, CLI arguments for `--output`, `--format`, `--prefix`, and `--suffix` act as fallbacks for any `settings` fields not specified in the JSON.
 
 ## Parameter Flags
 
