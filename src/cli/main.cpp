@@ -65,29 +65,32 @@ static bool saveMetadataJson(const QString &imgPath, const ImageData &frame)
     return true;
 }
 
-static bool saveAsTiff(const ImageData &frame, const QString &filePath, bool withMetadata)
+static bool saveAsTiff(const ImageData &frame, const QString &filePath)
 {
     QFileInfo fi(filePath);
     QDir().mkpath(fi.absolutePath());
 
-    if (!frame.image.save(filePath, "TIFF"))
+    // 新格式：主图像始终是 original 2D 图（无 original 时退化为 image）
+    const QImage &mainImage = frame.hasOriginal() ? frame.originalImage : frame.image;
+    if (!mainImage.save(filePath, "TIFF"))
     {
         qWarning().noquote() << "Failed to save TIFF:" << filePath;
         return false;
     }
 
-    if (withMetadata)
-        saveMetadataJson(filePath, frame);
+    saveMetadataJson(filePath, frame);
 
     qInfo().noquote() << "  Saved:" << QFileInfo(filePath).fileName();
     return true;
 }
 
-static bool saveAsCsv(const ImageData &frame, const QString &filePath, bool withMetadata)
+static bool saveAsCsv(const ImageData &frame, const QString &filePath)
 {
     QFileInfo fi(filePath);
     QDir().mkpath(fi.absolutePath());
 
+    // 新格式：CSV 始终写 2D 矩阵（original 2D 图或退化到 image）
+    const QImage &mainImage = frame.hasOriginal() ? frame.originalImage : frame.image;
     QFile file(filePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
     {
@@ -96,39 +99,26 @@ static bool saveAsCsv(const ImageData &frame, const QString &filePath, bool with
     }
 
     QTextStream out(&file);
-
-    if (frame.image.height() == 1 && !frame.spectrum.isEmpty())
+    out << "Row,Col,Value\n";
+    for (int y = 0; y < mainImage.height(); ++y)
     {
-        out << "Index,Counts\n";
-        for (int i = 0; i < frame.spectrum.size(); ++i)
-            out << i << "," << frame.spectrum[i] << "\n";
+        const quint16 *row = reinterpret_cast<const quint16 *>(mainImage.constScanLine(y));
+        for (int x = 0; x < mainImage.width(); ++x)
+            out << y << "," << x << "," << row[x] << "\n";
     }
-    else
-    {
-        out << "Row,Col,Value\n";
-        for (int y = 0; y < frame.image.height(); ++y)
-        {
-            const quint16 *row = reinterpret_cast<const quint16 *>(frame.image.constScanLine(y));
-            for (int x = 0; x < frame.image.width(); ++x)
-                out << y << "," << x << "," << row[x] << "\n";
-        }
-    }
-
     file.close();
 
-    if (withMetadata)
-        saveMetadataJson(filePath, frame);
+    saveMetadataJson(filePath, frame);
 
     qInfo().noquote() << "  Saved:" << QFileInfo(filePath).fileName();
     return true;
 }
 
-static bool saveFrame(const ImageData &frame, const QString &filePath,
-                       const QString &format, bool withMetadata)
+static bool saveFrame(const ImageData &frame, const QString &filePath, const QString &format)
 {
     if (format == QStringLiteral("csv"))
-        return saveAsCsv(frame, filePath, withMetadata);
-    return saveAsTiff(frame, filePath, withMetadata);
+        return saveAsCsv(frame, filePath);
+    return saveAsTiff(frame, filePath);
 }
 
 // ============================================================================
@@ -237,8 +227,7 @@ static void listParameters(ICameraDriver *driver)
 
 static int captureFrames(ICameraDriver *driver, int frameCount,
                           const QString &outputDir, const QString &format,
-                          const QString &prefix, const QString &suffix,
-                          bool saveMetadata)
+                          const QString &prefix, const QString &suffix)
 {
     if (frameCount <= 0)
     {
@@ -261,14 +250,17 @@ static int captureFrames(ICameraDriver *driver, int frameCount,
 
             ImageData frame;
             frame.image = *image;
+            frame.originalImage = *image;  // CLI 始终把 driver 帧作为 original
             frame.timestamp = timestamp;
             frame.frameNumber = frameNumber;
             frame.cameraId = cameraId;
             frame.parameters = parameters;
+            // CLI 不应用 software vbin，因此 softwareSettings 留空
+            // （加载时落入"无 vbin 范围"分支，直接显示 2D 图）
 
             QString filePath = generateFilename(outputDir, format, prefix, suffix);
 
-            if (!saveFrame(frame, filePath, format, saveMetadata))
+            if (!saveFrame(frame, filePath, format))
                 errors++;
 
             captured++;
@@ -458,9 +450,8 @@ static int runSequence(ICameraDriver *driver, const SequenceRunner &seq)
             QString fmt = step.format.isEmpty() ? seq.defaultFormat : step.format;
             QString pfx = step.prefix.isEmpty() ? seq.defaultPrefix : step.prefix;
             QString sfx = step.suffix.isEmpty() ? seq.defaultSuffix : step.suffix;
-            bool meta = step.saveMetadata;
 
-            int captured = captureFrames(driver, step.frames, outDir, fmt, pfx, sfx, meta);
+            int captured = captureFrames(driver, step.frames, outDir, fmt, pfx, sfx);
             if (captured < 0)
             {
                 qCritical() << "Capture failed, aborting sequence";
@@ -536,9 +527,6 @@ int main(int argc, char *argv[])
 
     QCommandLineOption suffixOpt(QStringLiteral("suffix"), QStringLiteral("Filename suffix"), QStringLiteral("str"), QString());
     parser.addOption(suffixOpt);
-
-    QCommandLineOption noMetaOpt(QStringLiteral("no-metadata"), QStringLiteral("Do not save metadata JSON"));
-    parser.addOption(noMetaOpt);
 
     QCommandLineOption sequenceOpt(QStringLiteral("sequence"), QStringLiteral("Event sequence JSON file"), QStringLiteral("file"));
     parser.addOption(sequenceOpt);
@@ -645,7 +633,6 @@ int main(int argc, char *argv[])
         if (seq.defaultFormat.isEmpty())   seq.defaultFormat = parser.value(formatOpt);
         if (seq.defaultPrefix.isEmpty())   seq.defaultPrefix = parser.value(prefixOpt);
         if (seq.defaultSuffix.isEmpty())   seq.defaultSuffix = parser.value(suffixOpt);
-        if (parser.isSet(noMetaOpt))       seq.defaultSaveMetadata = false;
 
         int result = runSequence(driver, seq);
         driver->disconnectCamera();
@@ -671,9 +658,8 @@ int main(int argc, char *argv[])
     }
     QString prefix = parser.value(prefixOpt);
     QString suffix = parser.value(suffixOpt);
-    bool saveMetadata = !parser.isSet(noMetaOpt);
 
-    int captured = captureFrames(driver, frameCount, outputDir, format, prefix, suffix, saveMetadata);
+    int captured = captureFrames(driver, frameCount, outputDir, format, prefix, suffix);
 
     driver->disconnectCamera();
     return (captured >= 0) ? 0 : 1;

@@ -40,6 +40,7 @@ target_sources(ezspeccam_gui PRIVATE
     widgets/dialogs/ScaleControlDialog.h widgets/dialogs/ScaleControlDialog.cpp
     widgets/dialogs/DisplayStyleDialog.h widgets/dialogs/DisplayStyleDialog.cpp
     workers/FileSaverWorker.h workers/FileSaverWorker.cpp
+    workers/FileLoaderWorker.h workers/FileLoaderWorker.cpp
     workers/SaveTypes.h
     workers/IImageFormatHandler.h
     workers/formats/CsvFormatHandler.h workers/formats/CsvFormatHandler.cpp

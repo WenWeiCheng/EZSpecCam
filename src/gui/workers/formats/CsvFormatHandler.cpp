@@ -17,29 +17,15 @@ CsvFormatHandler::CsvFormatHandler(QObject *parent)
 bool CsvFormatHandler::save(const SaveRequest &request)
 {
     const auto &frame = request.frame;
-    const auto &opts = request.options;
 
-    if (frame.image.height() == 1) {
-        if (!exportSpectrumCsv(frame.spectrum, request.filePath)) {
-            return false;
-        }
-    } else {
-        if (!exportImageCsv(frame.image, request.filePath)) {
-            return false;
-        }
+    // 新格式：主图像始终是 original 2D 图（无 original 时退化为 image）
+    const QImage &mainImage = frame.hasOriginal() ? frame.originalImage : frame.image;
+    if (!exportImageCsv(mainImage, request.filePath)) {
+        return false;
     }
 
-    if (frame.image.height() == 1 && opts.saveOriginal && frame.hasOriginal()) {
-        QString origPath = insertSuffix(request.filePath, "_original");
-        if (!exportImageCsv(frame.originalImage, origPath)) {
-            return false;
-        }
-    }
-
-    if (opts.saveMetadata) {
-        if (!saveMetadataJson(request.filePath, request)) {
-            return false;
-        }
+    if (!saveMetadataJson(request.filePath, request)) {
+        return false;
     }
 
     return true;
@@ -59,44 +45,6 @@ QStringList CsvFormatHandler::supportedExtensions() const
 QString CsvFormatHandler::displayName() const
 {
     return QStringLiteral("CSV File (*.csv)");
-}
-
-QString CsvFormatHandler::insertSuffix(const QString &filePath, const QString &suffix) const
-{
-    QString result = filePath;
-    int dotIndex = result.lastIndexOf('.');
-    if (dotIndex > 0) {
-        result.insert(dotIndex, suffix);
-    } else {
-        result += suffix;
-    }
-    return result;
-}
-
-bool CsvFormatHandler::exportSpectrumCsv(const QVector<quint64> &spectrum, const QString &path)
-{
-    if (spectrum.isEmpty()) {
-        return false;
-    }
-
-    QFile f(path);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        return false;
-    }
-
-    QString content;
-    content.reserve(spectrum.size() * 25);
-    content += "Index,Counts\n";
-
-    for (int i = 0; i < spectrum.size(); ++i) {
-        content += QString::number(i);
-        content += ',';
-        content += QString::number(spectrum[i]);
-        content += '\n';
-    }
-
-    f.write(content.toUtf8());
-    return true;
 }
 
 bool CsvFormatHandler::exportImageCsv(const QImage &img, const QString &path)
@@ -159,6 +107,12 @@ bool CsvFormatHandler::saveMetadataJson(const QString &imgPath, const SaveReques
         paramsObj[it.key()] = QJsonValue::fromVariant(it.value());
     }
     root["parameters"] = paramsObj;
+
+    QJsonObject softwareObj;
+    for (auto it = frame.softwareSettings.constBegin(); it != frame.softwareSettings.constEnd(); ++it) {
+        softwareObj[it.key()] = QJsonValue::fromVariant(it.value());
+    }
+    root["softwareSettings"] = softwareObj;
 
     QFile file(metadataPath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {

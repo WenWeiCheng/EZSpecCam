@@ -32,6 +32,7 @@ public:
     QAction *menuActionSaveFrame;
     QAction *menuActionAutoSaveToggle;
     QAction *menuActionChangeAutoSaveDir;
+    QAction *menuActionOpenFrame;
 
     QAction *menuActionConfig;
     QAction *menuActionAbout;

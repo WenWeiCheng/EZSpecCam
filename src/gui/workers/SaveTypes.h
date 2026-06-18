@@ -8,11 +8,11 @@
 /**
  * @struct SaveOptions
  * @brief 保存选项 - 跨所有格式统一
+ *
+ * 新格式：始终保存原始 2D 图 + _metadata.json，不再提供开关。
  */
 struct SaveOptions
 {
-    bool saveOriginal = false;   ///< 是否保存原始数据 (before post-processing)
-    bool saveMetadata = true;   ///< 是否保存元数据 JSON
     QString prefix;             ///< 文件名前缀
     QString suffix;             ///< 文件名后缀
 };

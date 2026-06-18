@@ -15,26 +15,15 @@ TiffFormatHandler::TiffFormatHandler(QObject *parent)
 bool TiffFormatHandler::save(const SaveRequest &request)
 {
     const auto &frame = request.frame;
-    const auto &opts = request.options;
 
-    // 保存主图像
-    if (!saveImage(frame.image, request.filePath)) {
+    // 新格式：主图像始终是 original 2D 图（无 original 时退化为 image）
+    const QImage &mainImage = frame.hasOriginal() ? frame.originalImage : frame.image;
+    if (!saveImage(mainImage, request.filePath)) {
         return false;
     }
 
-    // 保存原始数据
-    if (frame.image.height() == 1 && opts.saveOriginal && frame.hasOriginal()) {
-        QString origPath = insertSuffix(request.filePath, "_original");
-        if (!saveImage(frame.originalImage, origPath)) {
-            return false;
-        }
-    }
-
-    // 元数据
-    if (opts.saveMetadata) {
-        if (!saveMetadataJson(request.filePath, request)) {
-            return false;
-        }
+    if (!saveMetadataJson(request.filePath, request)) {
+        return false;
     }
 
     return true;
@@ -68,18 +57,6 @@ bool TiffFormatHandler::saveImage(const QImage &img, const QString &path)
     return img.save(path, "TIFF");
 }
 
-QString TiffFormatHandler::insertSuffix(const QString &filePath, const QString &suffix) const
-{
-    QString result = filePath;
-    int dotIndex = result.lastIndexOf('.');
-    if (dotIndex > 0) {
-        result.insert(dotIndex, suffix);
-    } else {
-        result += suffix;
-    }
-    return result;
-}
-
 bool TiffFormatHandler::saveMetadataJson(const QString &imgPath, const SaveRequest &request)
 {
     const auto &frame = request.frame;
@@ -97,6 +74,12 @@ bool TiffFormatHandler::saveMetadataJson(const QString &imgPath, const SaveReque
         paramsObj[it.key()] = QJsonValue::fromVariant(it.value());
     }
     root["parameters"] = paramsObj;
+
+    QJsonObject softwareObj;
+    for (auto it = frame.softwareSettings.constBegin(); it != frame.softwareSettings.constEnd(); ++it) {
+        softwareObj[it.key()] = QJsonValue::fromVariant(it.value());
+    }
+    root["softwareSettings"] = softwareObj;
 
     QFile file(metadataPath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {

@@ -392,6 +392,7 @@ struct ImageData
     int frameNumber = 0;
     QString cameraId;
     QVariantMap parameters;
+    QVariantMap softwareSettings;  ///< Software-side state at save time (vertical binning, row range, etc.)
 
     bool isValid() const { return !image.isNull() && timestamp > 0; }
     bool hasOriginal() const { return !originalImage.isNull(); }

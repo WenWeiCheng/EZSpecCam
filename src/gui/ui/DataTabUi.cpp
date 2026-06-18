@@ -16,8 +16,6 @@ DataTabUi::DataTabUi(QObject *parent)
     , browseDirectoryButton(nullptr)
     , autoSaveEnabledCheckBox(nullptr)
     , imageFormatComboBox(nullptr)
-    , saveOriginalDataCheckBox(nullptr)
-    , saveMetadataCheckBox(nullptr)
     , prefixLineEdit(nullptr)
     , suffixLineEdit(nullptr)
     , m_parent(parent)
@@ -55,12 +53,6 @@ void DataTabUi::setupUi(DataTab *tab)
     imageFormatComboBox->addItems({"TIFF", "CSV"});
     formLayout->addRow("Image Format:", imageFormatComboBox);
 
-    saveOriginalDataCheckBox = new QCheckBox("Save original data (before post-processing)", tab);
-    formLayout->addRow("Save Original:", saveOriginalDataCheckBox);
-
-    saveMetadataCheckBox = new QCheckBox("Save metadata as JSON file alongside image", tab);
-    formLayout->addRow("Save Metadata:", saveMetadataCheckBox);
-
     prefixLineEdit = new QLineEdit(tab);
     QRegularExpression regex("^[a-zA-Z0-9_\u4e00-\u9fa5]*$");
     prefixLineEdit->setValidator(new QRegularExpressionValidator(regex, tab));
@@ -79,8 +71,6 @@ void DataTabUi::setupUi(DataTab *tab)
     autoSaveDirectoryLineEdit->setText(settings.value(QStringLiteral("data/autoSaveDirectory"), QString()).toString());
     autoSaveEnabledCheckBox->setChecked(settings.value(QStringLiteral("data/autoSaveEnabled"), false).toBool());
     imageFormatComboBox->setCurrentText(settings.value(QStringLiteral("data/imageFormat"), QStringLiteral("TIFF")).toString());
-    saveOriginalDataCheckBox->setChecked(settings.value(QStringLiteral("data/saveOriginalData"), false).toBool());
-    saveMetadataCheckBox->setChecked(settings.value(QStringLiteral("data/saveMetadata"), true).toBool());
     prefixLineEdit->setText(settings.value(QStringLiteral("data/filenamePrefix"), QString()).toString());
     suffixLineEdit->setText(settings.value(QStringLiteral("data/filenameSuffix"), QString()).toString());
 }

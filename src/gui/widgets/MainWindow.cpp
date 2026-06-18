@@ -14,6 +14,7 @@
 #include "config/CameraConfigDialog.h"
 #include "PostProcess.h"
 #include "../workers/FileSaverWorker.h"
+#include "../workers/FileLoaderWorker.h"
 #include "../workers/SaveTypes.h"
 #include "../workers/formats/CsvFormatHandler.h"
 #include "../workers/formats/TiffFormatHandler.h"
@@ -173,6 +174,17 @@ MainWindow::MainWindow(QWidget *parent)
     m_fileSaverWorker->registerHandler(std::make_unique<CsvFormatHandler>());
     m_fileSaverWorker->registerHandler(std::make_unique<TiffFormatHandler>());
 
+    // Set up FileLoaderWorker on its own thread
+    m_fileLoaderThread = new QThread(this);
+    m_fileLoaderWorker = new FileLoaderWorker();
+    m_fileLoaderWorker->moveToThread(m_fileLoaderThread);
+    m_fileLoaderThread->start();
+
+    connect(m_fileLoaderWorker, &FileLoaderWorker::frameLoaded,
+            this, &MainWindow::onFrameLoaded, Qt::QueuedConnection);
+    connect(m_fileLoaderWorker, &FileLoaderWorker::loadFailed,
+            this, &MainWindow::onFrameLoadFailed, Qt::QueuedConnection);
+
     connect(ui->menuActionSaveFrameAs, &QAction::triggered,
             this, &MainWindow::on_actionSaveFrameAs_triggered);
     connect(ui->menuActionSaveFrame, &QAction::triggered,
@@ -181,6 +193,8 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::on_actionAutoSaveToggle_triggered);
     connect(ui->menuActionChangeAutoSaveDir, &QAction::triggered,
             this, &MainWindow::on_actionChangeAutoSaveDir_triggered);
+    connect(ui->menuActionOpenFrame, &QAction::triggered,
+            this, &MainWindow::on_actionOpenFrame_triggered);
     connect(ui->menuActionConfig, &QAction::triggered,
             this, &MainWindow::on_actionConfig_triggered);
     connect(ui->menuActionAbout, &QAction::triggered,
@@ -235,6 +249,13 @@ MainWindow::~MainWindow()
         m_fileSaverThread = nullptr;
     }
 
+    if (m_fileLoaderThread) {
+        m_fileLoaderThread->quit();
+        m_fileLoaderThread->wait(2000);
+        delete m_fileLoaderThread;
+        m_fileLoaderThread = nullptr;
+    }
+
     if (m_controllerThread) {
         m_controllerThread->quit();
         m_controllerThread->wait(2000);
@@ -245,15 +266,28 @@ MainWindow::~MainWindow()
 
 void MainWindow::saveFrameToFile(const QString &filePath)
 {
-    QSettings settings;
-    SaveOptions opts;
-    opts.saveOriginal = settings.value("data/saveOriginalData", false).toBool();
-    opts.saveMetadata = settings.value("data/saveMetadata", true).toBool();
-
     SaveRequest request;
     request.frame = m_currentFrame;
+
+    // 新格式：始终保存 original 2D 图 + metadata。
+    // softwareSettings 仅在 vbin 范围是图像行数的真子集时写入
+    // （加载时据此自动重算 spectrum）；无效范围直接不写。
+    const int h = request.frame.image.height();
+    if (h > 0) {
+        const int effEnd = (m_vBinEndRow < 0) ? (h - 1) : m_vBinEndRow;
+        const bool meaningfulRange = m_vBinEnabled
+            && (m_vBinStartRow > 0 || effEnd < h - 1);
+        if (meaningfulRange) {
+            request.frame.softwareSettings["softwareVerticalBinning"] = true;
+            request.frame.softwareSettings["vBinStartRow"] = m_vBinStartRow;
+            request.frame.softwareSettings["vBinEndRow"] = effEnd;
+        } else {
+            request.frame.softwareSettings["softwareVerticalBinning"] = false;
+        }
+    }
+
     request.filePath = filePath;
-    request.options = opts;
+    request.options = SaveOptions{};
 
     QMetaObject::invokeMethod(m_fileSaverWorker, [this, request]() {
         m_fileSaverWorker->saveFrame(request);
@@ -361,6 +395,114 @@ void MainWindow::on_actionChangeAutoSaveDir_triggered()
 
     settings.setValue("data/autoSaveDirectory", dir);
     showStatusMessage(tr("Auto-save directory set to: %1").arg(dir), 3000);
+}
+
+void MainWindow::on_actionOpenFrame_triggered()
+{
+    QSettings settings;
+    QString openDir = settings.value("data/lastOpenDirectory").toString();
+    if (openDir.isEmpty() || !QDir(openDir).exists()) {
+        openDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    }
+
+    QFileDialog dialog(this, tr("Open Frame"), openDir);
+    dialog.setAcceptMode(QFileDialog::AcceptOpen);
+    dialog.setFileMode(QFileDialog::ExistingFile);
+    dialog.setNameFilters(QStringList{
+        FileLoaderWorker::openFormatsDisplayName(),
+        QStringLiteral("TIFF Image (*.tiff *.tif)"),
+        QStringLiteral("CSV File (*.csv)"),
+        QStringLiteral("All Files (*)")
+    });
+
+    if (!dialog.exec() || dialog.selectedFiles().isEmpty()) {
+        return;
+    }
+
+    QString filePath = dialog.selectedFiles().first();
+    QFileInfo fileInfo(filePath);
+    settings.setValue("data/lastOpenDirectory", fileInfo.absoluteDir().absolutePath());
+
+    QMetaObject::invokeMethod(m_fileLoaderWorker, "loadFrame",
+        Qt::QueuedConnection,
+        Q_ARG(QString, filePath));
+    showStatusMessage(tr("Loading frame: %1").arg(fileInfo.fileName()), 2000);
+}
+
+void MainWindow::onFrameLoaded(const LoadResult &result, const QString &filePath)
+{
+    if (!result.success) {
+        QMessageBox::warning(this, tr("Open Frame"),
+            tr("Failed to load frame: %1").arg(result.errorMessage));
+        return;
+    }
+
+    // 旧格式检测：主文件若为 1 行 spectrum，且无 _original 边车，
+    // 则视为已废弃的旧格式（旧格式允许保存 1 行 spectrum 作为主文件），
+    // 直接拒绝加载。
+    if (result.frame.image.height() == 1 && result.frame.originalImage.isNull()) {
+        QMessageBox::warning(this, tr("Open Frame"),
+            tr("Failed to load %1: deprecated legacy format (1-row spectrum as main file "
+               "is no longer supported; please re-capture).")
+                .arg(QFileInfo(filePath).fileName()));
+        return;
+    }
+
+    m_currentFrame = result.frame;
+
+    const QImage &img = m_currentFrame.image;
+    const int imgHeight = img.height();
+    const QVariantMap &sw = m_currentFrame.softwareSettings;
+
+    // 自动恢复 spectrum：仅当 metadata 含 vbin 范围，且该范围是图像行数的真子集时
+    const int savedStart = sw.value("vBinStartRow", -1).toInt();
+    const int savedEnd = sw.value("vBinEndRow", -1).toInt();
+    const bool hasRange = (savedStart >= 0) && (savedEnd >= 0);
+    const bool fullRange = hasRange && (savedStart == 0) && (savedEnd >= imgHeight - 1);
+
+    const bool shouldRecover = result.hasMetadata
+        && hasRange
+        && !fullRange
+        && imgHeight > 1;
+
+    if (shouldRecover) {
+        m_vBinStartRow = qBound(0, savedStart, imgHeight - 1);
+        m_vBinEndRow = qBound(m_vBinStartRow, savedEnd, imgHeight - 1);
+        m_vBinEnabled = true;
+
+        PostProcess::verticalBinning(m_currentFrame, m_vBinStartRow, m_vBinEndRow);
+    } else {
+        // 缺 metadata / 无 vbin 范围 / 范围覆盖整图 → 直接显示 2D 图
+        m_vBinEnabled = false;
+        if (hasRange) {
+            m_vBinStartRow = qBound(0, savedStart, qMax(0, imgHeight - 1));
+            m_vBinEndRow = (savedEnd < 0)
+                ? qMax(0, imgHeight - 1)
+                : qBound(m_vBinStartRow, savedEnd, qMax(0, imgHeight - 1));
+        } else {
+            m_vBinStartRow = 0;
+            m_vBinEndRow = (imgHeight > 0) ? (imgHeight - 1) : -1;
+        }
+    }
+
+    ui->menuActionVerticalBinning->blockSignals(true);
+    ui->menuActionVerticalBinning->setChecked(m_vBinEnabled);
+    ui->menuActionVerticalBinning->blockSignals(false);
+
+    updateDisplay(m_currentFrame);
+
+    QString msg = tr("Loaded %1").arg(QFileInfo(filePath).fileName());
+    QStringList parts;
+    if (result.hasMetadata) parts << tr("with metadata");
+    if (shouldRecover) parts << tr("spectrum recovered");
+    if (!parts.isEmpty()) msg += QStringLiteral(" (") + parts.join(QStringLiteral(", ")) + QStringLiteral(")");
+    showStatusMessage(msg, 3000);
+}
+
+void MainWindow::onFrameLoadFailed(const QString &error, const QString &filePath)
+{
+    QMessageBox::warning(this, tr("Open Frame"),
+        tr("Failed to load %1: %2").arg(QFileInfo(filePath).fileName(), error));
 }
 
 void MainWindow::on_actionConfig_triggered()
@@ -493,24 +635,38 @@ void MainWindow::on_rowRange_triggered()
         return;
     }
 
-    int imageHeight = m_currentFrame.originalImage.height();
+    // Row range 始终基于 original 2D 图的高度（若存在），而不是当前显示的视图
+    // (spectrumView 时 image.height()==1，否则对话框 spinbox 会被锁死在 [1,1])。
+    const int imageHeight = m_currentFrame.hasOriginal()
+        ? m_currentFrame.originalImage.height()
+        : m_currentFrame.image.height();
+    if (imageHeight <= 0) {
+        QMessageBox::warning(this, tr("Invalid Frame"),
+            tr("Cannot set row range: current image has no rows."));
+        return;
+    }
+
     RowRangeDialog *dialog = new RowRangeDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setImageHeight(imageHeight);
-    dialog->setRange(m_vBinStartRow, m_vBinEndRow < 0 ? imageHeight - 1 : m_vBinEndRow);
+    dialog->setRange(m_vBinStartRow - 1, (m_vBinEndRow < 0 ? imageHeight : m_vBinEndRow) - 1);
     dialog->show();
 
     connect(dialog, &RowRangeDialog::applyClicked, this, [this](int startRow, int endRow) {
         m_vBinStartRow = startRow;
         m_vBinEndRow = endRow;
 
-        if (m_vBinEnabled && m_currentFrame.isValid()) {
+        if (m_currentFrame.isValid()) {
             ImageData frame = m_currentFrame;
             if (frame.hasOriginal()) {
                 frame.image = frame.originalImage;
             }
             PostProcess::verticalBinning(frame, m_vBinStartRow, m_vBinEndRow);
             m_currentFrame = frame;
+            m_vBinEnabled = true;
+            ui->menuActionVerticalBinning->blockSignals(true);
+            ui->menuActionVerticalBinning->setChecked(true);
+            ui->menuActionVerticalBinning->blockSignals(false);
             updateDisplay(frame);
         }
     });

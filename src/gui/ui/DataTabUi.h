@@ -22,8 +22,6 @@ public:
     QPushButton *browseDirectoryButton;
     QCheckBox *autoSaveEnabledCheckBox;
     QComboBox *imageFormatComboBox;
-    QCheckBox *saveOriginalDataCheckBox;
-    QCheckBox *saveMetadataCheckBox;
     QLineEdit *prefixLineEdit;
     QLineEdit *suffixLineEdit;
 
