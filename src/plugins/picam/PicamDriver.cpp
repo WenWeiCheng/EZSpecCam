@@ -1,9 +1,12 @@
 #include "PicamDriver.h"
+#include "PicamParameterRegistry.h"
 #include "gui/DebugMacros.h"
+#include "picam.h"
 
 #include <QThread>
 #include <QDebug>
 #include <QDateTime>
+#include <qthread.h>
 
 Q_LOGGING_CATEGORY(parameterCategory, "Parameter")
 Q_LOGGING_CATEGORY(cameraCategory, "Camera")
@@ -409,14 +412,21 @@ bool PicamDriver::commitParameters()
     piint failedCount = 0;
     PicamError err = Picam_CommitParameters(m_handle, &failedParams, &failedCount);
 
-    if (failedParams != nullptr) {
-        Picam_DestroyParameters(failedParams);
-    }
-
     if (err != PicamError_None) {
-        m_lastError = CameraError::makeError(
-            CameraError::Code::CommitFailed,
-            QString("Commit failed: %1 (%2 params failed)").arg(err).arg(failedCount));
+        if(failedCount > 0 && failedParams != nullptr) {
+            QStringList failedParamNames;
+            for(int i=0; i<failedCount; ++i) {
+                const PicamParameter& p = failedParams[i];
+                const PicamParameterRecord* rcd = findByPicamParam(p);
+                QString paramName = rcd ? rcd->displayName : QString("UnknownParam");
+                DRIVER_DEBUG << "Parameter commit failed for: " << paramName << " (PICAM param: " << p << ")";
+                failedParamNames.append(paramName);
+            }
+            m_lastError = CameraError::makeError(
+                CameraError::Code::CommitFailed,
+                QString("Commit failed: %1 (%2 params failed)").arg(err).arg(failedParamNames.join(", ")));
+            Picam_DestroyParameters(failedParams);
+        }
         emit errorOccurred(m_lastError);
         return false;
     }
@@ -439,16 +449,16 @@ bool PicamDriver::startCapture(int captureCount)
 {
     QMutexLocker locker(&m_mutex);
 
+    if (m_capturing.load()) {
+        stopCapture();
+    }
+
     if (m_state.load() != CameraState::Connected) {
         m_lastError = CameraError::makeError(
             CameraError::Code::StateInvalid,
             "Camera not connected");
         emit errorOccurred(m_lastError);
         return false;
-    }
-
-    if (m_capturing.load()) {
-        stopCapture(5000);
     }
 
     m_capturing.store(true);
@@ -469,21 +479,21 @@ void PicamDriver::stopCapture(int timeoutMs)
 {
     QMutexLocker locker(&m_mutex);
 
-    if (!m_capturing.load()) {
+    if(m_capturing.load() == false) {
         return;
     }
 
     m_capturing.store(false);
 
+    if (m_handle != nullptr) {
+        Picam_StopAcquisition(m_handle);
+    }
+
     if (m_captureThread != nullptr) {
-        locker.unlock();
+        m_captureThread->quit();
         m_captureThread->wait(timeoutMs > 0 ? timeoutMs : 5000);
-        if (m_captureThread->isRunning()) {
-            m_captureThread->terminate();
-        }
         m_captureThread->deleteLater();
         m_captureThread = nullptr;
-        locker.relock();
     }
 
     m_state.store(CameraState::Connected);
@@ -492,16 +502,34 @@ void PicamDriver::stopCapture(int timeoutMs)
 
 void PicamDriver::onCaptureLoop()
 {
-    // Use poll-style acquisition: StartAcquisition + WaitForAcquisitionUpdate loop
-    // This emits frames as they arrive, rather than waiting for all frames at once
+    int target = m_captureCountTarget.load();
+    #ifdef EZSPECCAM_PICAM_DEMO
+    if(target==0) target=10000;
+    #endif
 
-    PicamError err = Picam_StartAcquisition(m_handle);
-    if (err != PicamError_None) {
-        QMetaObject::invokeMethod(this, [this, err]() {
+    pibln committed;
+    Picam_SetParameterLargeIntegerValue(m_handle, PicamParameter_ReadoutCount, target);
+    Picam_AreParametersCommitted( m_handle, &committed );
+    if( !committed )
+    {
+        const PicamParameter* failed_parameter_array = NULL;
+        piint           failed_parameter_count = 0;
+        Picam_CommitParameters( m_handle, &failed_parameter_array, &failed_parameter_count );
+        if( failed_parameter_count )
+        {
+            Picam_DestroyParameters( failed_parameter_array );
+        }
+    }
+
+    PicamError startErr = Picam_StartAcquisition(m_handle);
+    if (startErr != PicamError_None) {
+        QMetaObject::invokeMethod(this, [this, startErr]() {
             m_lastError = CameraError::makeError(
                 CameraError::Code::CaptureFailed,
-                QString("Failed to start acquisition: %1").arg(err));
+                QString("Failed to start acquisition: %1").arg(startErr));
             emit errorOccurred(m_lastError);
+        }, Qt::QueuedConnection);
+        QMetaObject::invokeMethod(this, [this]() {
             m_capturing.store(false);
             m_state.store(CameraState::Connected);
             emit captureStopped(m_connectedCameraId);
@@ -509,65 +537,37 @@ void PicamDriver::onCaptureLoop()
         return;
     }
 
-    const int pollTimeout = 1000; // 1 second polling interval
     PicamAvailableData data;
     PicamAcquisitionStatus status;
+    pibln running = (startErr == PicamError_None);
 
-    while (m_capturing.load()) {
-        int target = m_captureCountTarget.load();
+    while (running) {
+        PicamError pollErr = Picam_WaitForAcquisitionUpdate(m_handle, -1, &data, &status);
 
-        // WaitForAcquisitionUpdate blocks until data arrives or timeout
-        PicamError err = Picam_WaitForAcquisitionUpdate(m_handle, pollTimeout, &data, &status);
-
-        if (err == PicamError_TimeOutOccurred) {
-            // Timeout is normal - no new data yet, continue polling
-            if (target > 0 && m_framesCaptured.load() >= target) {
-                break;
-            }
-            continue;
-        }
-
-        if (err == PicamError_AcquisitionNotInProgress) {
-            // Acquisition stopped - this is normal when target frames are reached
-            break;
-        }
-
-        if (err != PicamError_None) {
-            QMetaObject::invokeMethod(this, [this, err]() {
+        if (pollErr != PicamError_None) {
+            QMetaObject::invokeMethod(this, [this, pollErr]() {
                 m_lastError = CameraError::makeError(
                     CameraError::Code::CaptureFailed,
-                    QString("Acquisition update failed: %1").arg(err));
+                    QString("Acquisition update failed: %1").arg(pollErr));
                 emit errorOccurred(m_lastError);
             }, Qt::QueuedConnection);
             break;
         }
 
-        if (status.errors != PicamAcquisitionErrorsMask_None) {
-            QMetaObject::invokeMethod(this, [this, errors = status.errors]() {
-                m_lastError = CameraError::makeError(
-                    CameraError::Code::CaptureFailed,
-                    QString("Acquisition errors: %1").arg(errors),
-                    CameraError::Severity::Warning);
-                emit errorOccurred(m_lastError);
-            }, Qt::QueuedConnection);
-        }
+        running = status.running;
 
         if (data.readout_count > 0) {
             processFrame(data);
         }
-
-        if (target > 0 && m_framesCaptured.load() >= target) {
-            break;
-        }
     }
 
-    Picam_StopAcquisition(m_handle);
+    // stopCapture();
+    QMetaObject::invokeMethod(this, "onCaptureCompleted", Qt::QueuedConnection);
+}
 
-    QMetaObject::invokeMethod(this, [this]() {
-        m_capturing.store(false);
-        m_state.store(CameraState::Connected);
-        emit captureStopped(m_connectedCameraId);
-    }, Qt::QueuedConnection);
+void PicamDriver::onCaptureCompleted()
+{
+    stopCapture();
 }
 
 void PicamDriver::processFrame(const PicamAvailableData& data)
@@ -1208,7 +1208,6 @@ PicamError PicamDriver::setEnumeratedParameter(PicamParameter param, const QStri
     }
 
     const PicamCollectionConstraint* constraint = nullptr;
-    PicamEnumeratedType etype;
 
     PicamError err = Picam_GetParameterCollectionConstraint(
         m_handle, param, PicamConstraintCategory_Capable, &constraint);

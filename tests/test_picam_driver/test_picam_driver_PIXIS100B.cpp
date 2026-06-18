@@ -24,21 +24,6 @@ private:
     QString m_cameraId;
     QStringList m_params;
 
-    bool tryConnect()
-    {
-        QStringList cameras = m_driver->enumerate();
-        if (cameras.isEmpty()) {
-            return false;
-        }
-        m_cameraId = cameras.first();
-        if (!m_driver->connectToCamera(m_cameraId)) {
-            return false;
-        }
-        m_params = m_driver->parameterNames();
-        qDebug() << "Connected. Parameters:" << m_params.size() << m_params;
-        return true;
-    }
-
     void verifyParamExists(const QString &name)
     {
         QVERIFY2(m_params.contains(name),
@@ -233,6 +218,13 @@ private slots:
     {
         m_driver = new PicamDriver();
         QVERIFY2(m_driver != nullptr, "PicamDriver should be created");
+
+        QStringList cameras = m_driver->enumerate();
+        if (cameras.isEmpty()) {
+            QSKIP("PICam demo camera not available; skipping entire test suite");
+        }
+        m_cameraId = cameras.first();
+        qDebug() << "Will connect to" << m_cameraId << "for each test";
     }
 
     void cleanupTestCase()
@@ -248,14 +240,28 @@ private slots:
 
     void init()
     {
-        if (m_driver && m_driver->isConnected()) {
+        if (!m_driver) {
+            return;
+        }
+        // Each test starts with a fresh connection for a clean environment.
+        if (m_driver->isConnected()) {
             m_driver->disconnectCamera();
         }
+        QVERIFY2(m_driver->connectToCamera(m_cameraId),
+                 qPrintable(QString("init: connectToCamera(%1) failed").arg(m_cameraId)));
+        m_params = m_driver->parameterNames();
     }
 
     void cleanup()
     {
-        if (m_driver && m_driver->isConnected()) {
+        if (!m_driver) {
+            return;
+        }
+        // Safety net: stop any in-flight capture, then disconnect.
+        if (m_driver->state() == CameraState::Acquiring) {
+            m_driver->stopCapture();
+        }
+        if (m_driver->isConnected()) {
             m_driver->disconnectCamera();
         }
     }
@@ -284,9 +290,6 @@ private slots:
     //==========================================================================
     void test_connect()
     {
-        if (!tryConnect()) {
-            QSKIP("No PICam camera found, skipping test");
-        }
         QVERIFY2(m_driver->isConnected(),
                  qPrintable(QString("isConnected should be true after connect: %1").arg(m_cameraId)));
         QVERIFY2(m_driver->state() == CameraState::Connected,
@@ -308,9 +311,6 @@ private slots:
 
     void test_disconnect()
     {
-        if (!tryConnect()) {
-            QSKIP("No PICam camera found, skipping test");
-        }
         QSignalSpy connectionSpy(m_driver, &ICameraDriver::connectionChanged);
         m_driver->disconnectCamera();
         QVERIFY2(!m_driver->isConnected(),
@@ -334,9 +334,6 @@ private slots:
     //==========================================================================
     void test_parameter_names_not_empty()
     {
-        if (!tryConnect()) {
-            QSKIP("No PICam camera found, skipping test");
-        }
         QVERIFY2(!m_params.isEmpty(),
                  qPrintable(QString("parameterNames should not be empty, got %1 params").arg(m_params.size())));
         qDebug() << "Parameter count:" << m_params.size();
@@ -348,19 +345,16 @@ private slots:
     //==========================================================================
     void test_param_sensor_width()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
         verifyParamReadOnly("sensor_width", ParameterType::IntRange);
     }
 
     void test_param_sensor_height()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
         verifyParamReadOnly("sensor_height", ParameterType::IntRange);
     }
 
     void test_param_bit_depth()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
         verifyParamReadOnly("bit_depth", ParameterType::IntRange);
     }
 
@@ -369,13 +363,11 @@ private slots:
     //==========================================================================
     void test_param_exposure()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
         testFloatRangeParam("exposure");
     }
 
     void test_param_analog_gain()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
         if (!m_params.contains("analog_gain")) {
             qDebug() << "analog_gain not available, skipping";
             return;
@@ -407,7 +399,6 @@ private slots:
     //==========================================================================
     void test_param_adc_quality()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
         if (!m_params.contains("adc_quality")) {
             qDebug() << "adc_quality not available, skipping";
             return;
@@ -430,7 +421,6 @@ private slots:
 
     void test_param_adc_speed()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
         if (!m_params.contains("adc_speed")) {
             qDebug() << "adc_speed not available, skipping";
             return;
@@ -464,7 +454,6 @@ private slots:
     //==========================================================================
     void test_param_pixel_format()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
         if (!m_params.contains("pixel_format")) {
             qDebug() << "pixel_format not available, skipping";
             return;
@@ -490,7 +479,6 @@ private slots:
     //==========================================================================
     void test_param_roi()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
 
         QStringList roiParams = {"roi_x", "roi_y", "roi_width", "roi_height"};
         for (const QString &name : roiParams) {
@@ -509,41 +497,31 @@ private slots:
 
         qDebug() << "Full sensor size:" << fullWidth.toInt() << "x" << fullHeight.toInt();
 
-        m_driver->setParameter("roi_x", 0);
-        m_driver->setParameter("roi_y", 0);
-        m_driver->setParameter("roi_width", fullWidth);
-        m_driver->setParameter("roi_height", fullHeight);
+        QVERIFY2(m_driver->setParameter("roi_x", 0), "setParameter roi_x");
+        QVERIFY2(m_driver->setParameter("roi_y", 0), "setParameter roi_y");
+        QVERIFY2(m_driver->setParameter("roi_width", fullWidth), "setParameter roi_width");
+        QVERIFY2(m_driver->setParameter("roi_height", fullHeight), "setParameter roi_height");
+        QVERIFY2(m_driver->commitParameters(), "commitParameters for full-sensor ROI");
 
-        // Try to commit - may fail on demo camera due to SDK limitations
-        bool commitOk = m_driver->commitParameters();
-        if (!commitOk) {
-            qDebug() << "ROI commit failed - demo camera may have SDK limitations";
-            // Try reading back the values to verify setParameter worked
-            QVariant readX = m_driver->parameterValue("roi_x");
-            QVariant readWidth = m_driver->parameterValue("roi_width");
-            qDebug() << "Set roi_x =" << readX << "roi_width =" << readWidth;
-        }
-
-        // Try to capture a frame regardless
         QSignalSpy frameSpyFull(m_driver, &ICameraDriver::frameReady);
-        m_driver->startCapture(1);
-        if (frameSpyFull.wait(5000)) {
-            QSharedPointer<QImage> fullImage = frameSpyFull.takeFirst().at(0).value<QSharedPointer<QImage>>();
-            if (!fullImage->isNull()) {
-                qDebug() << "Full frame:" << fullImage->width() << "x" << fullImage->height();
-            }
-        }
+        QVERIFY2(m_driver->startCapture(1), "startCapture after ROI commit");
+        QVERIFY2(frameSpyFull.wait(10000), "ROI capture: no frame within 10s");
+        QCOMPARE(frameSpyFull.count(), 1);
+
+        QSharedPointer<QImage> fullImage = frameSpyFull.takeFirst().at(0).value<QSharedPointer<QImage>>();
+        QVERIFY2(!fullImage.isNull() && !fullImage->isNull(), "ROI frame QImage is null");
+        QCOMPARE(fullImage->width(), fullWidth.toInt());
+        QCOMPARE(fullImage->height(), fullHeight.toInt());
 
         m_driver->stopCapture();
 
-        // Reset ROI to full sensor to leave camera in clean state
-        m_driver->setParameter("roi_x", 0);
-        m_driver->setParameter("roi_y", 0);
-        m_driver->setParameter("roi_width", fullWidth);
-        m_driver->setParameter("roi_height", fullHeight);
-        m_driver->setParameter("roi_x_binning", 1);
-        m_driver->setParameter("roi_y_binning", 1);
-        m_driver->commitParameters();
+        QVERIFY2(m_driver->setParameter("roi_x", 0), "reset roi_x");
+        QVERIFY2(m_driver->setParameter("roi_y", 0), "reset roi_y");
+        QVERIFY2(m_driver->setParameter("roi_width", fullWidth), "reset roi_width");
+        QVERIFY2(m_driver->setParameter("roi_height", fullHeight), "reset roi_height");
+        QVERIFY2(m_driver->setParameter("roi_x_binning", 1), "reset roi_x_binning");
+        QVERIFY2(m_driver->setParameter("roi_y_binning", 1), "reset roi_y_binning");
+        QVERIFY2(m_driver->commitParameters(), "commitParameters for ROI reset");
     }
 
     //==========================================================================
@@ -551,7 +529,6 @@ private slots:
     //==========================================================================
     void test_param_binning()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
 
         bool hasXBinning = m_params.contains("roi_x_binning");
         bool hasYBinning = m_params.contains("roi_y_binning");
@@ -566,48 +543,49 @@ private slots:
 
         ParameterDefinition widthParam = m_driver->parameter("roi_width");
         ParameterDefinition heightParam = m_driver->parameter("roi_height");
-        m_driver->setParameter("roi_width", widthParam.constraint.maxValue);
-        m_driver->setParameter("roi_height", heightParam.constraint.maxValue);
-        m_driver->setParameter("roi_x_binning", 1);
-        m_driver->setParameter("roi_y_binning", 1);
-
-        bool commitOk = m_driver->commitParameters();
-        if (!commitOk) {
-            qDebug() << "Binning commit failed - demo camera may have SDK limitations";
-        }
+        QVERIFY2(m_driver->setParameter("roi_width", widthParam.constraint.maxValue), "set roi_width");
+        QVERIFY2(m_driver->setParameter("roi_height", heightParam.constraint.maxValue), "set roi_height");
+        QVERIFY2(m_driver->setParameter("roi_x_binning", 1), "set binning 1x1");
+        QVERIFY2(m_driver->setParameter("roi_y_binning", 1), "set binning 1x1");
+        QVERIFY2(m_driver->commitParameters(), "commit 1x1 binning");
 
         QSignalSpy frameSpy1(m_driver, &ICameraDriver::frameReady);
-        m_driver->startCapture(1);
-        if (frameSpy1.wait(5000)) {
-            QSharedPointer<QImage> image1 = frameSpy1.takeFirst().at(0).value<QSharedPointer<QImage>>();
-            if (!image1->isNull()) {
-                qDebug() << "Binning 1x1:" << image1->width() << "x" << image1->height();
-            }
-        }
+        QVERIFY2(m_driver->startCapture(1), "startCapture 1x1 binning");
+        QVERIFY2(frameSpy1.wait(10000), "Binning 1x1: no frame within 10s");
+        QCOMPARE(frameSpy1.count(), 1);
 
-        m_driver->setParameter("roi_x_binning", 2);
-        m_driver->setParameter("roi_y_binning", 2);
-        commitOk = m_driver->commitParameters();
-        if (!commitOk) {
-            qDebug() << "Binning 2x2 commit failed";
-        }
+        QSharedPointer<QImage> image1 = frameSpy1.takeFirst().at(0).value<QSharedPointer<QImage>>();
+        QVERIFY2(!image1.isNull() && !image1->isNull(), "1x1 binning frame is null");
+        int w1 = image1->width();
+        int h1 = image1->height();
+        qDebug() << "Binning 1x1:" << w1 << "x" << h1;
+
+        QVERIFY2(m_driver->setParameter("roi_x_binning", 2), "set binning 2x2");
+        QVERIFY2(m_driver->setParameter("roi_y_binning", 2), "set binning 2x2");
+        QVERIFY2(m_driver->commitParameters(), "commit 2x2 binning");
 
         QSignalSpy frameSpy2(m_driver, &ICameraDriver::frameReady);
-        m_driver->startCapture(1);
-        if (frameSpy2.wait(5000)) {
-            QSharedPointer<QImage> image2 = frameSpy2.takeFirst().at(0).value<QSharedPointer<QImage>>();
-            if (!image2.isNull()) {
-                qDebug() << "Binning 2x2:" << image2->width() << "x" << image2->height();
-            }
-        }
+        QVERIFY2(m_driver->startCapture(1), "startCapture 2x2 binning");
+        QVERIFY2(frameSpy2.wait(10000), "Binning 2x2: no frame within 10s");
+        QCOMPARE(frameSpy2.count(), 1);
+
+        QSharedPointer<QImage> image2 = frameSpy2.takeFirst().at(0).value<QSharedPointer<QImage>>();
+        QVERIFY2(!image2.isNull() && !image2->isNull(), "2x2 binning frame is null");
+        int w2 = image2->width();
+        int h2 = image2->height();
+        qDebug() << "Binning 2x2:" << w2 << "x" << h2;
+
+        QVERIFY2(w2 <= w1 && h2 <= h1,
+                 qPrintable(QString("2x2 binning frame (%1x%2) should be <= 1x1 frame (%3x%4)")
+                                .arg(w2).arg(h2).arg(w1).arg(h1)));
 
         m_driver->stopCapture();
 
-        m_driver->setParameter("roi_x", 0);
-        m_driver->setParameter("roi_y", 0);
-        m_driver->setParameter("roi_x_binning", 1);
-        m_driver->setParameter("roi_y_binning", 1);
-        m_driver->commitParameters();
+        QVERIFY2(m_driver->setParameter("roi_x", 0), "reset roi_x");
+        QVERIFY2(m_driver->setParameter("roi_y", 0), "reset roi_y");
+        QVERIFY2(m_driver->setParameter("roi_x_binning", 1), "reset binning 1");
+        QVERIFY2(m_driver->setParameter("roi_y_binning", 1), "reset binning 1");
+        QVERIFY2(m_driver->commitParameters(), "commit binning reset");
     }
 
     //==========================================================================
@@ -615,7 +593,6 @@ private slots:
     //==========================================================================
     void test_param_temperature()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
 
         if (!m_params.contains("sensor_temperature")) {
             qDebug() << "sensor_temperature not available, skipping";
@@ -646,7 +623,6 @@ private slots:
     //==========================================================================
     void test_param_sensor_info_extended()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
 
         verifyParamReadOnly("pixel_width", ParameterType::FloatRange);
         verifyParamReadOnly("pixel_height", ParameterType::FloatRange);
@@ -692,7 +668,6 @@ private slots:
     //==========================================================================
     void test_param_temperature_status()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
         verifyParamReadOnly("temperature_status", ParameterType::StringCollection);
     }
 
@@ -701,7 +676,6 @@ private slots:
     //==========================================================================
     void test_param_adc_bit_depth()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
         ParameterDefinition def = m_driver->parameter("adc_bit_depth");
         QVERIFY2(def.isValid(),
                  qPrintable(QString("adc_bit_depth definition should be valid")));
@@ -719,7 +693,6 @@ private slots:
     //==========================================================================
     void test_param_readout_trigger()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
 
         QStringList names = {"readout_mode", "trigger_response", "output_signal"};
         for (const QString &name : names) {
@@ -744,7 +717,6 @@ private slots:
     //==========================================================================
     void test_param_advanced()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
 
         QStringList enumNames = {"shutter_mode"};
         for (const QString &name : enumNames) {
@@ -825,7 +797,6 @@ private slots:
     //==========================================================================
     void test_param_all_writable_default_commit()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
 
         QStringList roiSubParams = {"roi_x", "roi_y", "roi_width", "roi_height",
                                     "roi_x_binning", "roi_y_binning"};
@@ -889,44 +860,101 @@ private slots:
     //==========================================================================
     void test_capture_single_frame()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
-
-        m_driver->disconnectCamera();
-        if (!m_driver->connectToCamera(m_cameraId)) {
-            QFAIL("Failed to reconnect");
-        }
-
-        m_driver->setParameter("exposure", 0.1);
-        m_driver->commitParameters();
+        QVERIFY2(m_driver->setParameter("exposure", 0.1), "setParameter exposure");
+        QVERIFY2(m_driver->commitParameters(), "commitParameters exposure");
 
         QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
-        m_driver->startCapture(1);
-        bool gotFrame = frameSpy.wait(10000);
-        qDebug() << "Single frame capture result:" << gotFrame << "frames received:" << frameSpy.count();
+        QVERIFY2(m_driver->startCapture(1), "startCapture(1) should return true");
+        QVERIFY2(frameSpy.wait(3000) || frameSpy.count() > 0, "Single frame: no frame received within 3s");
+        QCOMPARE(frameSpy.count(), 1);
+
+        QSharedPointer<QImage> img = frameSpy.takeFirst().at(0).value<QSharedPointer<QImage>>();
+        QVERIFY2(!img.isNull() && !img->isNull(), "Frame QImage is null");
+        QVERIFY2(img->width() > 0 && img->height() > 0,
+                 qPrintable(QString("Frame has zero dimensions: %1x%2")
+                                .arg(img->width()).arg(img->height())));
+        
+        frameSpy.clear();
+        QVERIFY2(m_driver->startCapture(1), "new startCapture(1) should return true");
+        QVERIFY2(frameSpy.wait(3000) || frameSpy.count() > 0, "Single frame: no new frame received within 3s");
+        QCOMPARE(frameSpy.count(), 1);
 
         m_driver->stopCapture();
-
-        if (!gotFrame) {
-            QSKIP("Demo camera capture may be inconsistent after parameter tests");
-        }
     }
 
     void test_capture_multiple_frames()
     {
-        if (!tryConnect()) { QSKIP("No PICam camera found, skipping test"); }
-
         QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
-        m_driver->startCapture(3);
-        QVERIFY2(frameSpy.wait(30000), "Should receive frames within timeout");
-
-        qDebug() << "Received" << frameSpy.count() << "frames (expected 3)";
+        QVERIFY2(m_driver->startCapture(3), "startCapture(3) should return true");
+        QTest::qWait(3000); // Wait up to 3s for frames to arrive
+        QCOMPARE(frameSpy.count(), 3);
 
         for (int i = 0; i < frameSpy.count(); ++i) {
             QSharedPointer<QImage> image = frameSpy.at(i).at(0).value<QSharedPointer<QImage>>();
-            QVERIFY2(!image.isNull(), qPrintable(QString("Frame %1 should not be null").arg(i)));
+            QVERIFY2(!image.isNull() && !image->isNull(),
+                     qPrintable(QString("Frame %1 is null").arg(i)));
+            QVERIFY2(image->width() > 0 && image->height() > 0,
+                     qPrintable(QString("Frame %1 has zero dimensions: %2x%3")
+                                    .arg(i).arg(image->width()).arg(image->height())));
         }
 
         m_driver->stopCapture();
+        QCOMPARE(int(m_driver->state()), int(CameraState::Connected));
+    }
+
+    void test_capture_burst_mode()
+    {
+        QVERIFY2(m_driver->setParameter("exposure", 0.1), "setParameter exposure");
+        QVERIFY2(m_driver->commitParameters(), "commitParameters exposure");
+
+        const int burstCount = 5;
+
+        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+        QSignalSpy captureStoppedSpy(m_driver, &ICameraDriver::captureStopped);
+        QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+
+        QVERIFY2(m_driver->startCapture(burstCount),
+                 qPrintable(QString("startCapture(%1) should return true").arg(burstCount)));
+        QTest::qWait(3000); // Wait up to 3s for frames to arrive
+        QCOMPARE(frameSpy.count(), burstCount);
+
+        for (int i = 0; i < frameSpy.count(); ++i) {
+            QSharedPointer<QImage> image = frameSpy.at(i).at(0).value<QSharedPointer<QImage>>();
+            QVERIFY2(!image.isNull() && !image->isNull(),
+                     qPrintable(QString("Burst frame %1 is null").arg(i)));
+        }
+
+        QVERIFY2(errorSpy.isEmpty() || errorSpy.count() == 0,
+                 "Burst capture emitted unexpected errorOccurred signals");
+
+        QVERIFY2(captureStoppedSpy.wait(3000) || captureStoppedSpy.count() >= 1,
+                 "Burst capture: captureStopped not emitted within 3s");
+    }
+
+    void test_capture_live_mode()
+    {
+        QVERIFY2(m_driver->setParameter("exposure", 0.1), "setParameter exposure");
+        QVERIFY2(m_driver->commitParameters(), "commitParameters exposure");
+
+        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+        QSignalSpy captureStartedSpy(m_driver, &ICameraDriver::captureStarted);
+        QSignalSpy captureStoppedSpy(m_driver, &ICameraDriver::captureStopped);
+
+        QVERIFY2(m_driver->startCapture(0),
+                 "startCapture(0) live mode should return true");
+        QVERIFY2(captureStartedSpy.count() == 1, "captureStarted not emitted exactly once");
+        QCOMPARE(int(m_driver->state()), int(CameraState::Acquiring));
+
+        QTest::qWait(3000); // Wait up to 3s for frames to arrive
+        QVERIFY2(frameSpy.count() >= 3,
+                 qPrintable(QString("Live mode: < 3 frames in 3s, got %1")
+                                .arg(frameSpy.count())));
+        int framesBeforeStop = frameSpy.count();
+        qDebug() << "Live mode received" << framesBeforeStop << "frames in 3s before stop";
+
+        m_driver->stopCapture();
+        QVERIFY2(captureStoppedSpy.count() == 1, "captureStopped not emitted exactly once");
+        QCOMPARE(int(m_driver->state()), int(CameraState::Connected));
     }
 };
 

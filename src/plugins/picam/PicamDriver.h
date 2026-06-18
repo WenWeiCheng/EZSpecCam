@@ -186,4 +186,10 @@ private:
     // SDK reference counting (static, shared across instances)
     static std::atomic<bool> s_sdkInitialized;
     static std::atomic<int> s_sdkRefCount;
+
+private slots:
+    /**
+     * @brief Internal slot to handle capture completion
+     */
+    void onCaptureCompleted();
 };
