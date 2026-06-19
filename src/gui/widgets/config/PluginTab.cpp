@@ -49,10 +49,15 @@ void PluginTab::setAppController(AppController *controller)
 
         connect(controller, &AppController::pluginScanCompleted,
                 this, &PluginTab::onScanCompleted);
+        connect(controller, &AppController::pluginScanProgress,
+                this, &PluginTab::onScanProgress);
         connect(controller, &AppController::pluginLoadFailed,
                 this, &PluginTab::onPluginLoadFailed);
 
         if (!pluginDir.isEmpty() && QDir(pluginDir).exists()) {
+            m_lastScanFailed = 0;
+            m_scanStatusLabel->setText("Scanning plugins...");
+            m_scanStatusLabel->setVisible(true);
             QMetaObject::invokeMethod(controller, &AppController::scanPlugins, Qt::QueuedConnection);
         }
     }
@@ -92,6 +97,9 @@ void PluginTab::setupUi()
     pluginsTableWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
     pluginsLayout->addWidget(pluginsTableWidget);
+    m_scanStatusLabel = new QLabel(this);
+    m_scanStatusLabel->setVisible(false);
+    pluginsLayout->addWidget(m_scanStatusLabel);
     loadedPluginsGroup->setLayout(pluginsLayout);
     mainLayout->addWidget(loadedPluginsGroup);
 
@@ -132,24 +140,44 @@ void PluginTab::onScanClicked()
         settings.setValue("plugins/pluginDirectory", pluginDir);
     }
 
+    m_lastScanFailed = 0;
+    m_scanStatusLabel->setText("Scanning plugins...");
+    m_scanStatusLabel->setVisible(true);
+
     QMetaObject::invokeMethod(m_appController, &AppController::scanPlugins, Qt::QueuedConnection);
 }
 
 void PluginTab::onScanCompleted(int totalPlugins, int loadedPlugins)
 {
     Q_UNUSED(totalPlugins);
-    Q_UNUSED(loadedPlugins);
+    m_lastScanLoaded = loadedPlugins;
     updatePluginsTable();
 
     if (m_cameraTab) {
         m_cameraTab->refreshCameraList();
     }
+
+    int cameraCount = m_appController ? m_appController->availableCameras().size() : 0;
+    m_scanStatusLabel->setText(
+        QString("Scan complete: %1 plugins loaded, %2 cameras found. %3 failed.")
+            .arg(loadedPlugins)
+            .arg(cameraCount)
+            .arg(m_lastScanFailed));
+}
+
+void PluginTab::onScanProgress(int current, int total, const QString &currentFile)
+{
+    Q_UNUSED(currentFile);
+    m_scanStatusLabel->setText(
+        QString("Scanning plugins... (%1/%2)").arg(current).arg(total));
+    m_scanStatusLabel->setVisible(true);
 }
 
 void PluginTab::onPluginLoadFailed(const QString &filePath, const QString &error)
 {
     Q_UNUSED(filePath);
     Q_UNUSED(error);
+    m_lastScanFailed++;
     updatePluginsTable();
 }
 
