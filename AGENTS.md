@@ -79,6 +79,8 @@ When executing certain test executable, you can't see the output in terminal, so
 
 ```
 & "build\msvc-debug\bin\Debug\test_picam_driver_PIXIS100B.exe" -v2 -o test_output.txt 2>&1; Get-Content test_output.txt -Tail 100
+# test single function
+& "build\msvc-debug\bin\Debug\test_picam_driver_PIXIS100B.exe" test_enumerate -v2 -o test_output.txt 2>&1; Get-Content test_output.txt -Tail 100
 ```
 
 ## NOTES
