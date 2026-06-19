@@ -560,6 +560,16 @@ private slots:
         int h1 = image1->height();
         qDebug() << "Binning 1x1:" << w1 << "x" << h1;
 
+        ParameterDefinition xBinningDef = m_driver->parameter("roi_x_binning");
+        ParameterDefinition yBinningDef = m_driver->parameter("roi_y_binning");
+        if(xBinningDef.constraint.maxValue < 2) {
+            qDebug() << "Maximum x binning is less than 2, skipping 2x2 binning test";
+            return;
+        }
+        if(yBinningDef.constraint.maxValue < 2) {
+            qDebug() << "Maximum y binning is less than 2, skipping 2x2 binning test";
+            return;
+        }
         QVERIFY2(m_driver->setParameter("roi_x_binning", 2), "set binning 2x2");
         QVERIFY2(m_driver->setParameter("roi_y_binning", 2), "set binning 2x2");
         QVERIFY2(m_driver->commitParameters(), "commit 2x2 binning");
