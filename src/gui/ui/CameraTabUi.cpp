@@ -15,6 +15,7 @@
 
 CameraTabUi::CameraTabUi(QObject *parent)
     : QObject(parent)
+    , scanButton(nullptr)
     , connectButton(nullptr)
     , disconnectButton(nullptr)
     , cameraComboBox(nullptr)
@@ -25,6 +26,7 @@ CameraTabUi::CameraTabUi(QObject *parent)
     , parameterGroup(nullptr)
     , m_statusLabel(nullptr)
     , m_loadingIndicator(nullptr)
+    , m_scanStatusLabel(nullptr)
     , m_dynamicParametersLayout(nullptr)
     , m_scrollArea(nullptr)
 {
@@ -43,7 +45,14 @@ void CameraTabUi::setupUi(CameraTab *tab)
     cameraComboBox = new QComboBox(tab);
     cameraComboBox->setObjectName("cameraComboBox");
     cameraComboBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    formLayout->addRow("Camera:", cameraComboBox);
+
+    scanButton = new QPushButton("Scan", tab);
+    scanButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+
+    QHBoxLayout *cameraLayout = new QHBoxLayout();
+    cameraLayout->addWidget(scanButton);
+    cameraLayout->addWidget(cameraComboBox, 1);
+    formLayout->addRow("Camera:", cameraLayout);
 
     connectButton = new QPushButton("Connect", tab);
     connectButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
@@ -61,7 +70,6 @@ void CameraTabUi::setupUi(CameraTab *tab)
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     buttonLayout->addWidget(connectButton);
     buttonLayout->addWidget(disconnectButton);
-    buttonLayout->addStretch();
     formLayout->addRow("", buttonLayout);
 
     QHBoxLayout *statusLayout = new QHBoxLayout();
@@ -69,6 +77,10 @@ void CameraTabUi::setupUi(CameraTab *tab)
     statusLayout->addWidget(m_statusLabel);
     statusLayout->addStretch();
     formLayout->addRow("", statusLayout);
+
+    m_scanStatusLabel = new QLabel(tab);
+    m_scanStatusLabel->setVisible(false);
+    formLayout->addRow("", m_scanStatusLabel);
 
     captureModeComboBox = new QComboBox(tab);
     captureModeComboBox->addItems({"Single", "Burst", "Live"});

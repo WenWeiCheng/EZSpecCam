@@ -48,8 +48,23 @@ void AppController::scanPlugins()
     int totalPlugins = fileList.size();
     int loadedPlugins = 0;
 
-    for (const QFileInfo &fileInfo : fileList) {
-        QString filePath = fileInfo.absoluteFilePath();
+    for (int i = 0; i < fileList.size(); ++i) {
+        QString filePath = fileList[i].absoluteFilePath();
+
+        bool alreadyLoaded = false;
+        for (const auto &existing : m_plugins) {
+            if (QFileInfo(existing.filePath).canonicalFilePath() == QFileInfo(filePath).canonicalFilePath()) {
+                alreadyLoaded = true;
+                break;
+            }
+        }
+        if (alreadyLoaded) {
+            loadedPlugins++;
+            continue;
+        }
+
+        emit pluginScanProgress(i + 1, totalPlugins, filePath);
+
         if (loadPlugin(filePath)) {
             loadedPlugins++;
         }

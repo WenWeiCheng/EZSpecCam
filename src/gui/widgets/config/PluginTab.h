@@ -7,6 +7,7 @@
 #include <QPushButton>
 #include <QTableWidget>
 #include <QAbstractItemView>
+#include <QLabel>
 
 class AppController;
 class CameraTab;
@@ -27,6 +28,7 @@ private slots:
     void onBrowseClicked();
     void onScanClicked();
     void onScanCompleted(int totalPlugins, int loadedPlugins);
+    void onScanProgress(int current, int total, const QString &currentFile);
     void onPluginLoadFailed(const QString &filePath, const QString &error);
 
 private:
@@ -40,6 +42,9 @@ private:
     QPushButton *browsePluginDirectoryButton;
     QPushButton *scanPluginsButton;
     QTableWidget *pluginsTableWidget;
+    QLabel *m_scanStatusLabel = nullptr;
+    int m_lastScanLoaded = 0;
+    int m_lastScanFailed = 0;
 };
 
 #endif // PLUGINTAB_H

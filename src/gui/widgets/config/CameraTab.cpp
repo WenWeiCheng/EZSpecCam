@@ -18,6 +18,8 @@ CameraTab::CameraTab(QWidget *parent)
 {
     ui->setupUi(this);
     connect(m_coolingTimer, &QTimer::timeout, this, &CameraTab::onCoolingTimerTimeout);
+    connect(ui->scanButton, &QPushButton::clicked,
+            this, &CameraTab::onScanButtonClicked);
     connect(ui->connectButton, &QPushButton::clicked,
             this, &CameraTab::onConnectButtonClicked);
     connect(ui->disconnectButton, &QPushButton::clicked,
@@ -55,6 +57,14 @@ void CameraTab::setAppController(AppController *controller)
                 this, &CameraTab::onConnectCameraFinished);
         connect(controller, &AppController::disconnectCameraFinished,
                 this, &CameraTab::onDisconnectCameraFinished);
+        connect(controller, &AppController::pluginScanProgress,
+                this, &CameraTab::onScanProgress);
+        connect(controller, &AppController::pluginScanCompleted,
+                this, &CameraTab::onScanCompleted);
+        connect(controller, &AppController::pluginLoadFailed,
+                this, [this](const QString &, const QString &) {
+            m_lastScanFailed++;
+        });
 
         if (controller->isConnected()) {
             setBufferedConfig(controller->allParameters());
@@ -80,6 +90,21 @@ void CameraTab::updateConnectionState()
     bool connected = !camera_notConnected && ui->cameraComboBox->count() > 0;
     ui->connectButton->setEnabled(!connected);
     ui->disconnectButton->setEnabled(connected);
+}
+
+void CameraTab::onScanButtonClicked()
+{
+    if (!m_appController) {
+        return;
+    }
+
+    m_lastScanFailed = 0;
+    if (ui->m_scanStatusLabel) {
+        ui->m_scanStatusLabel->setText("Scanning plugins...");
+        ui->m_scanStatusLabel->setVisible(true);
+    }
+
+    QMetaObject::invokeMethod(m_appController, &AppController::scanPlugins, Qt::QueuedConnection);
 }
 
 void CameraTab::onConnectButtonClicked()
@@ -445,6 +470,31 @@ void CameraTab::onCoolingTimerTimeout()
                 }
             }
         }
+    }
+}
+
+void CameraTab::onScanProgress(int current, int total, const QString &currentFile)
+{
+    Q_UNUSED(currentFile);
+    if (ui->m_scanStatusLabel) {
+        ui->m_scanStatusLabel->setText(
+            QString("Scanning plugins... (%1/%2)").arg(current).arg(total));
+        ui->m_scanStatusLabel->setVisible(true);
+    }
+}
+
+void CameraTab::onScanCompleted(int totalPlugins, int loadedPlugins)
+{
+    Q_UNUSED(totalPlugins);
+    refreshCameraList();
+
+    if (ui->m_scanStatusLabel) {
+        int cameraCount = m_appController ? m_appController->availableCameras().size() : 0;
+        ui->m_scanStatusLabel->setText(
+            QString("Scan complete: %1 plugins loaded, %2 cameras found. %3 failed.")
+                .arg(loadedPlugins)
+                .arg(cameraCount)
+                .arg(m_lastScanFailed));
     }
 }
 

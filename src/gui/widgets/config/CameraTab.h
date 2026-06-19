@@ -39,6 +39,7 @@ public:
     CameraTabUi *ui = nullptr;
 
 protected slots:
+    void onScanButtonClicked();
     void onConnectButtonClicked();
     void onDisconnectButtonClicked();
     void onCameraSelected(int index);
@@ -48,6 +49,8 @@ protected slots:
     void onCoolingTimerTimeout();
     void onConnectCameraFinished(const QString &cameraId, bool success, const QString &error);
     void onDisconnectCameraFinished(const QString &cameraId);
+    void onScanProgress(int current, int total, const QString &currentFile);
+    void onScanCompleted(int totalPlugins, int loadedPlugins);
 
 private:
     void updateConnectionState();
@@ -62,6 +65,7 @@ private:
     QMap<ParameterCategory, QGroupBox*> m_categoryGroups;
     QHash<QString, ParameterDefinition> m_parameterDefinitions;
     QTimer *m_coolingTimer;
+    int m_lastScanFailed = 0;
 };
 
 #endif // CAMERATAB_H
