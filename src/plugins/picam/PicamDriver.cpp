@@ -2,6 +2,7 @@
 #include "PicamParameterRegistry.h"
 #include "gui/DebugMacros.h"
 #include "picam.h"
+#include "picam_advanced.h"
 
 #include <QThread>
 #include <QDebug>
@@ -268,6 +269,23 @@ QVariant PicamDriver::parameterValue(const QString &name) const
 
     if (isRoiSubParam(name)) {
         return getRoiSubValue(name);
+    }
+
+    if (m_parameterDefinitions.contains(name)) {
+        const ParameterDefinition &def = m_parameterDefinitions.value(name);
+
+        // For dynamic or extrinsic parameters, always re-query the hardware
+        // to get the latest value. The cached m_parameters value is stale
+        // until the next commitParameters() call, which is not acceptable
+        // for values that change with environment/time (e.g. sensor_temperature).
+        if (def.isDynamic || def.isExtrinsic) {
+            QVariant live = readParameterValueFromHardware(name);
+            if (live.isValid()) {
+                return live;
+            }
+            // Fall through to cache if HW read failed to keep UI responsive
+            return m_parameters.value(name);
+        }
     }
 
     if (m_parameters.contains(name)) {
@@ -750,6 +768,16 @@ ParameterDefinition PicamDriver::buildParameterDefinition(PicamParameter param)
         def.isReadOnly = (access == PicamValueAccess_ReadOnly);
     }
 
+    PicamDynamicsMask dynamicsMask = PicamDynamicsMask_None;
+    if (PicamAdvanced_GetParameterDynamics(m_handle, param, &dynamicsMask) == PicamError_None) {
+        def.isDynamic = (dynamicsMask != PicamDynamicsMask_None);
+    }
+
+    PicamDynamicsMask extrinsicMask = PicamDynamicsMask_None;
+    if (PicamAdvanced_GetParameterExtrinsicDynamics(m_handle, param, &extrinsicMask) == PicamError_None) {
+        def.isExtrinsic = (extrinsicMask != PicamDynamicsMask_None);
+    }
+
     bool constraintLoaded = false;
 
     if (vt == PicamValueType_Enumeration) {
@@ -1094,66 +1122,77 @@ void PicamDriver::syncAllValuesFromHardware()
 
     for (auto it = m_paramEnumMap.constBegin(); it != m_paramEnumMap.constEnd(); ++it) {
         const QString& name = it.key();
-        PicamParameter picamParam = it.value();
-
         if (isRoiSubParam(name)) {
             continue;
         }
-
-        PicamValueType vt = m_paramTypeMap.value(name, PicamValueType_Integer);
-        QVariant value;
-
-        switch (vt) {
-        case PicamValueType_Integer: {
-            piint v;
-            if (Picam_GetParameterIntegerValue(m_handle, picamParam, &v) == PicamError_None) {
-                value = QVariant(static_cast<int>(v));
-            }
-            break;
-        }
-        case PicamValueType_Boolean: {
-            piint v;
-            if (Picam_GetParameterIntegerValue(m_handle, picamParam, &v) == PicamError_None) {
-                value = QVariant(v != 0);
-            }
-            break;
-        }
-        case PicamValueType_FloatingPoint: {
-            piflt v;
-            if (Picam_GetParameterFloatingPointValue(m_handle, picamParam, &v) == PicamError_None) {
-                value = QVariant(static_cast<double>(v));
-            }
-            break;
-        }
-        case PicamValueType_LargeInteger: {
-            pi64s v;
-            if (Picam_GetParameterLargeIntegerValue(m_handle, picamParam, &v) == PicamError_None) {
-                value = QVariant(static_cast<qlonglong>(v));
-            }
-            break;
-        }
-        case PicamValueType_Enumeration: {
-            piint v;
-            if (Picam_GetParameterIntegerValue(m_handle, picamParam, &v) == PicamError_None) {
-                PicamEnumeratedType etype;
-                if (Picam_GetParameterEnumeratedType(m_handle, picamParam, &etype) == PicamError_None) {
-                    const pichar* str;
-                    if (Picam_GetEnumerationString(etype, v, &str) == PicamError_None) {
-                        value = QString(str);
-                        Picam_DestroyString(str);
-                    }
-                }
-            }
-            break;
-        }
-        default:
-            break;
-        }
-
+        QVariant value = readParameterValueFromHardware(name);
         if (value.isValid()) {
             m_parameters.insert(name, value);
         }
     }
+}
+
+QVariant PicamDriver::readParameterValueFromHardware(const QString &name) const
+{
+    if (m_handle == nullptr) {
+        return QVariant();
+    }
+    if (!m_paramEnumMap.contains(name)) {
+        return QVariant();
+    }
+
+    PicamParameter picamParam = m_paramEnumMap.value(name);
+    PicamValueType vt = m_paramTypeMap.value(name, PicamValueType_Integer);
+    QVariant value;
+
+    switch (vt) {
+    case PicamValueType_Integer: {
+        piint v;
+        if (Picam_GetParameterIntegerValue(m_handle, picamParam, &v) == PicamError_None) {
+            value = QVariant(static_cast<int>(v));
+        }
+        break;
+    }
+    case PicamValueType_Boolean: {
+        piint v;
+        if (Picam_GetParameterIntegerValue(m_handle, picamParam, &v) == PicamError_None) {
+            value = QVariant(v != 0);
+        }
+        break;
+    }
+    case PicamValueType_FloatingPoint: {
+        piflt v;
+        if (Picam_GetParameterFloatingPointValue(m_handle, picamParam, &v) == PicamError_None) {
+            value = QVariant(static_cast<double>(v));
+        }
+        break;
+    }
+    case PicamValueType_LargeInteger: {
+        pi64s v;
+        if (Picam_GetParameterLargeIntegerValue(m_handle, picamParam, &v) == PicamError_None) {
+            value = QVariant(static_cast<qlonglong>(v));
+        }
+        break;
+    }
+    case PicamValueType_Enumeration: {
+        piint v;
+        if (Picam_GetParameterIntegerValue(m_handle, picamParam, &v) == PicamError_None) {
+            PicamEnumeratedType etype;
+            if (Picam_GetParameterEnumeratedType(m_handle, picamParam, &etype) == PicamError_None) {
+                const pichar* str;
+                if (Picam_GetEnumerationString(etype, v, &str) == PicamError_None) {
+                    value = QString(str);
+                    Picam_DestroyString(str);
+                }
+            }
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    return value;
 }
 
 //==============================================================================

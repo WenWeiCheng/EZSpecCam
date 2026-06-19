@@ -107,6 +107,17 @@ private:
 
     ParameterType mapValueType(PicamValueType vt) const;
 
+    /**
+     * @brief Query a single parameter value from PICam SDK hardware
+     *
+     * Dispatches by PicamValueType (Integer/Boolean/FloatingPoint/LargeInteger/
+     * Enumeration). Returns an invalid QVariant on SDK error or unknown param.
+     *
+     * Used by both syncAllValuesFromHardware() to populate the cache and by
+     * parameterValue() to re-query live state for isDynamic/isExtrinsic params.
+     */
+    QVariant readParameterValueFromHardware(const QString &name) const;
+
     void syncAllValuesFromHardware();
 
     // ——— ROI Sub-Parameter Helpers ———

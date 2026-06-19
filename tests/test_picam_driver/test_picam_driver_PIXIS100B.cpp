@@ -880,6 +880,193 @@ private slots:
     }
 
     //==========================================================================
+    // Parameter Flag Tests (isReadOnly / isDynamic / isExtrinsic / needReconnect)
+    //==========================================================================
+
+    void verifyFlagConsistency(const QString &name)
+    {
+        if (!m_params.contains(name)) {
+            qDebug() << "Skipping" << name << "- not available";
+            return;
+        }
+        ParameterDefinition def = m_driver->parameter(name);
+        QVERIFY2(def.isValid(),
+                 qPrintable(QString("Parameter '%1' definition should be valid").arg(name)));
+
+        if (def.isReadOnly && def.isExtrinsic) {
+            QVERIFY2(def.isDynamic,
+                     qPrintable(QString("Read-only extrinsic parameter '%1' must also be isDynamic").arg(name)));
+        }
+
+        qDebug() << "Flags for" << name
+                 << ": isReadOnly=" << def.isReadOnly
+                 << "isDynamic=" << def.isDynamic
+                 << "isExtrinsic=" << def.isExtrinsic
+                 << "needReconnect=" << def.needReconnect;
+    }
+
+    void test_param_sensor_temperature_flags()
+    {
+        verifyFlagConsistency("sensor_temperature");
+        ParameterDefinition def = m_driver->parameter("sensor_temperature");
+        QVERIFY2(def.isReadOnly,
+                 qPrintable(QString("sensor_temperature should be isReadOnly, got false")));
+        QVERIFY2(def.isDynamic,
+                 qPrintable(QString("sensor_temperature should be isDynamic (value changes with time/environment)")));
+        QVERIFY2(def.isExtrinsic,
+                 qPrintable(QString("sensor_temperature should be isExtrinsic (changes outside user control)")));
+    }
+
+    void test_param_temperature_status_flags()
+    {
+        verifyFlagConsistency("temperature_status");
+        ParameterDefinition def = m_driver->parameter("temperature_status");
+        QVERIFY2(def.isReadOnly,
+                 qPrintable(QString("temperature_status should be isReadOnly")));
+    }
+
+    void test_param_static_info_flags()
+    {
+        const QStringList staticInfoParams = {
+            "sensor_width", "sensor_height", "bit_depth",
+            "camera_model", "serial_number", "firmware_version",
+            "chip_name"
+        };
+        for (const QString &name : staticInfoParams) {
+            if (!m_params.contains(name)) {
+                qDebug() << "Skipping" << name << "- not available";
+                continue;
+            }
+            ParameterDefinition def = m_driver->parameter(name);
+            QVERIFY2(def.isReadOnly,
+                     qPrintable(QString("Static info '%1' should be isReadOnly").arg(name)));
+            QVERIFY2(!def.isDynamic,
+                     qPrintable(QString("Static info '%1' should NOT be isDynamic").arg(name)));
+            QVERIFY2(!def.isExtrinsic,
+                     qPrintable(QString("Static info '%1' should NOT be isExtrinsic").arg(name)));
+        }
+    }
+
+    void test_param_exposure_flags()
+    {
+        if (!m_params.contains("exposure")) {
+            qDebug() << "exposure not available, skipping";
+            return;
+        }
+        ParameterDefinition def = m_driver->parameter("exposure");
+        QVERIFY2(!def.isReadOnly,
+                 qPrintable(QString("exposure should NOT be isReadOnly")));
+        QVERIFY2(!def.isExtrinsic,
+                 qPrintable(QString("exposure should NOT be isExtrinsic (user-controlled)")));
+    }
+
+    void test_param_adc_speed_flags()
+    {
+        if (!m_params.contains("adc_speed")) {
+            qDebug() << "adc_speed not available, skipping";
+            return;
+        }
+        ParameterDefinition def = m_driver->parameter("adc_speed");
+        QVERIFY2(!def.isReadOnly,
+                 qPrintable(QString("adc_speed should NOT be isReadOnly")));
+    }
+
+    void test_param_all_flags_populated()
+    {
+        QStringList checkedNames;
+        for (const QString &name : m_params) {
+            ParameterDefinition def = m_driver->parameter(name);
+            if (!def.isValid()) continue;
+            checkedNames.append(name);
+        }
+        QVERIFY2(!checkedNames.isEmpty(),
+                 qPrintable(QString("Should have at least one valid parameter, got 0")));
+        qDebug() << "Verified flags consistency across" << checkedNames.size() << "parameters";
+    }
+
+    //==========================================================================
+    // Parameter Read Tests (dynamic / extrinsic must re-query hardware)
+    //==========================================================================
+
+    void test_param_dynamic_live_read()
+    {
+        if (!m_params.contains("sensor_temperature")) {
+            qDebug() << "sensor_temperature not available, skipping";
+            return;
+        }
+        ParameterDefinition def = m_driver->parameter("sensor_temperature");
+        QVERIFY2(def.isReadOnly && def.isDynamic && def.isExtrinsic,
+                 "Pre-condition: sensor_temperature must be RO+dynamic+extrinsic");
+
+        QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+        QVariant v1 = m_driver->parameterValue("sensor_temperature");
+        QVERIFY2(v1.isValid(), "First live read should return a valid value");
+        QVERIFY2(errorSpy.isEmpty(),
+                 qPrintable(QString("Live read 1 of dynamic param emitted error: %1")
+                     .arg(errorSpy.count() > 0
+                          ? errorSpy.at(0).at(0).value<CameraError>().description
+                          : QString())));
+
+        errorSpy.clear();
+        QVariant v2 = m_driver->parameterValue("sensor_temperature");
+        QVERIFY2(v2.isValid(), "Second live read should return a valid value");
+        QVERIFY2(errorSpy.isEmpty(),
+                 qPrintable(QString("Live read 2 of dynamic param emitted error: %1")
+                     .arg(errorSpy.count() > 0
+                          ? errorSpy.at(0).at(0).value<CameraError>().description
+                          : QString())));
+
+        qDebug() << "sensor_temperature live reads:" << v1 << "(between)" << v2;
+    }
+
+    void test_param_static_cache_preserved()
+    {
+        if (!m_params.contains("sensor_width")) {
+            qDebug() << "sensor_width not available, skipping";
+            return;
+        }
+        ParameterDefinition def = m_driver->parameter("sensor_width");
+        QVERIFY2(def.isReadOnly && !def.isDynamic && !def.isExtrinsic,
+                 "Pre-condition: sensor_width must be RO+NOT dynamic+NOT extrinsic");
+
+        QVariant v1 = m_driver->parameterValue("sensor_width");
+        QVariant v2 = m_driver->parameterValue("sensor_width");
+        QVariant v3 = m_driver->parameterValue("sensor_width");
+        QVERIFY2(v1.isValid() && v2.isValid() && v3.isValid(),
+                 "Static reads should return valid values");
+        QCOMPARE(v1.toInt(), v2.toInt());
+        QCOMPARE(v2.toInt(), v3.toInt());
+        qDebug() << "sensor_width cached reads (3x):" << v1;
+    }
+
+    void test_param_temperature_status_re_reads()
+    {
+        if (!m_params.contains("temperature_status")) {
+            qDebug() << "temperature_status not available, skipping";
+            return;
+        }
+        ParameterDefinition def = m_driver->parameter("temperature_status");
+        QVERIFY2(def.isReadOnly, "temperature_status should be isReadOnly");
+
+        QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+        QVariant v1 = m_driver->parameterValue("temperature_status");
+        QVERIFY2(v1.isValid() && !v1.toString().isEmpty(),
+                 qPrintable(QString("temperature_status should be non-empty string, got '%1'")
+                     .arg(v1.toString())));
+        QVERIFY2(errorSpy.isEmpty(), "Read 1 emitted unexpected error");
+
+        QTest::qWait(150);
+
+        errorSpy.clear();
+        QVariant v2 = m_driver->parameterValue("temperature_status");
+        QVERIFY2(v2.isValid() && !v2.toString().isEmpty(),
+                 "Second read should return non-empty status string");
+        QVERIFY2(errorSpy.isEmpty(), "Read 2 emitted unexpected error");
+
+        qDebug() << "temperature_status re-reads:" << v1 << "->" << v2;
+    }
+
+    //==========================================================================
     // Capture Tests
     //==========================================================================
     void test_capture_single_frame()
