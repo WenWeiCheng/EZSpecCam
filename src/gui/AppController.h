@@ -279,6 +279,14 @@ signals:
     void pluginLoadFailed(const QString &filePath, const QString &error);
 
     /**
+     * @brief Emitted during plugin scan to report progress
+     * @param current Current file index (1-based)
+     * @param total Total number of files to scan
+     * @param currentFile Absolute path of the file being processed
+     */
+    void pluginScanProgress(int current, int total, const QString &currentFile);
+
+    /**
      * @brief Emitted when async connectCamera completes
      * @param cameraId Camera that was connected
      * @param success true if connected successfully
