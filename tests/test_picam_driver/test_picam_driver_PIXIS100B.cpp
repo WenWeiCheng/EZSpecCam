@@ -529,6 +529,68 @@ private slots:
 
         m_driver->stopCapture();
 
+        ParameterDefinition xParam = m_driver->parameter("roi_x");
+        ParameterDefinition yParam = m_driver->parameter("roi_y");
+
+        auto alignToStep = [](int target, double minVal, double maxVal, double step) {
+            if (step > 0.0) {
+                int stepsFromMin = static_cast<int>(std::round((target - minVal) / step));
+                int aligned = static_cast<int>(minVal + stepsFromMin * step);
+                if (aligned < static_cast<int>(minVal)) aligned = static_cast<int>(minVal);
+                if (aligned > static_cast<int>(maxVal)) aligned = static_cast<int>(maxVal);
+                return aligned;
+            }
+            return target;
+        };
+
+        int targetW = fullWidth.toInt() / 2;
+        int targetH = fullHeight.toInt() / 2;
+        int targetX = targetW / 2;
+        int targetY = targetH / 2;
+
+        int halfW = alignToStep(targetW,
+                                widthParam.constraint.minValue,
+                                widthParam.constraint.maxValue,
+                                widthParam.constraint.step);
+        int halfH = alignToStep(targetH,
+                                heightParam.constraint.minValue,
+                                heightParam.constraint.maxValue,
+                                heightParam.constraint.step);
+        int cx = alignToStep(targetX,
+                             xParam.constraint.minValue,
+                             xParam.constraint.maxValue,
+                             xParam.constraint.step);
+        int cy = alignToStep(targetY,
+                             yParam.constraint.minValue,
+                             yParam.constraint.maxValue,
+                             yParam.constraint.step);
+
+        QVERIFY2(halfW > 0 && halfH > 0,
+                 qPrintable(QString("Centered half ROI dimensions must be > 0 after alignment: %1x%2")
+                                .arg(halfW).arg(halfH)));
+        qDebug() << "Centered half ROI:" << halfW << "x" << halfH
+                 << "@ offset (" << cx << "," << cy << ")";
+
+        QVERIFY2(m_driver->setParameter("roi_x_binning", 1), "setParameter roi_x_binning=1");
+        QVERIFY2(m_driver->setParameter("roi_y_binning", 1), "setParameter roi_y_binning=1");
+        QVERIFY2(m_driver->setParameter("roi_x", cx), "setParameter roi_x (centered half)");
+        QVERIFY2(m_driver->setParameter("roi_y", cy), "setParameter roi_y (centered half)");
+        QVERIFY2(m_driver->setParameter("roi_width", halfW), "setParameter roi_width (half)");
+        QVERIFY2(m_driver->setParameter("roi_height", halfH), "setParameter roi_height (half)");
+        QVERIFY2(m_driver->commitParameters(), "commitParameters for centered half ROI");
+
+        QSignalSpy frameSpyHalf(m_driver, &ICameraDriver::frameReady);
+        QVERIFY2(m_driver->startCapture(1), "startCapture after half ROI commit");
+        QVERIFY2(frameSpyHalf.wait(10000), "Half ROI capture: no frame within 10s");
+        QCOMPARE(frameSpyHalf.count(), 1);
+
+        QSharedPointer<QImage> halfImage = frameSpyHalf.takeFirst().at(0).value<QSharedPointer<QImage>>();
+        QVERIFY2(!halfImage.isNull() && !halfImage->isNull(), "Half ROI frame QImage is null");
+        QCOMPARE(halfImage->width(), halfW);
+        QCOMPARE(halfImage->height(), halfH);
+
+        m_driver->stopCapture();
+
         QVERIFY2(m_driver->setParameter("roi_x", 0), "reset roi_x");
         QVERIFY2(m_driver->setParameter("roi_y", 0), "reset roi_y");
         QVERIFY2(m_driver->setParameter("roi_width", fullWidth), "reset roi_width");
@@ -599,8 +661,8 @@ private slots:
         int h2 = image2->height();
         qDebug() << "Binning 2x2:" << w2 << "x" << h2;
 
-        QVERIFY2(w2 <= w1 && h2 <= h1,
-                 qPrintable(QString("2x2 binning frame (%1x%2) should be <= 1x1 frame (%3x%4)")
+        QVERIFY2(w2 == w1 / 2 && h2 == h1 / 2,
+                 qPrintable(QString("2x2 binning frame should be exactly half of 1x1 frame (1x1=%3x%4, 2x2=%1x%2)")
                                 .arg(w2).arg(h2).arg(w1).arg(h1)));
 
         m_driver->stopCapture();

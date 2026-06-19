@@ -85,25 +85,22 @@ QStringList PicamDriver::enumerate()
 
     QStringList cameras;
 
-    const PicamHandle* handles = nullptr;
+    const PicamCameraID* camID = nullptr;
     piint count = 0;
-    PicamError err = Picam_GetOpenCameras(&handles, &count);
+    PicamError err = Picam_GetAvailableCameraIDs(&camID, &count);
 
-    if (err == PicamError_None && handles != nullptr && count > 0) {
+    if (err == PicamError_None && camID != nullptr && count > 0) {
         for (piint i = 0; i < count; ++i) {
-            PicamCameraID id;
-            if (Picam_GetCameraID(handles[i], &id) == PicamError_None) {
-                const pichar* modelStr = nullptr;
-                if (Picam_GetEnumerationString(PicamEnumeratedType_Model, id.model, &modelStr) == PicamError_None) {
-                    QString model(modelStr);
-                    Picam_DestroyString(modelStr);
-                    QString serial = QString::fromLatin1(id.serial_number);
-                    QString cameraId = QString("%1:%2").arg(model).arg(serial);
-                    cameras.append(cameraId);
-                }
+            const pichar* modelStr = nullptr;
+            if (Picam_GetEnumerationString(PicamEnumeratedType_Model, camID[i].model, &modelStr) == PicamError_None) {
+                QString model(modelStr);
+                Picam_DestroyString(modelStr);
+                QString serial = QString::fromLatin1(camID[i].serial_number);
+                QString cameraId = QString("%1:%2").arg(model).arg(serial);
+                cameras.append(cameraId);
             }
         }
-        Picam_DestroyHandles(handles);
+        Picam_DestroyCameraIDs(camID);
     }
 
     if (cameras.isEmpty()) {
@@ -139,37 +136,34 @@ bool PicamDriver::connectToCamera(const QString &cameraId)
         return false;
     }
 
-    // Try to find the requested camera in the list of open cameras
-    const PicamHandle* handles = nullptr;
+    // Try to find the requested camera in the list of available cameras
+    const PicamCameraID* camID = nullptr;
     piint count = 0;
-    PicamError err = Picam_GetOpenCameras(&handles, &count);
+    PicamError err = Picam_GetAvailableCameraIDs(&camID, &count);
 
     m_handle = nullptr;
 
-    if (err == PicamError_None && handles != nullptr && count > 0) {
+    if (err == PicamError_None && camID != nullptr && count > 0) {
         // Search for the requested camera ID
         for (piint i = 0; i < count; ++i) {
-            PicamCameraID id;
-            if (Picam_GetCameraID(handles[i], &id) == PicamError_None) {
-                const pichar* modelStr = nullptr;
-                QString foundId;
-                if (Picam_GetEnumerationString(PicamEnumeratedType_Model, id.model, &modelStr) == PicamError_None) {
-                    foundId = QString("%1:%2").arg(modelStr).arg(id.serial_number);
-                    Picam_DestroyString(modelStr);
-                }
+            const pichar* modelStr = nullptr;
+            QString foundId;
+            if (Picam_GetEnumerationString(PicamEnumeratedType_Model, camID[i].model, &modelStr) == PicamError_None) {
+                foundId = QString("%1:%2").arg(QString::fromLatin1(modelStr)).arg(QString::fromLatin1(camID[i].serial_number));
+                Picam_DestroyString(modelStr);
+            }
 
-                if (foundId == cameraId) {
-                    // Found the requested camera
-                    err = Picam_OpenCamera(&id, &m_handle);
-                    if (err == PicamError_None) {
-                        m_connectedCameraId = foundId;
-                    }
-                    break;
+            if (foundId == cameraId) {
+                // Found the requested camera
+                err = Picam_OpenCamera(&camID[i], &m_handle);
+                if (err == PicamError_None) {
+                    m_connectedCameraId = foundId;
                 }
+                break;
             }
         }
 
-        Picam_DestroyHandles(handles);
+        Picam_DestroyCameraIDs(camID);
     }
 
 #ifdef EZSPECCAM_PICAM_DEMO
@@ -596,8 +590,6 @@ void PicamDriver::processFrame(const PicamAvailableData& data)
 
     piint frameWidth = 0;
     piint frameHeight = 0;
-    Picam_GetParameterIntegerValue(m_handle, PicamParameter_SensorActiveWidth, &frameWidth);
-    Picam_GetParameterIntegerValue(m_handle, PicamParameter_SensorActiveHeight, &frameHeight);
 
     PicamPixelFormat format;
     Picam_GetParameterIntegerValue(m_handle, PicamParameter_PixelFormat, reinterpret_cast<piint*>(&format));
@@ -611,8 +603,20 @@ void PicamDriver::processFrame(const PicamAvailableData& data)
         bytesPerPixel = 4;
     }
 
+    piint binX = m_cachedRoi.x_binning > 0 ? m_cachedRoi.x_binning : 1;
+    piint binY = m_cachedRoi.y_binning > 0 ? m_cachedRoi.y_binning : 1;
+    frameWidth  = m_cachedRoi.width  / binX;
+    frameHeight = m_cachedRoi.height / binY;
+
     // Calculate expected stride (width * bytesPerPixel) - PICAM may include padding
     int expectedStride = static_cast<int>(frameWidth) * bytesPerPixel;
+    piint expectedFrameSize = frameWidth * frameHeight * bytesPerPixel;
+    if (readoutStride > 0 && readoutStride != expectedFrameSize) {
+        qCWarning(captureCategory) << "ROI/stride mismatch: expectedFrameSize="
+                                   << expectedFrameSize << " readoutStride="
+                                   << readoutStride
+                                   << " (m_cachedRoi may be out of sync with hardware)";
+    }
 
     for (piint i = 0; i < data.readout_count; ++i) {
         const pibyte* frameData = static_cast<const pibyte*>(data.initial_readout) + (i * readoutStride);
