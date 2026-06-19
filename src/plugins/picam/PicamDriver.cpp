@@ -902,7 +902,7 @@ void PicamDriver::initializeRoisSubParameters()
 {
     const PicamRoisConstraint* constraint = nullptr;
     PicamError err = Picam_GetParameterRoisConstraint(
-        m_handle, PicamParameter_Rois, PicamConstraintCategory_Capable, &constraint);
+        m_handle, PicamParameter_Rois, PicamConstraintCategory_Required, &constraint);
 
     const PicamRois* defaultRois = nullptr;
     PicamError defaultErr = Picam_GetParameterRoisDefaultValue(
