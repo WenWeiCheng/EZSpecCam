@@ -25,6 +25,7 @@ public:
 
     void setupUi(CameraTab *tab);
 
+    QPushButton *scanButton = nullptr;
     QPushButton *connectButton = nullptr;
     QPushButton *disconnectButton = nullptr;
     QComboBox *cameraComboBox = nullptr;
@@ -36,6 +37,7 @@ public:
 
     QLabel *m_statusLabel = nullptr;
     LoadingIndicator *m_loadingIndicator = nullptr;
+    QLabel *m_scanStatusLabel = nullptr;
     QVBoxLayout *m_dynamicParametersLayout = nullptr;
     QScrollArea *m_scrollArea = nullptr;
 };
