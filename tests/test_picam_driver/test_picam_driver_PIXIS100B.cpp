@@ -6,6 +6,8 @@
 #include <qobject.h>
 #include <qtestcase.h>
 
+#include <cmath>
+
 #include "core/ICameraDriver.h"
 #include "core/CameraTypes.h"
 #include "plugins/picam/PicamDriver.h"
@@ -124,7 +126,19 @@ private:
                          .arg(name).arg(def.constraint.maxValue).arg(readVal.toDouble())));
         }
 
-        double mid = (def.constraint.minValue + def.constraint.maxValue) / 2.0;
+        double minVal = def.constraint.minValue;
+        double maxVal = def.constraint.maxValue;
+        double step = def.constraint.step;
+        double mid;
+        if (step > 0.0) {
+            double rawMid = (minVal + maxVal) / 2.0;
+            double stepsFromMin = std::round((rawMid - minVal) / step);
+            mid = minVal + stepsFromMin * step;
+            if (mid < minVal) mid = minVal;
+            if (mid > maxVal) mid = maxVal;
+        } else {
+            mid = (minVal + maxVal) / 2.0;
+        }
         ok = m_driver->setParameter(name, mid);
         QVERIFY2(ok, qPrintable(QString("Should set '%1' to midpoint").arg(name)));
         QVERIFY2(m_driver->commitParameters(),
