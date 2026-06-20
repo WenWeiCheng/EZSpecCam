@@ -42,6 +42,7 @@ void CameraTab::setAppController(AppController *controller)
         QStringList cameras = controller->availableCameras();
         ui->cameraComboBox->clear();
         ui->cameraComboBox->addItems(cameras);
+        ui->cameraComboBox->setEnabled(!cameras.isEmpty());
 
         if (controller->isConnected()) {
             QString currentId = controller->currentCameraId();
@@ -99,6 +100,7 @@ void CameraTab::onScanButtonClicked()
     }
 
     m_lastScanFailed = 0;
+    ui->cameraComboBox->setEnabled(false);
     if (ui->m_scanStatusLabel) {
         ui->m_scanStatusLabel->setText("Scanning plugins...");
         ui->m_scanStatusLabel->setVisible(true);
@@ -401,6 +403,8 @@ void CameraTab::refreshCameraList()
         }
     }
 
+    ui->cameraComboBox->setEnabled(true);
+
     updateConnectionState();
 }
 
@@ -487,6 +491,7 @@ void CameraTab::onScanCompleted(int totalPlugins, int loadedPlugins)
 {
     Q_UNUSED(totalPlugins);
     refreshCameraList();
+    ui->cameraComboBox->setEnabled(true);
 
     if (ui->m_scanStatusLabel) {
         int cameraCount = m_appController ? m_appController->availableCameras().size() : 0;

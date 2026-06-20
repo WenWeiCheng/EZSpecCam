@@ -45,6 +45,7 @@ void CameraTabUi::setupUi(CameraTab *tab)
     cameraComboBox = new QComboBox(tab);
     cameraComboBox->setObjectName("cameraComboBox");
     cameraComboBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    cameraComboBox->setEnabled(false);
 
     scanButton = new QPushButton("Scan", tab);
     scanButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
