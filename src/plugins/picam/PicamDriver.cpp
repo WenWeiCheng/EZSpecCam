@@ -1039,13 +1039,8 @@ void PicamDriver::initializeRoisSubParameters()
     roiXB.category = ParameterCategory::Core;
     roiXB.order = 204.0f;
     roiXB.constraint.minValue = 1;
-    roiXB.constraint.maxValue = 1;
+    roiXB.constraint.maxValue = constraint->width_constraint.maximum;
     roiXB.constraint.step = 1;
-    if (err == PicamError_None && constraint != nullptr && constraint->x_binning_limits_count > 0) {
-        roiXB.constraint.minValue = constraint->x_binning_limits_array[0];
-        roiXB.constraint.maxValue = constraint->x_binning_limits_array[constraint->x_binning_limits_count - 1];
-        roiXB.constraint.step = 1;
-    }
     m_parameterDefinitions.insert("roi_x_binning", roiXB);
     m_paramEnumMap.insert("roi_x_binning", PicamParameter_Rois);
     m_paramTypeMap.insert("roi_x_binning", PicamValueType_Integer);
@@ -1057,13 +1052,8 @@ void PicamDriver::initializeRoisSubParameters()
     roiYB.category = ParameterCategory::Core;
     roiYB.order = 205.0f;
     roiYB.constraint.minValue = 1;
-    roiYB.constraint.maxValue = 1;
+    roiYB.constraint.maxValue = constraint->height_constraint.maximum;
     roiYB.constraint.step = 1;
-    if (err == PicamError_None && constraint != nullptr && constraint->y_binning_limits_count > 0) {
-        roiYB.constraint.minValue = constraint->y_binning_limits_array[0];
-        roiYB.constraint.maxValue = constraint->y_binning_limits_array[constraint->y_binning_limits_count - 1];
-        roiYB.constraint.step = 1;
-    }
     m_parameterDefinitions.insert("roi_y_binning", roiYB);
     m_paramEnumMap.insert("roi_y_binning", PicamParameter_Rois);
     m_paramTypeMap.insert("roi_y_binning", PicamValueType_Integer);
