@@ -273,6 +273,10 @@ QVariant PicamDriver::parameterValue(const QString &name) const
         // until the next commitParameters() call, which is not acceptable
         // for values that change with environment/time (e.g. sensor_temperature).
         if (def.isDynamic || def.isExtrinsic) {
+            // need commit to update the model
+            const PicamParameter* failedParams = nullptr;
+            piint failedCount = 0;
+            Picam_CommitParameters(m_handle, &failedParams, &failedCount);
             QVariant live = readParameterValueFromHardware(name);
             if (live.isValid()) {
                 return live;
