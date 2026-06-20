@@ -45,6 +45,8 @@ target_sources(ezspeccam_gui PRIVATE
     widgets/dialogs/DisplayStyleDialog.h widgets/dialogs/DisplayStyleDialog.cpp
     workers/FileSaverWorker.h workers/FileSaverWorker.cpp
     workers/FileLoaderWorker.h workers/FileLoaderWorker.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/PluginLoader.h
+    ${CMAKE_SOURCE_DIR}/src/app/PluginLoader.cpp
     ${CMAKE_SOURCE_DIR}/src/app/formats/SaveTypes.h
     ${CMAKE_SOURCE_DIR}/src/app/formats/IImageFormatHandler.h
     ${CMAKE_SOURCE_DIR}/src/app/formats/CsvFormatHandler.h ${CMAKE_SOURCE_DIR}/src/app/formats/CsvFormatHandler.cpp

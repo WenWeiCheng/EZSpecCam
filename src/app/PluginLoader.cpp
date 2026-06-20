@@ -13,6 +13,7 @@ namespace
 
 QVector<app::plugins::Entry> g_entries;
 QStringList g_extraRoots;
+app::plugins::LoadFailedCallback g_loadFailedCallback;
 
 QStringList defaultRoots()
 {
@@ -28,6 +29,11 @@ namespace app::plugins
 void setExtraRoots(const QStringList &roots)
 {
     g_extraRoots = roots;
+}
+
+void setLoadFailedCallback(LoadFailedCallback cb)
+{
+    g_loadFailedCallback = std::move(cb);
 }
 
 int scan(const QStringList &roots)
@@ -54,10 +60,19 @@ int scan(const QStringList &roots)
             seenFiles.insert(canon);
 
             auto *loader = new QPluginLoader(path);
+            if (!loader->load())
+            {
+                const QString error = loader->errorString();
+                if (g_loadFailedCallback) g_loadFailedCallback(path, error);
+                delete loader;
+                continue;
+            }
+
             QObject *obj = loader->instance();
             auto *driver = qobject_cast<ICameraDriver *>(obj);
             if (!driver)
             {
+                if (g_loadFailedCallback) g_loadFailedCallback(path, "Plugin does not implement ICameraDriver");
                 loader->unload();
                 delete loader;
                 continue;

@@ -6,21 +6,12 @@
 #include <QStringList>
 #include <QTimer>
 #include <QThread>
-#include <QPluginLoader>
-#include <QDir>
 #include <QSharedPointer>
 #include <QImage>
 
 #include "ICameraDriver.h"
 #include "CameraTypes.h"
-
-// Plugin management
-struct PluginInfo {
-    QString filePath;
-    QStringList cameraIds;
-    QPluginLoader *loader = nullptr;
-    ICameraDriver *instance = nullptr;
-};
+#include "PluginLoader.h"
 
 /**
  * @class AppController
@@ -63,12 +54,6 @@ public:
 
 public:
     /**
-     * @brief Set the plugin directory path (for testing)
-     * @param path Directory path to scan for plugins
-     */
-    void setPluginDirectory(const QString &path);
-
-    /**
      * @brief Get list of all available cameras from loaded plugins
      * @return List of camera identifiers
      */
@@ -76,11 +61,11 @@ public:
 
     /**
      * @brief Get information about all loaded plugins
-     * @return List of PluginInfo structures containing plugin metadata
+     * @return List of app::plugins::Entry structures containing plugin metadata
      *
      * @see hasLoadedPlugins() to check if any plugins are loaded
      */
-    QList<PluginInfo> loadedPlugins() const;
+    QVector<app::plugins::Entry> loadedPlugins() const;
 
     /**
      * @brief Check if any plugins are loaded
@@ -341,11 +326,6 @@ private:
     void disconnectFromDriver();
     void cleanupDriver();
 
-    const PluginInfo *findPluginForCamera(const QString &cameraId) const;
-    bool loadPlugin(const QString &filePath);
-    void unloadPlugin(const PluginInfo &info);
-    void clearPlugins();
-
     // INI persistence helpers
     static QString getConfigDirectory();
     static QString getConfigPath(const QString &cameraId);
@@ -358,8 +338,6 @@ private:
 
     // State
     CameraState m_state = CameraState::Disconnected;
-    QList<PluginInfo> m_plugins;
-    QString m_pluginDir;
     ICameraDriver *m_driver = nullptr;
     QString m_cameraId;
     CameraError m_lastError;

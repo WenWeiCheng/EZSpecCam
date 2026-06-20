@@ -4,6 +4,8 @@
 #include <QStringList>
 #include <QVector>
 
+#include <functional>
+
 class ICameraDriver;
 
 namespace app::plugins
@@ -16,7 +18,10 @@ struct Entry
     ICameraDriver *instance = nullptr;
 };
 
+using LoadFailedCallback = std::function<void(const QString &filePath, const QString &error)>;
+
 void setExtraRoots(const QStringList &roots);
+void setLoadFailedCallback(LoadFailedCallback cb);
 int  scanDefaultRoots();
 int  scan(const QStringList &roots);
 const QVector<Entry> &entries();

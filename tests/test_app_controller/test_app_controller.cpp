@@ -13,6 +13,7 @@
 #include "core/ICameraDriver.h"
 #include "core/CameraTypes.h"
 #include "plugins/mock/MockCameraDriver.h"
+#include "PluginLoader.h"
 
 class TestAppController : public QObject
 {
@@ -21,6 +22,8 @@ class TestAppController : public QObject
 private slots:
     void init()
     {
+        app::plugins::unloadAll();
+        app::plugins::setLoadFailedCallback({});
         m_controller = new AppController();
         m_mockDriver = new MockCameraDriver();
     }
@@ -236,7 +239,7 @@ private slots:
             QFile::copy(pluginFile.absoluteFilePath(), destPlugin);
         }
 
-        m_controller->setPluginDirectory(pluginsDirPath);
+        app::plugins::setExtraRoots({ pluginsDirPath });
 
         QSignalSpy scanSpy(m_controller, &AppController::pluginScanCompleted);
         QSignalSpy loadFailSpy(m_controller, &AppController::pluginLoadFailed);
@@ -279,7 +282,7 @@ private slots:
             QFile::copy(pluginFile.absoluteFilePath(), destPlugin);
         }
 
-        m_controller->setPluginDirectory(pluginsDirPath);
+        app::plugins::setExtraRoots({ pluginsDirPath });
         m_controller->scanPlugins();
 
         if (m_controller->hasPlugins()) {
@@ -304,7 +307,7 @@ private slots:
         invalidDll.write("not a valid dll");
         invalidDll.close();
 
-        m_controller->setPluginDirectory(pluginsDirPath);
+        app::plugins::setExtraRoots({ pluginsDirPath });
 
         QSignalSpy scanSpy(m_controller, &AppController::pluginScanCompleted);
         QSignalSpy loadFailSpy(m_controller, &AppController::pluginLoadFailed);
@@ -350,7 +353,7 @@ private slots:
         QString destPlugin = pluginsDirPath + "/mock_camera_driver.dll";
         QFile::copy(pluginFile.absoluteFilePath(), destPlugin);
 
-        m_controller->setPluginDirectory(pluginsDirPath);
+        app::plugins::setExtraRoots({ pluginsDirPath });
         m_controller->scanPlugins();
 
         QVERIFY2(m_controller->hasPlugins(), "Should have plugins after scan");
