@@ -152,7 +152,7 @@ struct ParameterDefinition
         // For non-info, writable parameters, default value and constraint must be valid
         if (!isReadOnly && defaultValue.isNull() && !constraint.isValid()) return false;
         // Validate default value against constraints for applicable categories
-        if(category != ParameterCategory::Info){
+        if(!isReadOnly && category != ParameterCategory::Info){
             return validate(defaultValue, constraint, type);
         }
         return true;

@@ -196,7 +196,7 @@ These are the most common parameters across PICam camera models. **Not all camer
 
 | Picam Parameter (enum name) | EZSpecCam Name | Type | Notes |
 |---------------------------|---------------|------|-------|
-| `PicamParameter_ExposureTime` | `exposure` | `FloatRange` | milliseconds |
+| `PicamParameter_ExposureTime` | `exposure` | `FloatRange` | milliseconds; `constraint.unit = {"ms", "s", "min"}` with `unitRange = {1000.0, 60000.0}` (raw value stays in ms) |
 | `PicamParameter_AdcAnalogGain` | `analog_gain` | `StringCollection` | Enum: Low/Medium/High |
 | `PicamParameter_AdcSpeed` | `adc_speed` | `StringCollection` | Enum: readout rates |
 | `PicamParameter_AdcQuality` | `adc_quality` | `StringCollection` | Enum: speed vs noise |

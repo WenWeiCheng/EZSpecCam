@@ -377,7 +377,19 @@ private slots:
     //==========================================================================
     void test_param_exposure()
     {
+        if (!m_params.contains("exposure")) {
+            qDebug() << "exposure not available, skipping";
+            return;
+        }
         testFloatRangeParam("exposure");
+
+        ParameterDefinition def = m_driver->parameter("exposure");
+        if (!def.constraint.unit.isEmpty()) {
+            QVERIFY2(!def.constraint.unitRange.isEmpty(),
+                     "exposure unitRange should exist if unit is defined");
+            QVERIFY2(def.constraint.hasUnitRange(),
+                     "exposure unitRange size should be unit.size() - 1");
+        }
     }
 
     void test_param_analog_gain()

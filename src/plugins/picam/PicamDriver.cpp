@@ -826,6 +826,11 @@ ParameterDefinition PicamDriver::buildParameterDefinition(PicamParameter param)
         }
     }
 
+    if (param == PicamParameter_ExposureTime) {
+        def.constraint.unit = {QStringLiteral("ms"), QStringLiteral("s"), QStringLiteral("min")};
+        def.constraint.unitRange = {1000.0, 60000.0};
+    }
+
     switch (vt) {
         case PicamValueType_Integer:
         case PicamValueType_Boolean: {
