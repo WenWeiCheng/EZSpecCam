@@ -96,7 +96,7 @@ QStringList PicamDriver::enumerate()
                 QString model(modelStr);
                 Picam_DestroyString(modelStr);
                 QString serial = QString::fromLatin1(camID[i].serial_number);
-                QString cameraId = QString("%1:%2").arg(model).arg(serial);
+                QString cameraId = QString("%1-%2").arg(model).arg(serial);
                 cameras.append(cameraId);
             }
         }
@@ -105,7 +105,7 @@ QStringList PicamDriver::enumerate()
 
     if (cameras.isEmpty()) {
 #ifdef EZSPECCAM_PICAM_DEMO
-        cameras.append("Pixis100B:123456");
+        cameras.append("Pixis100B-123456");
 #endif
     }
 
@@ -167,12 +167,12 @@ bool PicamDriver::connectToCamera(const QString &cameraId)
     }
 
 #ifdef EZSPECCAM_PICAM_DEMO
-    if (m_handle == nullptr && cameraId == QStringLiteral("Pixis100B:123456")) {
+    if (m_handle == nullptr && cameraId == QStringLiteral("Pixis100B-123456")) {
         PicamCameraID demoId;
         PicamError demoErr = Picam_ConnectDemoCamera(PicamModel_Pixis100B, "123456", &demoId);
         if (demoErr == PicamError_None) {
             if (Picam_OpenCamera(&demoId, &m_handle) == PicamError_None) {
-                m_connectedCameraId = QStringLiteral("Pixis100B:123456");
+                m_connectedCameraId = QStringLiteral("Pixis100B-123456");
             }
         }
     }

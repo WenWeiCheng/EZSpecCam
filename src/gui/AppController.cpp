@@ -7,6 +7,7 @@
 #include <QStandardPaths>
 #include <QFile>
 #include <QDir>
+#include <QRegularExpression>
 #include <qobject.h>
 
 
@@ -383,7 +384,24 @@ QString AppController::getConfigDirectory()
 
 QString AppController::getConfigPath(const QString &cameraId)
 {
-    return getConfigDirectory() + "/" + cameraId + ".ini";
+    return getConfigDirectory() + "/" + sanitizeFilenameComponent(cameraId) + ".ini";
+}
+
+QString AppController::sanitizeFilenameComponent(const QString &name)
+{
+    if (name.isEmpty()) {
+        return QStringLiteral("_");
+    }
+    QString s = name;
+    static const QRegularExpression bad(R"([<>:"/\\|?*\x00-\x1F])");
+    s.replace(bad, QStringLiteral("_"));
+    while (s.endsWith(QLatin1Char('.')) || s.endsWith(QLatin1Char(' '))) {
+        s.chop(1);
+    }
+    if (s.isEmpty()) {
+        s = QStringLiteral("_");
+    }
+    return s;
 }
 
 void AppController::saveDynamicConfig(const QString &cameraId, const QVariantMap &parameters)
