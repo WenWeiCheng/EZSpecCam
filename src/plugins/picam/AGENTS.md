@@ -98,12 +98,16 @@ Picam has 5 constraint types queried via typed `Picam_GetParameter*Constraint()`
 | Picam Property | Query API | EZSpecCam `ParameterDefinition` Field |
 |---------------|-----------|--------------------------------------|
 | `ValueAccess_ReadOnly` | `Picam_GetParameterValueAccess()` | `isReadOnly = true` |
-| Can change during acquisition | `Picam_CanSetParameterOnline()` | Store as custom field or log only |
-| Volatile (must read from HW) | `Picam_CanReadParameter()` | `isDynamic = true` |
-| Extrinsic (externally changed) | `PicamAdvanced_GetParameterExtrinsicDynamics()` | `isExtrinsic = true` |
-| Dynamic (can change internally) | `PicamAdvanced_GetParameterDynamics()` | `isDynamic = true` if any dynamics masked |
+| Can change during acquisition | `Picam_CanSetParameterOnline()` | `needReconnect = !onlineable` |
+| Volatile (must read from HW) | `Picam_CanReadParameter()` | Informational only — see `isDynamic` below |
+| Extrinsic (externally changed) | `PicamAdvanced_GetParameterExtrinsicDynamics()` | `isExtrinsic = (mask != None)` |
+| Dynamic (can change internally) | `PicamAdvanced_GetParameterDynamics()` | `isDynamic = (mask != None)` |
 | Relevant in current mode | `Picam_IsParameterRelevant()` | Runtime filter — exclude irrelevant params from `parameterNames()` |
 | Waitable status | `Picam_CanWaitForStatusParameter()` | No direct mapping; informational only |
+
+`isDynamic` reflects whether *any* aspect of the parameter (value, value access, relevance, constraint) can change internally. `isExtrinsic` reflects whether the parameter can be modified outside the user's direct control. A parameter that is both read-only and extrinsic (e.g. `sensor_temperature`) is therefore expected to also be marked `isDynamic` — the `test_param_sensor_temperature_flags` test in `tests/test_picam_driver/test_picam_driver_PIXIS100B.cpp` enforces this invariant.
+
+Implementation lives in `PicamDriver::buildParameterDefinition()` (`src/plugins/picam/PicamDriver.cpp`) and requires `#include "picam_advanced.h"` for the dynamics API.
 
 ---
 
@@ -192,7 +196,7 @@ These are the most common parameters across PICam camera models. **Not all camer
 
 | Picam Parameter (enum name) | EZSpecCam Name | Type | Notes |
 |---------------------------|---------------|------|-------|
-| `PicamParameter_ExposureTime` | `exposure` | `FloatRange` | milliseconds |
+| `PicamParameter_ExposureTime` | `exposure` | `FloatRange` | milliseconds; `constraint.unit = {"ms", "s", "min"}` with `unitRange = {1000.0, 60000.0}` (raw value stays in ms) |
 | `PicamParameter_AdcAnalogGain` | `analog_gain` | `StringCollection` | Enum: Low/Medium/High |
 | `PicamParameter_AdcSpeed` | `adc_speed` | `StringCollection` | Enum: readout rates |
 | `PicamParameter_AdcQuality` | `adc_quality` | `StringCollection` | Enum: speed vs noise |

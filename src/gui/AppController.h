@@ -349,6 +349,7 @@ private:
     // INI persistence helpers
     static QString getConfigDirectory();
     static QString getConfigPath(const QString &cameraId);
+    static QString sanitizeFilenameComponent(const QString &name);
     bool saveParameters(const QString &filePath, const QString &cameraId, const QVariantMap &parameters);
     bool loadParameters(const QString &filePath, QString &cameraId, QVariantMap &parameters);
     QString variantToString(const QVariant &value);

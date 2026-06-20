@@ -133,9 +133,9 @@ bool validate(const QVariant &value, const ParameterConstraint &constraint, Para
  */
 struct ParameterDefinition
 {
-    QString name;
-    QString displayName;
-    QString description;
+    QString name;                      // Unique identifier for the parameter (e.g., "exposure", "gain")
+    QString displayName;               // User-friendly name for UI display 
+    QString description;               // Detailed description for tooltips or documentation
     ParameterCategory category;
     ParameterType type;
     ParameterConstraint constraint;
@@ -147,8 +147,12 @@ struct ParameterDefinition
     float order = 10000000.0f;         // Order of parameter in GUI, lower number means higher priority
 
     bool isValid() const {
-        if (name.isEmpty() || (isReadOnly != true && !constraint.isValid())) return false;
-        if(category != ParameterCategory::Info){
+        // name, displayName, description must be non-empty
+        if (name.isEmpty() || displayName.isEmpty() || description.isEmpty()) return false;
+        // For non-info, writable parameters, default value and constraint must be valid
+        if (!isReadOnly && defaultValue.isNull() && !constraint.isValid()) return false;
+        // Validate default value against constraints for applicable categories
+        if(!isReadOnly && category != ParameterCategory::Info){
             return validate(defaultValue, constraint, type);
         }
         return true;
@@ -223,8 +227,8 @@ inline bool validate(const QVariant &value,
 }
 
 inline QString validateReason(const QVariant &value,
-                               const ParameterConstraint &constraint,
-                               ParameterType type)
+                                const ParameterConstraint &constraint,
+                                ParameterType type)
 {
     switch (type) {
     case ParameterType::FloatRange: {

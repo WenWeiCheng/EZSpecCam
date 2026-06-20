@@ -113,6 +113,7 @@ node_modules/
 *.js
 package*.json
 test_result/
+test_*.txt
 
 # ===========================================
 # CMake Generated Files

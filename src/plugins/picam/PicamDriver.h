@@ -13,12 +13,14 @@
 
 #include "core/ICameraDriver.h"
 #include "core/CameraTypes.h"
+#include "PicamParameterRegistry.h"
 
 #include <QObject>
 #include <QMutex>
 #include <QRecursiveMutex>
 #include <QMap>
 #include <QVariantMap>
+#include <QThread>
 #include <atomic>
 #include <cstdint>
 
@@ -99,33 +101,23 @@ private:
      */
     ParameterDefinition buildParameterDefinition(PicamParameter param);
 
-    /**
-     * @brief Categorize a Picam parameter into a ParameterCategory
-     * @param param Picam parameter enum
-     * @return ParameterCategory enum
-     */
-    ParameterCategory categorizeParameter(PicamParameter param) const;
+    void initializeRoisSubParameters();
 
-    /**
-     * @brief Map a Picam parameter enum to an EZSpecCam parameter name
-     * @param param Picam parameter enum
-     * @return EZSpecCam parameter name string
-     */
-    QString mapParameterName(PicamParameter param) const;
-
-    /**
-     * @brief Get the PicamValueType for a stored parameter
-     * @param name EZSpecCam parameter name
-     * @return PicamValueType enum
-     */
     PicamValueType getValueType(const QString &name) const;
 
+    ParameterType mapValueType(PicamValueType vt) const;
+
     /**
-     * @brief Sync all current parameter values from hardware
+     * @brief Query a single parameter value from PICam SDK hardware
      *
-     * Called after connectToCamera() and commitParameters(). For ROI,
-     * this caches the composite PicamRois value for sub-param access.
+     * Dispatches by PicamValueType (Integer/Boolean/FloatingPoint/LargeInteger/
+     * Enumeration). Returns an invalid QVariant on SDK error or unknown param.
+     *
+     * Used by both syncAllValuesFromHardware() to populate the cache and by
+     * parameterValue() to re-query live state for isDynamic/isExtrinsic params.
      */
+    QVariant readParameterValueFromHardware(const QString &name) const;
+
     void syncAllValuesFromHardware();
 
     // ——— ROI Sub-Parameter Helpers ———
@@ -157,9 +149,13 @@ private:
      */
     void assembleRois(PicamRois &rois) const;
 
+    void onCaptureLoop();
+    void processFrame(const PicamAvailableData& data);
+    PicamError setEnumeratedParameter(PicamParameter param, const QString &value);
+
     // ——— SDK Lifecycle ———
 
-    static void initializeSDK();
+    static bool initializeSDK();
     static void shutdownSDK();
 
     //==========================================================================
@@ -189,15 +185,22 @@ private:
     QMap<QString, PicamValueType> m_paramTypeMap; // name → PicamValueType
 
     // ROI cache — composite PicamRois decomposed for sub-param access
-    PicamRoi m_cachedRoi;
-    bool m_roiDirty = false;
+    mutable PicamRoi m_cachedRoi;
+    mutable bool m_roiDirty = false;
 
     // Capture state
     std::atomic<bool> m_capturing{false};
     std::atomic<int> m_captureCountTarget{0};
     std::atomic<int> m_framesCaptured{0};
+    QThread* m_captureThread = nullptr;
 
     // SDK reference counting (static, shared across instances)
     static std::atomic<bool> s_sdkInitialized;
     static std::atomic<int> s_sdkRefCount;
+
+private slots:
+    /**
+     * @brief Internal slot to handle capture completion
+     */
+    void onCaptureCompleted();
 };
