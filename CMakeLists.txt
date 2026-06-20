@@ -23,8 +23,7 @@ set(CMAKE_AUTORCC ON)
 # Build Options
 # ===========================================
 option(EZSPECCAM_BUILD_TESTS "Build test executables" ON)
-option(EZSPECCAM_BUILD_GUI "Build GUI application" ON)
-option(EZSPECCAM_BUILD_CLI "Build CLI application" ON)
+option(EZSPECCAM_BUILD_APP "Build unified EZSpecCam application" ON)
 option(EZSPECCAM_BUILD_PLUGINS "Build plugins" ON)
 # PICAM_SDK_ROOT is defined and consumed by src/plugins/picam/CMakeLists.txt
 
@@ -110,12 +109,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # ===========================================
 add_subdirectory(src/core)
 
-if(EZSPECCAM_BUILD_GUI)
-    add_subdirectory(src/gui)
-endif()
-
-if(EZSPECCAM_BUILD_CLI)
-    add_subdirectory(src/cli)
+if(EZSPECCAM_BUILD_APP)
+    add_subdirectory(src/app)
 endif()
 
 if(EZSPECCAM_BUILD_PLUGINS)
@@ -152,8 +147,7 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
 message(STATUS "Qt version: ${Qt6_VERSION}")
 message(STATUS "Build tests: ${EZSPECCAM_BUILD_TESTS}")
-message(STATUS "Build GUI: ${EZSPECCAM_BUILD_GUI}")
-message(STATUS "Build CLI: ${EZSPECCAM_BUILD_CLI}")
+message(STATUS "Build app: ${EZSPECCAM_BUILD_APP}")
 message(STATUS "Build plugins: ${EZSPECCAM_BUILD_PLUGINS}")
 message(STATUS "===========================================")
 message(STATUS "")

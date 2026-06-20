@@ -7,6 +7,9 @@
 #include "app/MessageHandler.h"
 #include "SequenceRunner.h"
 
+namespace cli
+{
+
 static QVariant parseSetValue(const QString &valueStr)
 {
     bool ok = false;
@@ -19,12 +22,8 @@ static QVariant parseSetValue(const QString &valueStr)
     return valueStr;
 }
 
-int main(int argc, char *argv[])
+int run(int argc, char *argv[], QCoreApplication & /*app*/)
 {
-    app::installMessageHandler();
-    app::attachParentConsoleIfAvailable();
-
-    QCoreApplication app(argc, argv);
     QCoreApplication::setApplicationName("EZSpecCam");
     QCoreApplication::setApplicationVersion("1.0.0");
 
@@ -55,7 +54,7 @@ int main(int argc, char *argv[])
     parser.addOption(suffixOpt);
     parser.addOption(sequenceOpt);
 
-    parser.process(app);
+    parser.process(QCoreApplication::instance()->arguments());
 
     app::HeadlessOptions opts;
     opts.listCameras = parser.isSet(listOpt);
@@ -89,4 +88,6 @@ int main(int argc, char *argv[])
     }
 
     return app::run(opts);
+}
+
 }

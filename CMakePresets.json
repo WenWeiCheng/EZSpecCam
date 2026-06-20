@@ -20,8 +20,7 @@
                 "CMAKE_PREFIX_PATH": "$penv{QT_DIR}",
                 "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDebugDLL",
                 "CMAKE_POLICY_VERSION_MINIMUM": "3.20",
-                "EZSPECCAM_BUILD_GUI": "ON",
-                "EZSPECCAM_BUILD_CLI": "ON",
+                "EZSPECCAM_BUILD_APP": "ON",
                 "EZSPECCAM_BUILD_PLUGINS": "ON",
                 "EZSPECCAM_BUILD_TESTS": "ON",
                 "EZSPECCAM_PICAM_DEMO": "ON"
@@ -41,8 +40,7 @@
                 "CMAKE_PREFIX_PATH": "$penv{QT_DIR}",
                 "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDLL",
                 "CMAKE_POLICY_VERSION_MINIMUM": "3.20",
-                "EZSPECCAM_BUILD_GUI": "ON",
-                "EZSPECCAM_BUILD_CLI": "ON",
+                "EZSPECCAM_BUILD_APP": "ON",
                 "EZSPECCAM_BUILD_PLUGINS": "ON",
                 "EZSPECCAM_BUILD_TESTS": "ON",
                 "EZSPECCAM_PICAM_DEMO": "ON"
@@ -51,7 +49,7 @@
         {
             "name": "msvc-debug-gui",
             "displayName": "MSVC Debug GUI",
-            "description": "Visual Studio 2022 with MSVC compiler, Debug configuration, GUI only",
+            "description": "Visual Studio 2022 with MSVC compiler, Debug configuration (legacy name; binary is unified)",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/msvc-debug-gui",
             "cacheVariables": {
@@ -62,8 +60,7 @@
                 "CMAKE_PREFIX_PATH": "$penv{QT_DIR}",
                 "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDebugDLL",
                 "CMAKE_POLICY_VERSION_MINIMUM": "3.20",
-                "EZSPECCAM_BUILD_GUI": "ON",
-                "EZSPECCAM_BUILD_CLI": "OFF",
+                "EZSPECCAM_BUILD_APP": "ON",
                 "EZSPECCAM_BUILD_PLUGINS": "ON",
                 "EZSPECCAM_BUILD_TESTS": "OFF",
                 "EZSPECCAM_PICAM_DEMO": "ON"

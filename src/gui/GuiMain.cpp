@@ -3,10 +3,11 @@
 
 #include "widgets/MainWindow.h"
 
-int main(int argc, char *argv[])
+namespace gui
 {
-    QApplication app(argc, argv);
 
+int run(QApplication &app)
+{
     QCoreApplication::setApplicationName("EZSpecCam");
     QCoreApplication::setApplicationVersion("1.0.0");
     QCoreApplication::setOrganizationName("EZSpecCam");
@@ -22,6 +23,7 @@ int main(int argc, char *argv[])
 
     MainWindow window;
     window.show();
-
     return app.exec();
+}
+
 }
