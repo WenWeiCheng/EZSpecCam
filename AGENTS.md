@@ -13,7 +13,7 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 ├── src/
 │   ├── core/           # Camera driver interface + types → see src/core/ICameraDriver.md
 │   ├── gui/            # Qt GUI app → see src/gui/AGENTS.md
-│   ├── cli/            # CLI app (QCoreApplication)
+│   ├── cli/            # CLI app (QCoreApplication) — see src/cli/README.md
 │   └── plugins/        # Camera driver plugins → see src/plugins/AGENTS.md
 ├── tests/              # Qt Test suite → see tests/AGENTS.md
 └── build/              # CMake build outputs (gitignored)
@@ -26,7 +26,7 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 | Core data types | `src/core/CameraTypes.h` | ROIs, binning, params, errors, enums → see `src/core/CameraTypes.md` |
 | App controller (GUI) | `src/gui/AppController.h` | Merged CameraManager + PluginManager |
 | MainWindow | `src/gui/widgets/MainWindow.h` | QMainWindow with toolbar, menus, signals |
-| CLI entry point | `src/cli/main.cpp` | QCoreApplication, CommandLineParser |
+| CLI entry point | `src/cli/main.cpp` | QCoreApplication + Qt's `QCommandLineParser` (in-place) + `SequenceRunner` for JSON event sequences |
 | Build config | `CMakeLists.txt` / `CMakePresets.json` | msvc-debug, msvc-release, msvc-debug-gui presets |
 | Plugin metadata | `src/plugins/*/plugin.json` | JSON descriptors per driver |
 
@@ -42,8 +42,7 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 | `SpectrumViewWidget` | Widget | `src/gui/widgets/display/SpectrumViewWidget.h` | Spectrum plot widget |
 | `MockCameraDriver` | Plugin | `src/plugins/mock/MockCameraDriver.cpp` | Simulated camera for testing |
 | `QHYCCDDriver` | Plugin | `src/plugins/qhyccd/QHYCCDDriver.cpp` | Real QHYCCD hardware driver |
-| `CommandLineParser` | Class | `src/cli/CommandLineParser.h` | CLI argument parsing |
-| `CaptureController` | Class | `src/cli/CaptureController.h` | CLI capture workflow |
+| `SequenceRunner` | Class | `src/cli/SequenceRunner.h` / `SequenceRunner.cpp` | Parses and runs JSON event-sequence scripts (`--sequence`) |
 
 ## CONVENTIONS
 - **C++17**, no extensions (`CMAKE_CXX_EXTENSIONS OFF`)

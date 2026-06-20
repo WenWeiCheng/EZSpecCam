@@ -12,6 +12,7 @@ A Qt-based camera control application for scientific spectroscopy — discovery,
 - **Parameter management** — Configure ROI, binning, exposure, gain, and more
 - **Image & spectrum view** — Live frame display with spectrum visualization
 - **Qt GUI application** — Modern Windows UI
+- **Headless CLI** — Scripted capture, parameter sweeps, and event sequences (see `src/cli/README.md`)
 
 ## Requirements
 
@@ -42,6 +43,7 @@ Run the application:
 ```
 src/
 ├── core/           Camera driver interface + data types (static library)
+├── cli/            Headless camera control (QCoreApplication)
 ├── gui/            Qt GUI application
 └── plugins/        Camera driver plugins
     ├── mock/       Simulated camera (for testing)
@@ -52,6 +54,10 @@ src/
 ### Core (`src/core/`)
 
 Static library defining the camera driver contract (`ICameraDriver`) and core data types (ROIs, binning, parameters, errors).
+
+### CLI (`src/cli/`)
+
+Headless command-line tool (`QCoreApplication`) for scripted capture, single-shot parameter sweeps, and JSON event sequences (e.g. configure → wait-for-stable-temperature → capture). See `src/cli/README.md` for options and the sequence schema.
 
 ### GUI (`src/gui/`)
 
@@ -83,6 +89,7 @@ Each camera driver is a Qt plugin implementing `ICameraDriver`. Drivers are load
 |--------|---------|-------------|
 | `EZSPECCAM_BUILD_TESTS` | ON | Build test executables |
 | `EZSPECCAM_BUILD_GUI` | ON | Build GUI application |
+| `EZSPECCAM_BUILD_CLI` | ON | Build headless CLI application (`ezspeccam_cli`) |
 | `EZSPECCAM_BUILD_PLUGINS` | ON | Build camera driver plugins |
 
 ## License

@@ -40,7 +40,7 @@ ezspeccam_cli --camera mock-001 --set exposure=500 --set gain=5.5 --frames 5
 |--------|---------|-------------|
 | `--frames <n>` | `1` | Number of frames to capture |
 | `--output <dir>` | `.` | Output directory (created if missing) |
-| `--format <fmt>` | `tiff` | Output format: `tiff` or `csv` |
+| `--format <fmt>` | `tiff` | Output format: `tiff` or `csv` (unknown values fall back to `tiff` with a warning) |
 | `--prefix <str>` | `""` | Filename prefix |
 | `--suffix <str>` | `""` | Filename suffix |
 
@@ -98,6 +98,8 @@ range recorded in `softwareSettings`.
 For workflows requiring multiple configurations or stabilized conditions, use `--sequence` with a JSON file.
 
 ### Format
+
+> **Note:** A legacy `save_metadata` field is accepted inside both `settings` and per-step `capture` blocks but is silently ignored — a `_metadata.json` sidecar is **always** written alongside each image.
 
 ```json
 {
@@ -166,6 +168,8 @@ For workflows requiring multiple configurations or stabilized conditions, use `-
 }
 ```
 
+(As noted above, a legacy `save_metadata` field here is accepted but ignored.)
+
 **`wait_stable`** — Poll an extrinsic parameter until it stabilizes.
 
 | Field | Default | Description |
@@ -200,6 +204,6 @@ Extrinsic parameters (e.g. sensor temperature) are ideal targets for `wait_stabl
 .\build_preset.bat debug
 ```
 
-The CLI binary is at `build/msvc-debug/bin/Debug/ezspeccam_cli.exe`. Mock plugins are deployed alongside it automatically.
+The CLI binary is at `build/msvc-debug/bin/Debug/ezspeccam_cli.exe`. The Mock plugin is deployed alongside it automatically so `--list` and a `mock-001` camera are usable out of the box.
 
-Enable the CLI build in `CMakePresets.json` by setting `EZSPECCAM_BUILD_CLI` to `"ON"` in the desired configure preset.
+CLI is enabled by default in the `msvc-debug` and `msvc-release` presets (`EZSPECCAM_BUILD_CLI: ON`); only `msvc-debug-gui` sets it to `OFF`. To disable it in another preset, set `EZSPECCAM_BUILD_CLI` to `"OFF"`.

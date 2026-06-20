@@ -262,7 +262,7 @@ Each driver is a Qt plugin with a `plugin.json` descriptor (JSON metadata includ
 
 ## USAGE LIFECYCLE
 
-A typical consumer (GUI `AppController`, CLI `CaptureController`) follows this flow:
+A typical consumer (GUI `AppController`, CLI `main.cpp` — see `captureFrames` / `runSequence` free functions) follows this flow:
 
 ```
 1. DISCOVERY
@@ -291,7 +291,7 @@ A typical consumer (GUI `AppController`, CLI `CaptureController`) follows this f
 ### Consumer Patterns
 
 - **GUI (`AppController`)**: Maintains a state machine (`Disconnected → Connecting → Connected → Acquiring → Error`). Transitions driven by `connectionChanged` and `captureStarted`/`captureStopped` signals. Displays `frameReady` images in `ImageViewWidget`.
-- **CLI (`CaptureController`)**: Sequential flow — connect, configure, capture N frames, disconnect. Uses `QEventLoop` + signal connections for synchronous-style control.
+- **CLI (`main.cpp` free functions)**: Sequential flow — connect, configure, capture N frames, disconnect. Uses `QEventLoop` + signal connections for synchronous-style control. Capture logic lives in `captureFrames()`; sequence scripts run via `runSequence()` which drives `SequenceRunner`.
 
 ---
 
@@ -350,6 +350,6 @@ To create a new camera driver plugin:
 - `src/core/CameraTypes.h` — header source
 - `src/core/AGENTS.md` — overview of the core library
 - `src/gui/AppController.h` — GUI driver consumer (state machine)
-- `src/cli/CaptureController.h` — CLI driver consumer
+- `src/cli/main.cpp` — CLI driver consumer (`captureFrames`, `runSequence` free functions)
 - `src/plugins/AGENTS.md` — plugin development guide
 - `src/plugins/mock/` — reference implementation for new driver authors

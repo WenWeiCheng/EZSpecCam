@@ -20,7 +20,7 @@
 enum class CameraState { Disconnected, Connecting, Connected, Acquiring, Error };
 ```
 
-Tracks the lifecycle of a camera driver. Consumers (GUI `AppController`, CLI `CaptureController`) use this for UI state and workflow gating.
+Tracks the lifecycle of a camera driver. Consumers (GUI `AppController`, CLI `main.cpp`) use this for UI state and workflow gating.
 
 ```
 Disconnected ──→ Connecting ──→ Connected ──→ Acquiring
@@ -228,7 +228,7 @@ struct ImageData {
 };
 ```
 
-`isValid()` requires `!image.isNull() && timestamp > 0`. On the driver side, frames are delivered via `ICameraDriver::frameReady(QSharedPointer<QImage>, ...)` — `ImageData` is the consumer-side wrapper used in CLI workflows and test assertions.
+`isValid()` requires `!image.isNull() && timestamp > 0`. On the driver side, frames are delivered via `ICameraDriver::frameReady(QSharedPointer<QImage>, ...)` — `ImageData` is the consumer-side wrapper used in CLI workflows (`src/cli/main.cpp::captureFrames`) and test assertions.
 
 ---
 
