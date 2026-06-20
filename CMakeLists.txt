@@ -26,11 +26,7 @@ option(EZSPECCAM_BUILD_TESTS "Build test executables" ON)
 option(EZSPECCAM_BUILD_GUI "Build GUI application" ON)
 option(EZSPECCAM_BUILD_CLI "Build CLI application" ON)
 option(EZSPECCAM_BUILD_PLUGINS "Build plugins" ON)
-option(EZSPECCAM_BUILD_PLUGIN_PICAM "Build PICam camera driver plugin (requires PICAM_SDK_ROOT for live mode)" ON)
-
-# External SDK paths — set by installer environment variables.
-# Override with -D<VAR>=<path> if needed.
-set(PICAM_SDK_ROOT "" CACHE PATH "Override for \$ENV{PicamRoot}")
+# PICAM_SDK_ROOT is defined and consumed by src/plugins/picam/CMakeLists.txt
 
 # ===========================================
 # Find Qt Components
@@ -48,16 +44,6 @@ endif()
 # ===========================================
 # Find External Dependencies
 # ===========================================
-
-# Exiv2 for image metadata
-find_package(Exiv2 CONFIG QUIET)
-if(Exiv2_FOUND)
-    message(STATUS "Exiv2 found: ${Exiv2_VERSION}")
-    set(EZSPECCAM_HAVE_EXIV2 ON)
-else()
-    message(WARNING "Exiv2 not found. Image metadata support will be limited.")
-    set(EZSPECCAM_HAVE_EXIV2 OFF)
-endif()
 
 # OpenGL for QCustomPlot hardware acceleration
 find_package(OpenGL REQUIRED)
@@ -165,7 +151,6 @@ message(STATUS "===========================================")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
 message(STATUS "Qt version: ${Qt6_VERSION}")
-message(STATUS "Exiv2 support: ${EZSPECCAM_HAVE_EXIV2}")
 message(STATUS "Build tests: ${EZSPECCAM_BUILD_TESTS}")
 message(STATUS "Build GUI: ${EZSPECCAM_BUILD_GUI}")
 message(STATUS "Build CLI: ${EZSPECCAM_BUILD_CLI}")

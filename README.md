@@ -18,7 +18,6 @@ A Qt-based camera control application for scientific spectroscopy — discovery,
 - **Qt 6.8** or higher
 - **C++17** compiler (MSVC 2022)
 - **CMake 3.20+**
-- **Exiv2** (optional — for image metadata support)
 
 ## Quick Start
 

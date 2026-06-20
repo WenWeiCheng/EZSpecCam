@@ -6,15 +6,30 @@
 #
 # Or define USE_REAL_CAMERA in your build system.
 
-# Locate PICam SDK (same logic as src/plugins/picam/CMakeLists.txt)
+# Locate PICam SDK (same logic as src/plugins/picam/CMakeLists.txt).
+# If the SDK cannot be located, the test target is SKIPPED with a warning
+# so that the rest of the test suite can still build.
+# Set -DEZSPECCAM_REQUIRE_PICAM=ON to upgrade the warning to a fatal error.
 set(PICAM_SDK_ROOT "" CACHE PATH "Override PICam SDK path (default: $ENV{PicamRoot})")
 
 if(PICAM_SDK_ROOT)
     set(_picam_root "${PICAM_SDK_ROOT}")
 elseif(DEFINED ENV{PicamRoot})
     set(_picam_root "$ENV{PicamRoot}")
-else()
-    message(FATAL_ERROR "PICam SDK not found. Set PicamRoot environment variable or pass -DPICAM_SDK_ROOT=<path>")
+endif()
+
+if(NOT _picam_root
+        OR NOT EXISTS "${_picam_root}/Includes/picam.h"
+        OR (NOT EXISTS "${_picam_root}/Libraries/picam.lib"
+            AND NOT EXISTS "${_picam_root}/Libraries/picam32.lib"))
+    if(EZSPECCAM_REQUIRE_PICAM)
+        message(FATAL_ERROR "PICam SDK not found. Set PicamRoot environment variable or pass -DPICAM_SDK_ROOT=<path>")
+    else()
+        message(WARNING "PICam SDK not found. Skipping test_picam_driver_PIXIS100B. "
+                        "Set PicamRoot env var or -DPICAM_SDK_ROOT=<path> to enable. "
+                        "Pass -DEZSPECCAM_REQUIRE_PICAM=ON to upgrade this to an error.")
+        return()
+    endif()
 endif()
 
 set(PICAM_INCLUDE_DIR "${_picam_root}/Includes")

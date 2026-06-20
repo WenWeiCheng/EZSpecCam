@@ -142,8 +142,7 @@ ui_*.h
 # ===========================================
 msvc-debug/
 msvc-release/
-gcc-debug/
-gcc-release/
+msvc-debug-gui/
 
 # ===========================================
 # Compile Commands (for tooling)

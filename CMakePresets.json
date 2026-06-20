@@ -17,8 +17,7 @@
                 "CMAKE_CXX_COMPILER": "cl",
                 "CMAKE_C_COMPILER": "cl",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_PREFIX_PATH": "C:/Qt/6.8.2/msvc2022_64;C:/Users/weichen/vcpkg/installed/x64-windows",
-                "Exiv2_DIR": "C:/Users/weichen/vcpkg/installed/x64-windows/share/exiv2",
+                "CMAKE_PREFIX_PATH": "$penv{QT_DIR}",
                 "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDebugDLL",
                 "CMAKE_POLICY_VERSION_MINIMUM": "3.20",
                 "EZSPECCAM_BUILD_GUI": "ON",
@@ -39,44 +38,14 @@
                 "CMAKE_CXX_COMPILER": "cl",
                 "CMAKE_C_COMPILER": "cl",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_PREFIX_PATH": "C:/Qt/6.8.2/msvc2022_64;C:/Users/weichen/vcpkg/installed/x64-windows",
-                "Exiv2_DIR": "C:/Users/weichen/vcpkg/installed/x64-windows/share/exiv2",
+                "CMAKE_PREFIX_PATH": "$penv{QT_DIR}",
                 "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDLL",
                 "CMAKE_POLICY_VERSION_MINIMUM": "3.20",
                 "EZSPECCAM_BUILD_GUI": "ON",
                 "EZSPECCAM_BUILD_CLI": "ON",
                 "EZSPECCAM_BUILD_PLUGINS": "ON",
-                "EZSPECCAM_BUILD_TESTS": "ON"
-            }
-        },
-        {
-            "name": "gcc-debug",
-            "displayName": "GCC Debug (Linux)",
-            "description": "GCC compiler, Debug configuration for Linux",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build/gcc-debug",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_CXX_COMPILER": "g++",
-                "CMAKE_C_COMPILER": "gcc",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_PREFIX_PATH": "$env{QT_DIR}",
-                "CMAKE_POLICY_VERSION_MINIMUM": "3.20"
-            }
-        },
-        {
-            "name": "gcc-release",
-            "displayName": "GCC Release (Linux)",
-            "description": "GCC compiler, Release configuration for Linux",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build/gcc-release",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_CXX_COMPILER": "g++",
-                "CMAKE_C_COMPILER": "gcc",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_PREFIX_PATH": "$env{QT_DIR}",
-                "CMAKE_POLICY_VERSION_MINIMUM": "3.20"
+                "EZSPECCAM_BUILD_TESTS": "ON",
+                "EZSPECCAM_PICAM_DEMO": "ON"
             }
         },
         {
@@ -90,14 +59,14 @@
                 "CMAKE_CXX_COMPILER": "cl",
                 "CMAKE_C_COMPILER": "cl",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "CMAKE_PREFIX_PATH": "C:/Qt/6.8.2/msvc2022_64;C:/Users/weichen/vcpkg/installed/x64-windows",
-                "Exiv2_DIR": "C:/Users/weichen/vcpkg/installed/x64-windows/share/exiv2",
+                "CMAKE_PREFIX_PATH": "$penv{QT_DIR}",
                 "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDebugDLL",
                 "CMAKE_POLICY_VERSION_MINIMUM": "3.20",
                 "EZSPECCAM_BUILD_GUI": "ON",
                 "EZSPECCAM_BUILD_CLI": "OFF",
                 "EZSPECCAM_BUILD_PLUGINS": "ON",
-                "EZSPECCAM_BUILD_TESTS": "OFF"
+                "EZSPECCAM_BUILD_TESTS": "OFF",
+                "EZSPECCAM_PICAM_DEMO": "ON"
             }
         }
     ],
@@ -113,32 +82,6 @@
             "configurePreset": "msvc-release",
             "description": "Build MSVC Release configuration",
             "configuration": "Release"
-        },
-        {
-            "name": "msvc-release-install",
-            "configurePreset": "msvc-release",
-            "description": "Build and install MSVC Release configuration",
-            "configuration": "Release",
-            "targets": ["install"]
-        },
-        {
-            "name": "gcc-debug",
-            "configurePreset": "gcc-debug",
-            "description": "Build GCC Debug configuration",
-            "configuration": "Debug"
-        },
-        {
-            "name": "gcc-release",
-            "configurePreset": "gcc-release",
-            "description": "Build GCC Release configuration",
-            "configuration": "Release"
-        },
-        {
-            "name": "gcc-release-install",
-            "configurePreset": "gcc-release",
-            "description": "Build and install GCC Release configuration",
-            "configuration": "Release",
-            "targets": ["install"]
         },
         {
             "name": "msvc-debug-gui",
@@ -158,18 +101,6 @@
             "name": "msvc-release",
             "configurePreset": "msvc-release",
             "description": "Run tests with MSVC Release configuration",
-            "configuration": "Release"
-        },
-        {
-            "name": "gcc-debug",
-            "configurePreset": "gcc-debug",
-            "description": "Run tests with GCC Debug configuration",
-            "configuration": "Debug"
-        },
-        {
-            "name": "gcc-release",
-            "configurePreset": "gcc-release",
-            "description": "Run tests with GCC Release configuration",
             "configuration": "Release"
         }
     ]

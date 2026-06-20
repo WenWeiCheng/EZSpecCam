@@ -16,9 +16,4 @@ target_sources(ezspeccam_core PRIVATE
 
 target_link_libraries(ezspeccam_core PUBLIC Qt6::Core Qt6::Gui)
 
-if(EZSPECCAM_HAVE_EXIV2)
-    target_link_libraries(ezspeccam_core PUBLIC Exiv2::exiv2lib)
-    target_compile_definitions(ezspeccam_core PUBLIC EZSPECCAM_HAVE_EXIV2=1)
-endif()
-
 add_library(EZSpecCam::Core ALIAS ezspeccam_core)

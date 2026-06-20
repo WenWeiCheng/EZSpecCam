@@ -13,10 +13,7 @@
 #       ├── picam.lib      (x64 import library)
 #       └── picam32.lib    (x86 import library)
 
-option(EZSPECCAM_BUILD_PLUGIN_PICAM "Build PICam camera driver plugin" ON)
-if(NOT EZSPECCAM_BUILD_PLUGIN_PICAM)
-    return()
-endif()
+option(EZSPECCAM_REQUIRE_PICAM "Fail the build if PICam SDK is not found (default: skip with warning)" OFF)
 
 # —— Locate PICam SDK ——
 #
@@ -29,11 +26,24 @@ if(PICAM_SDK_ROOT)
 elseif(DEFINED ENV{PicamRoot})
     set(_picam_root "$ENV{PicamRoot}")
     set(PICAM_SDK_ROOT "${_picam_root}" CACHE PATH "PICam SDK path" FORCE)
-else()
-    message(FATAL_ERROR "PICam SDK not found. "
-                        "The PicamRoot environment variable is not set.\n"
-                        "  Install the PICam 5.x SDK, or set PicamRoot manually.\n"
-                        "  Alternatively, pass -DPICAM_SDK_ROOT=<path>.")
+endif()
+
+if(NOT _picam_root
+        OR NOT EXISTS "${_picam_root}/Includes/picam.h"
+        OR (NOT EXISTS "${_picam_root}/Libraries/picam.lib"
+            AND NOT EXISTS "${_picam_root}/Libraries/picam32.lib"))
+    if(EZSPECCAM_REQUIRE_PICAM)
+        message(FATAL_ERROR "PICam SDK not found. "
+                            "The PicamRoot environment variable is not set "
+                            "or PICAM_SDK_ROOT does not point to a valid SDK.\n"
+                            "  Install the PICam 5.x SDK, or set PicamRoot manually.\n"
+                            "  Alternatively, pass -DPICAM_SDK_ROOT=<path>.")
+    else()
+        message(WARNING "PICam SDK not found. Skipping picam plugin. "
+                        "Set PicamRoot env var or -DPICAM_SDK_ROOT=<path> to enable. "
+                        "Pass -DEZSPECCAM_REQUIRE_PICAM=ON to upgrade this to an error.")
+        return()
+    endif()
 endif()
 
 set(PICAM_INCLUDE_DIR "${_picam_root}/Includes")
@@ -43,13 +53,6 @@ if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(PICAM_LIB_NAME "picam.lib")
 else()
     set(PICAM_LIB_NAME "picam32.lib")
-endif()
-
-if(NOT EXISTS "${PICAM_INCLUDE_DIR}/picam.h")
-    message(FATAL_ERROR "picam.h not found at ${PICAM_INCLUDE_DIR}/picam.h")
-endif()
-if(NOT EXISTS "${PICAM_LIBRARY_DIR}/${PICAM_LIB_NAME}")
-    message(FATAL_ERROR "${PICAM_LIB_NAME} not found at ${PICAM_LIBRARY_DIR}/${PICAM_LIB_NAME}")
 endif()
 
 message(STATUS "PICam SDK: ${_picam_root}")

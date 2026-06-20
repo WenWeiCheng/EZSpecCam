@@ -27,7 +27,7 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 | App controller (GUI) | `src/gui/AppController.h` | Merged CameraManager + PluginManager |
 | MainWindow | `src/gui/widgets/MainWindow.h` | QMainWindow with toolbar, menus, signals |
 | CLI entry point | `src/cli/main.cpp` | QCoreApplication, CommandLineParser |
-| Build config | `CMakeLists.txt` / `CMakePresets.json` | msvc-debug, msvc-release, gcc-debug presets |
+| Build config | `CMakeLists.txt` / `CMakePresets.json` | msvc-debug, msvc-release, msvc-debug-gui presets |
 | Plugin metadata | `src/plugins/*/plugin.json` | JSON descriptors per driver |
 
 ## CODE MAP
@@ -57,6 +57,9 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 ## ANTI-PATTERNS (THIS PROJECT)
 - **DO NOT** modify `src/gui/qcustomplot.*` — external library (bundled QCustomPlot 2.1.1)
 - **DO NOT** add absolute paths to sibling project directories in CMakeLists.txt and build scripts.
+- **DO NOT** commit machine-specific paths to `CMakePresets.json`. Use `$penv{NAME}` for env vars, or have users create a local `CMakeUserPresets.json` for overrides. See [Build Portability](#build-portability).
+- **DO NOT** hardcode Visual Studio install paths in `.bat` files. Use `vswhere.exe` (ships with the VS Installer) to detect the active installation.
+- **DO NOT** make missing optional SDKs (PICam, third-party camera SDKs) fatal by default. They should be detected at configure time, emit a `WARNING`, and the corresponding plugin/target should `return()` so the rest of the project still builds. Add an explicit `EZSPECCAM_REQUIRE_<SDK>` opt-in flag for users who want a hard failure.
 
 ## Build and Test
 
@@ -85,7 +88,6 @@ When executing certain test executable, you can't see the output in terminal, so
 
 ## NOTES
 - `qcustomplot.cpp` is 32k lines — largest file; read-only
-- Exiv2 for image metadata (optional, warns if missing)
 - Camera drivers loaded via Qt plugin system (`QPluginLoader`); each has a `.json` descriptor
 - Test executables are separate targets built with Qt Test framework (`Qt6::Test`)
 - IDE: `.clangd` config present for LSP; `compile_commands.json` generated at build
@@ -93,3 +95,44 @@ When executing certain test executable, you can't see the output in terminal, so
 ## BUILD CONVENTIONS
 - Root CMakeLists.txt: Uses `file(MAKE_DIRECTORY ...)` after setting output dirs — redundant butharmless
 - Use `build_preset.bat` to configure and build.
+
+## Build Portability
+
+The build system must work on any Windows machine with a Qt MSVC kit and a recent Visual Studio 2022 install, without modification of tracked files.
+
+### Required user-side setup
+
+| Env var | Example | Purpose |
+|---------|---------|---------|
+| `QT_DIR` | `C:\Qt\6.8.2\msvc2022_64` | Qt MSVC kit root; `build_preset.bat` validates `lib\cmake\Qt6\Qt6Config.cmake` exists |
+| `PicamRoot` | `C:\Program Files\Princeton Instruments\PICam\v5` | PICam 5.x SDK root; if missing, picam plugin is skipped with a warning |
+
+`vswhere.exe` (shipped with the VS Installer) is used to locate the active VS install — no hardcoded SKU or path in `build_preset.bat`.
+
+### Per-machine overrides: `CMakeUserPresets.json`
+
+If users cannot or do not want to set environment variables globally, they can drop a `CMakeUserPresets.json` at the repo root (already in `.gitignore`) that `inherits` from a tracked preset and overrides specific `cacheVariables`:
+
+```jsonc
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "msvc-debug-local",
+      "inherits": "msvc-debug",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "D:/my-qt/6.8.0/msvc2022_64"
+      }
+    }
+  ]
+}
+```
+
+Then run `cmake --preset msvc-debug-local`. CMake merges user presets on top of the tracked ones at configure time.
+
+### Adding a new optional SDK dependency
+
+1. Define `option(EZSPECCAM_BUILD_PLUGIN_<NAME> "..." ON)` and an `EZSPECCAM_REQUIRE_<SDK>` flag (default `OFF`) in the affected plugin's `CMakeLists.txt`.
+2. Locate the SDK via env var first, then `-D<VAR>=<path>` override, then fall back to `find_package()` / header probe.
+3. If the SDK is absent and `EZSPECCAM_REQUIRE_<SDK>` is `OFF`, `message(WARNING ...)` and `return()` — do NOT call `message(FATAL_ERROR ...)`. The rest of the project must still build.
+4. Document the env var in this section and in `README.md`'s Building chapter.

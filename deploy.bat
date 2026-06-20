@@ -86,13 +86,6 @@ if not exist "%QHYCCD_SDK%\qhyccd.dll" (
     copy /Y "%QHYCCD_SDK%\msvcr90.dll" "%DEPLOY_DIR%\"
 )
 
-:: Copy Exiv2 DLL if exists
-echo Copying Exiv2...
-set "EXIV2_DIR=C:\Users\weichen\vcpkg\installed\x64-windows\bin"
-if exist "%EXIV2_DIR%\exiv2.dll" (
-    copy /Y "%EXIV2_DIR%\exiv2.dll" "%DEPLOY_DIR%\"
-)
-
 echo.
 echo ============================================
 echo Deployment complete!
