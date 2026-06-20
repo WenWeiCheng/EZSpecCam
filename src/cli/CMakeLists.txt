@@ -5,6 +5,7 @@ add_executable(ezspeccam_cli)
 
 target_include_directories(ezspeccam_cli PRIVATE
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/app
 )
 
 target_link_libraries(ezspeccam_cli PRIVATE
@@ -14,8 +15,8 @@ target_link_libraries(ezspeccam_cli PRIVATE
 
 target_sources(ezspeccam_cli PRIVATE
     main.cpp
-    SequenceRunner.h
-    SequenceRunner.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/SequenceRunner.h
+    ${CMAKE_SOURCE_DIR}/src/app/SequenceRunner.cpp
 )
 
 # Deploy mock plugin for CLI testing
