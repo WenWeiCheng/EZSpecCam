@@ -104,7 +104,6 @@ private:
     double widgetToDataX(int widgetX) const;
     QVector<double> extractRowData(const QImage &image) const;
     void applyAxisRange();
-    void resetZoomToFit();
 
     QCustomPlot *m_plot;
     QCPGraph *m_graph;

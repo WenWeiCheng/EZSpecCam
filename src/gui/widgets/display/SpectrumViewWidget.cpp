@@ -5,6 +5,7 @@
 #include <QDebug>
 #include <algorithm>
 #include <limits>
+#include <cmath>
 #include "../../qcustomplot.h"
 
 SpectrumViewWidget::SpectrumViewWidget(QWidget *parent)
@@ -98,7 +99,7 @@ void SpectrumViewWidget::setData(const QVector<double> &x, const QVector<double>
     m_graph->setData(x, y);
 
     if (!m_userHasZoomed) {
-        applyXAxisRange();
+        applyAxisRange();
     }
 
     m_plot->replot(QCustomPlot::rpQueuedReplot);
@@ -170,6 +171,7 @@ void SpectrumViewWidget::clearData()
     m_graph->data()->clear();
     m_plot->xAxis->setRange(0, 100);
     m_plot->yAxis->setRange(0, 100);
+    m_userHasZoomed = false;
 
     m_cursorLine->setVisible(false);
     m_cursorLabel->setVisible(false);
@@ -242,7 +244,7 @@ void SpectrumViewWidget::setYAxisLabel(const QString &label)
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
-void SpectrumViewWidget::setXAxisRangeMode(XAxisRangeMode mode)
+void SpectrumViewWidget::setXAxisRangeMode(AxisRangeMode mode)
 {
     if (m_xAxisRangeMode == mode) {
         return;
@@ -252,18 +254,52 @@ void SpectrumViewWidget::setXAxisRangeMode(XAxisRangeMode mode)
     m_userHasZoomed = false;
 
     if (m_dataValid && !m_xData.isEmpty()) {
-        applyXAxisRange();
+        applyAxisRange();
         m_plot->replot(QCustomPlot::rpQueuedReplot);
     }
 }
 
-void SpectrumViewWidget::setCustomXRange(double min, double max)
+void SpectrumViewWidget::setYAxisRangeMode(AxisRangeMode mode)
 {
-    m_customXMin = min;
-    m_customXMax = max;
+    if (m_yAxisRangeMode == mode) {
+        return;
+    }
 
-    if (m_xAxisRangeMode == XAxisRangeMode::Custom && m_dataValid) {
-        applyXAxisRange();
+    m_yAxisRangeMode = mode;
+    m_userHasZoomed = false;
+
+    if (m_dataValid && !m_xData.isEmpty()) {
+        applyAxisRange();
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
+    }
+}
+
+void SpectrumViewWidget::setManualXRange(double min, double max)
+{
+    if (max <= min) {
+        return;
+    }
+
+    m_manualXMin = min;
+    m_manualXMax = max;
+
+    if (m_xAxisRangeMode == AxisRangeMode::Manual && m_dataValid) {
+        applyAxisRange();
+        m_plot->replot(QCustomPlot::rpQueuedReplot);
+    }
+}
+
+void SpectrumViewWidget::setManualYRange(double min, double max)
+{
+    if (max <= min) {
+        return;
+    }
+
+    m_manualYMin = min;
+    m_manualYMax = max;
+
+    if (m_yAxisRangeMode == AxisRangeMode::Manual && m_dataValid) {
+        applyAxisRange();
         m_plot->replot(QCustomPlot::rpQueuedReplot);
     }
 }
@@ -292,46 +328,41 @@ void SpectrumViewWidget::setIntensityScaleType(IntensityScaleType type)
     }
 
     if (m_dataValid && !m_xData.isEmpty()) {
-        applyXAxisRange();
+        applyAxisRange();
         m_plot->replot(QCustomPlot::rpQueuedReplot);
     }
 }
 
-void SpectrumViewWidget::applyXAxisRange()
+void SpectrumViewWidget::applyAxisRange()
 {
     if (!m_dataValid || m_xData.isEmpty()) {
         return;
     }
 
+    if (m_userHasZoomed) {
+        return;
+    }
+
     double minX = m_xData.first();
     double maxX = m_xData.last();
-    double range = maxX - minX;
+    double rangeX = maxX - minX;
 
-    switch (m_xAxisRangeMode) {
-        case XAxisRangeMode::Auto: {
-            double minY = *std::min_element(m_yData.constBegin(), m_yData.constEnd());
-            double maxY = *std::max_element(m_yData.constBegin(), m_yData.constEnd());
-            double yPadding = (maxY - minY) * 0.02;
-            if (yPadding < 1.0) yPadding = 1.0;
-            m_plot->xAxis->setRange(minX - range * 0.02, maxX + range * 0.02);
-            m_plot->yAxis->setRange(minY - yPadding, maxY + yPadding);
-            break;
+    if (m_xAxisRangeMode == AxisRangeMode::Auto) {
+        m_plot->xAxis->setRange(minX - rangeX * 0.02, maxX + rangeX * 0.02);
+    } else {
+        m_plot->xAxis->setRange(m_manualXMin, m_manualXMax);
+    }
+
+    if (m_yAxisRangeMode == AxisRangeMode::Auto) {
+        double minY = *std::min_element(m_yData.constBegin(), m_yData.constEnd());
+        double maxY = *std::max_element(m_yData.constBegin(), m_yData.constEnd());
+        double yPadding = (maxY - minY) * 0.02;
+        if (yPadding < 1.0) {
+            yPadding = 1.0;
         }
-        case XAxisRangeMode::Full:
-            m_plot->xAxis->setRange(minX, maxX);
-            break;
-        case XAxisRangeMode::ZoomLeft:
-            m_plot->xAxis->setRange(minX, minX + range * 0.5);
-            break;
-        case XAxisRangeMode::ZoomRight:
-            m_plot->xAxis->setRange(maxX - range * 0.5, maxX);
-            break;
-        case XAxisRangeMode::ZoomCenter:
-            m_plot->xAxis->setRange(minX + range * 0.25, maxX - range * 0.25);
-            break;
-        case XAxisRangeMode::Custom:
-            m_plot->xAxis->setRange(m_customXMin, m_customXMax);
-            break;
+        m_plot->yAxis->setRange(minY - yPadding, maxY + yPadding);
+    } else {
+        m_plot->yAxis->setRange(m_manualYMin, m_manualYMax);
     }
 }
 
@@ -398,7 +429,7 @@ bool SpectrumViewWidget::eventFilter(QObject *obj, QEvent *event)
                     return true;
                 }
             } else if (me->button() == Qt::RightButton) {
-                resetZoomToFit();
+                resetZoom();
                 return true;
             }
         } else if (event->type() == QEvent::MouseMove) {
@@ -515,13 +546,13 @@ QVector<double> SpectrumViewWidget::extractRowData(const QImage &image) const
     return data;
 }
 
-void SpectrumViewWidget::resetZoomToFit()
+void SpectrumViewWidget::resetZoom()
 {
     if (!m_dataValid || m_xData.isEmpty()) {
         return;
     }
 
     m_userHasZoomed = false;
-    applyXAxisRange();
+    applyAxisRange();
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
