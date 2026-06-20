@@ -867,16 +867,6 @@ ParameterDefinition PicamDriver::buildParameterDefinition(PicamParameter param)
             break;
     }
 
-    if (!def.defaultValue.isValid() && rec && rec->fallbackDefault.isValid()) {
-        def.defaultValue = rec->fallbackDefault;
-    }
-
-    if (!def.defaultValue.isValid()
-        && vt == PicamValueType_Enumeration
-        && !def.constraint.validValues.isEmpty()) {
-        def.defaultValue = def.constraint.validValues.first();
-    }
-
     if (!def.defaultValue.isValid() && def.isReadOnly) {
         switch (vt) {
             case PicamValueType_Integer:
@@ -918,6 +908,12 @@ ParameterDefinition PicamDriver::buildParameterDefinition(PicamParameter param)
             default:
                 break;
         }
+    }
+
+    if (!def.defaultValue.isValid()
+        && vt == PicamValueType_Enumeration
+        && !def.constraint.validValues.isEmpty()) {
+        def.defaultValue = def.constraint.validValues.first();
     }
 
     if (!def.defaultValue.isValid()) {
