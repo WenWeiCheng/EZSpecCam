@@ -110,6 +110,14 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_scaleDialog, &ScaleControlDialog::spectrumXRangeModeChanged,
             this, [this](int mode) {
                 if (m_spectrumViewWidget) {
+                    if (mode == 1) {
+                        m_scaleDialog->setSpectrumManualXRange(
+                            m_spectrumViewWidget->currentXMin(),
+                            m_spectrumViewWidget->currentXMax());
+                        m_spectrumViewWidget->setManualXRange(
+                            m_spectrumViewWidget->currentXMin(),
+                            m_spectrumViewWidget->currentXMax());
+                    }
                     m_spectrumViewWidget->setXAxisRangeMode(
                         mode == 0 ? SpectrumViewWidget::AxisRangeMode::Auto
                                   : SpectrumViewWidget::AxisRangeMode::Manual);
@@ -119,6 +127,14 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_scaleDialog, &ScaleControlDialog::spectrumYRangeModeChanged,
             this, [this](int mode) {
                 if (m_spectrumViewWidget) {
+                    if (mode == 1) {
+                        m_scaleDialog->setSpectrumManualYRange(
+                            m_spectrumViewWidget->currentYMin(),
+                            m_spectrumViewWidget->currentYMax());
+                        m_spectrumViewWidget->setManualYRange(
+                            m_spectrumViewWidget->currentYMin(),
+                            m_spectrumViewWidget->currentYMax());
+                    }
                     m_spectrumViewWidget->setYAxisRangeMode(
                         mode == 0 ? SpectrumViewWidget::AxisRangeMode::Auto
                                   : SpectrumViewWidget::AxisRangeMode::Manual);
