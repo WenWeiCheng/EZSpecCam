@@ -786,7 +786,7 @@ ParameterDefinition PicamDriver::buildParameterDefinition(PicamParameter param)
 
     if (vt == PicamValueType_Enumeration) {
         const PicamCollectionConstraint* constraint = nullptr;
-        if (Picam_GetParameterCollectionConstraint(m_handle, param, PicamConstraintCategory_Capable, &constraint) == PicamError_None && constraint != nullptr) {
+        if (Picam_GetParameterCollectionConstraint(m_handle, param, PicamConstraintCategory_Required, &constraint) == PicamError_None && constraint != nullptr) {
             PicamEnumeratedType etype;
             Picam_GetParameterEnumeratedType(m_handle, param, &etype);
             for (piint i = 0; i < constraint->values_count; ++i) {
@@ -801,7 +801,7 @@ ParameterDefinition PicamDriver::buildParameterDefinition(PicamParameter param)
         }
     } else {
         const PicamRangeConstraint* range = nullptr;
-        if (Picam_GetParameterRangeConstraint(m_handle, param, PicamConstraintCategory_Capable, &range) == PicamError_None && range != nullptr) {
+        if (Picam_GetParameterRangeConstraint(m_handle, param, PicamConstraintCategory_Required, &range) == PicamError_None && range != nullptr) {
             def.constraint.minValue = range->minimum;
             def.constraint.maxValue = range->maximum;
             def.constraint.step = range->increment;
@@ -810,7 +810,7 @@ ParameterDefinition PicamDriver::buildParameterDefinition(PicamParameter param)
 
         if (!constraintLoaded) {
             const PicamCollectionConstraint* collection = nullptr;
-            if (Picam_GetParameterCollectionConstraint(m_handle, param, PicamConstraintCategory_Capable, &collection) == PicamError_None && collection != nullptr) {
+            if (Picam_GetParameterCollectionConstraint(m_handle, param, PicamConstraintCategory_Required, &collection) == PicamError_None && collection != nullptr) {
                 for (piint i = 0; i < collection->values_count; ++i) {
                     def.constraint.validValues.append(static_cast<double>(collection->values_array[i]));
                 }
@@ -1249,7 +1249,7 @@ PicamError PicamDriver::setEnumeratedParameter(PicamParameter param, const QStri
     const PicamCollectionConstraint* constraint = nullptr;
 
     PicamError err = Picam_GetParameterCollectionConstraint(
-        m_handle, param, PicamConstraintCategory_Capable, &constraint);
+        m_handle, param, PicamConstraintCategory_Required, &constraint);
 
     if (err != PicamError_None || constraint == nullptr) {
         return err;
