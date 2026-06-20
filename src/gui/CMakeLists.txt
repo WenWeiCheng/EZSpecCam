@@ -35,7 +35,6 @@ target_sources(ezspeccam_gui PRIVATE
     widgets/display/SpectrumViewWidget.h widgets/display/SpectrumViewWidget.cpp
     widgets/display/StatisticsDialog.h widgets/display/StatisticsDialog.cpp
     widgets/display/ProfileWindow.h widgets/display/ProfileWindow.cpp
-    widgets/dialogs/CustomRangeDialog.h widgets/dialogs/CustomRangeDialog.cpp
     widgets/dialogs/RowRangeDialog.h widgets/dialogs/RowRangeDialog.cpp
     widgets/dialogs/ScaleControlDialog.h widgets/dialogs/ScaleControlDialog.cpp
     widgets/dialogs/DisplayStyleDialog.h widgets/dialogs/DisplayStyleDialog.cpp
