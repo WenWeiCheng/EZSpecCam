@@ -14,6 +14,8 @@ struct RawEntry {
         static const QVariant kZeroD(0.0);
         static const QVariant kPoint1(0.1);
         static const QVariant kNeg75(-75.0);
+        static const QVariant kOne(1);
+        static const QVariant kTrue(true);
         switch (param) {
         case PicamParameter_ExposureTime:             return kPoint1;
         case PicamParameter_SensorTemperatureReading: return kZeroD;
@@ -22,6 +24,9 @@ struct RawEntry {
         case PicamParameter_VerticalShiftRate:        return kZeroD;
         case PicamParameter_PixelWidth:               return kZeroD;
         case PicamParameter_PixelHeight:              return kZeroD;
+        case PicamParameter_CleanCycleCount:          return kOne;
+        case PicamParameter_CleanSerialRegister:      return kTrue;
+        case PicamParameter_CleanBeforeExposure:      return kTrue;
         default:
             if (category == ParameterCategory::Core
                 || category == ParameterCategory::Advanced) {
@@ -50,6 +55,9 @@ constexpr RawEntry kRawEntries[] = {
     {PicamParameter_CcdCharacteristics,       "ccd_chars",         "CCD Characteristics",        "Reports characteristics of a CCD sensor via the PicamCcdCharacteristicsMask data enumeration.",                  ParameterCategory::Info,     63.0f},
     {PicamParameter_PixelWidth,               "pixel_width",       "Pixel Width (um)",                "Reports the pixel width, in microns.",                      ParameterCategory::Info,     66.0f},
     {PicamParameter_PixelHeight,              "pixel_height",      "Pixel Height (um)",               "Reports the pixel height, in microns.",                     ParameterCategory::Info,     67.0f},
+    {PicamParameter_CleanCycleCount,          "clean_cycle_count", "Clean Cycle Count",          "Controls the number of clean cycles to run before acquisition begins.", ParameterCategory::Advanced, 310.0f},
+    {PicamParameter_CleanSerialRegister,      "clean_serial_register", "Clean Serial Register",      "Controls the cleaning of the serial register itself.",                    ParameterCategory::Advanced, 320.0f},
+    {PicamParameter_CleanBeforeExposure,      "clean_before_exposure", "Clean Before Exposure",      "Controls cleaning before each exposure.",                                ParameterCategory::Advanced, 330.0f},
 };
 
 QHash<PicamParameter, PicamParameterRecord> buildRegistry()

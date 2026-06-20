@@ -149,7 +149,7 @@ bool PicamDriver::connectToCamera(const QString &cameraId)
             const pichar* modelStr = nullptr;
             QString foundId;
             if (Picam_GetEnumerationString(PicamEnumeratedType_Model, camID[i].model, &modelStr) == PicamError_None) {
-                foundId = QString("%1:%2").arg(QString::fromLatin1(modelStr)).arg(QString::fromLatin1(camID[i].serial_number));
+                foundId = QString("%1-%2").arg(QString::fromLatin1(modelStr)).arg(QString::fromLatin1(camID[i].serial_number));
                 Picam_DestroyString(modelStr);
             }
 
@@ -823,6 +823,8 @@ ParameterDefinition PicamDriver::buildParameterDefinition(PicamParameter param)
 
                 if (vt == PicamValueType_FloatingPoint) {
                     def.type = ParameterType::FloatCollection;
+                } else if (vt == PicamValueType_Boolean) {
+                    def.type = ParameterType::Boolean;
                 } else {
                     def.type = ParameterType::IntCollection;
                 }

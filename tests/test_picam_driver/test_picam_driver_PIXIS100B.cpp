@@ -891,6 +891,114 @@ private slots:
     }
 
     //==========================================================================
+    // Clean Parameters (Advanced)
+    //==========================================================================
+    void test_param_clean_cycle_count()
+    {
+        if (!m_params.contains("clean_cycle_count")) {
+            qDebug() << "clean_cycle_count not available, skipping";
+            return;
+        }
+        verifyParamReadWrite("clean_cycle_count", ParameterType::IntRange);
+        ParameterDefinition def = m_driver->parameter("clean_cycle_count");
+
+        QVERIFY2(def.category == ParameterCategory::Advanced,
+                 qPrintable(QString("clean_cycle_count should be Advanced, got %1")
+                     .arg(static_cast<int>(def.category))));
+        QVERIFY2(qFuzzyCompare(def.defaultValue.toDouble() - 1.0, 0.0),
+                 qPrintable(QString("clean_cycle_count default should be 1, got %1")
+                     .arg(def.defaultValue.toString())));
+
+        qDebug() << "Testing IntRange:" << "clean_cycle_count"
+                 << "min=" << def.constraint.minValue
+                 << "max=" << def.constraint.maxValue;
+
+        int originalValue = m_driver->parameterValue("clean_cycle_count").toInt();
+        QVERIFY2(m_driver->setParameter("clean_cycle_count", 4),
+                 "Should set clean_cycle_count to 4");
+        QVERIFY2(m_driver->commitParameters(),
+                 "Should commit clean_cycle_count = 4");
+        {
+            QVariant readVal = m_driver->parameterValue("clean_cycle_count");
+            QVERIFY2(readVal.toInt() == 4,
+                     qPrintable(QString("clean_cycle_count readback should match: expected 4, got %1")
+                         .arg(readVal.toInt())));
+        }
+
+        QVERIFY2(m_driver->setParameter("clean_cycle_count", originalValue),
+                 qPrintable(QString("Should restore clean_cycle_count to %1").arg(originalValue)));
+        QVERIFY2(m_driver->commitParameters(),
+                 "Should commit clean_cycle_count restoration");
+    }
+
+    void test_param_clean_serial_register()
+    {
+        if (!m_params.contains("clean_serial_register")) {
+            qDebug() << "clean_serial_register not available, skipping";
+            return;
+        }
+        verifyParamReadWrite("clean_serial_register", ParameterType::Boolean);
+        ParameterDefinition def = m_driver->parameter("clean_serial_register");
+
+        QVERIFY2(def.category == ParameterCategory::Advanced,
+                 qPrintable(QString("clean_serial_register should be Advanced, got %1")
+                     .arg(static_cast<int>(def.category))));
+        QVERIFY2(def.defaultValue.toBool() == true,
+                 qPrintable(QString("clean_serial_register default should be true, got '%1'")
+                     .arg(def.defaultValue.toString())));
+
+        bool originalValue = m_driver->parameterValue("clean_serial_register").toBool();
+        bool newValue = !originalValue;
+        QVERIFY2(m_driver->setParameter("clean_serial_register", newValue),
+                 qPrintable(QString("Should set clean_serial_register to %1").arg(newValue)));
+        QVERIFY2(m_driver->commitParameters(),
+                 qPrintable(QString("Should commit clean_serial_register = %1").arg(newValue)));
+        {
+            QVariant readVal = m_driver->parameterValue("clean_serial_register");
+            QVERIFY2(readVal.toBool() == newValue,
+                     qPrintable(QString("clean_serial_register readback should match: expected %1, got %2")
+                         .arg(newValue).arg(readVal.toBool())));
+        }
+
+        QVERIFY2(m_driver->setParameter("clean_serial_register", originalValue),
+                 qPrintable(QString("Should restore clean_serial_register to %1").arg(originalValue)));
+        QVERIFY2(m_driver->commitParameters(),
+                 "Should commit clean_serial_register restoration");
+    }
+
+    void test_param_clean_before_exposure()
+    {
+        if (!m_params.contains("clean_before_exposure")) {
+            qDebug() << "clean_before_exposure not available, skipping";
+            return;
+        }
+        verifyParamReadWrite("clean_before_exposure", ParameterType::Boolean);
+        ParameterDefinition def = m_driver->parameter("clean_before_exposure");
+
+        QVERIFY2(def.category == ParameterCategory::Advanced,
+                 qPrintable(QString("clean_before_exposure should be Advanced, got %1")
+                     .arg(static_cast<int>(def.category))));
+
+        bool originalValue = m_driver->parameterValue("clean_before_exposure").toBool();
+        bool newValue = !originalValue;
+        QVERIFY2(m_driver->setParameter("clean_before_exposure", newValue),
+                 qPrintable(QString("Should set clean_before_exposure to %1").arg(newValue)));
+        QVERIFY2(m_driver->commitParameters(),
+                 qPrintable(QString("Should commit clean_before_exposure = %1").arg(newValue)));
+        {
+            QVariant readVal = m_driver->parameterValue("clean_before_exposure");
+            QVERIFY2(readVal.toBool() == newValue,
+                     qPrintable(QString("clean_before_exposure readback should match: expected %1, got %2")
+                         .arg(newValue).arg(readVal.toBool())));
+        }
+
+        QVERIFY2(m_driver->setParameter("clean_before_exposure", originalValue),
+                 qPrintable(QString("Should restore clean_before_exposure to %1").arg(originalValue)));
+        QVERIFY2(m_driver->commitParameters(),
+                 "Should commit clean_before_exposure restoration");
+    }
+
+    //==========================================================================
     // Writable Parameters — Default Value Commit Test
     //==========================================================================
     void test_param_all_writable_default_commit()
