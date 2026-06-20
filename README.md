@@ -69,7 +69,7 @@ Each camera driver is a Qt plugin implementing `ICameraDriver`. Drivers are load
 | Mock | Simulated | For development and testing | None | None |
 | QHYCCD | Hardware | Real QHY camera support | QHY268M | [download](https://www.qhyccd.cn/download/) |
 | Hamamatsu | Hardware | Hamamatsu camera support | C16091-10 | [download](https://www.hamamatsu.com/jp/en/product/cameras/software/driver-software.html) |
-| PI | Hardware | Princeton Camera support | PIXIS100B,PIXIS400B | [download]([产品-PICAM驱动程序-特励达达而视（上海）贸易有限公司](https://www.princetoninstruments.com.cn/products_driver.html)) |
+| PI | Hardware | Princeton Camera support | PIXIS100B,PIXIS400B | [download](https://www.princetoninstruments.com.cn/products_driver.html) |
 
 ## Building
 
