@@ -17,6 +17,21 @@ target_sources(ezspeccam_cli PRIVATE
     main.cpp
     ${CMAKE_SOURCE_DIR}/src/app/SequenceRunner.h
     ${CMAKE_SOURCE_DIR}/src/app/SequenceRunner.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/HeadlessController.h
+    ${CMAKE_SOURCE_DIR}/src/app/HeadlessController.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/PluginLoader.h
+    ${CMAKE_SOURCE_DIR}/src/app/PluginLoader.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/WaitStabilizer.h
+    ${CMAKE_SOURCE_DIR}/src/app/WaitStabilizer.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/MessageHandler.h
+    ${CMAKE_SOURCE_DIR}/src/app/MessageHandler.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/formats/FrameWriter.h
+    ${CMAKE_SOURCE_DIR}/src/app/formats/FrameWriter.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/formats/IImageFormatHandler.h
+    ${CMAKE_SOURCE_DIR}/src/app/formats/TiffFormatHandler.h
+    ${CMAKE_SOURCE_DIR}/src/app/formats/TiffFormatHandler.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/formats/CsvFormatHandler.h
+    ${CMAKE_SOURCE_DIR}/src/app/formats/CsvFormatHandler.cpp
 )
 
 # Deploy mock plugin for CLI testing
