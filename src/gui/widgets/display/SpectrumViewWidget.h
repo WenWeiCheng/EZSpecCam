@@ -19,15 +19,11 @@ class SpectrumViewWidget : public QWidget
 {
     Q_OBJECT
 public:
-    enum class XAxisRangeMode {
+    enum class AxisRangeMode {
         Auto,
-        Full,
-        ZoomLeft,
-        ZoomRight,
-        ZoomCenter,
-        Custom
+        Manual
     };
-    Q_ENUM(XAxisRangeMode)
+    Q_ENUM(AxisRangeMode)
 
     enum class LineStyle {
         Line,
@@ -62,19 +58,34 @@ public:
     void setXAxisLabel(const QString &label);
     void setYAxisLabel(const QString &label);
 
-    XAxisRangeMode xAxisRangeMode() const { return m_xAxisRangeMode; }
-    void setXAxisRangeMode(XAxisRangeMode mode);
-    void setCustomXRange(double min, double max);
-
     IntensityScaleType intensityScaleType() const { return m_intensityScaleType; }
     void setIntensityScaleType(IntensityScaleType type);
 
-    double customXMin() const { return m_customXMin; }
-    double customXMax() const { return m_customXMax; }
+    AxisRangeMode xAxisRangeMode() const { return m_xAxisRangeMode; }
+    void setXAxisRangeMode(AxisRangeMode mode);
+
+    AxisRangeMode yAxisRangeMode() const { return m_yAxisRangeMode; }
+    void setYAxisRangeMode(AxisRangeMode mode);
+
+    void setManualXRange(double min, double max);
+    void setManualYRange(double min, double max);
+
+    double manualXMin() const { return m_manualXMin; }
+    double manualXMax() const { return m_manualXMax; }
+    double manualYMin() const { return m_manualYMin; }
+    double manualYMax() const { return m_manualYMax; }
+
     int dataWidth() const { return m_xData.isEmpty() ? 0 : m_xData.size(); }
 
     double currentXMin() const { return m_plot->xAxis->range().lower; }
     double currentXMax() const { return m_plot->xAxis->range().upper; }
+    double currentYMin() const { return m_plot->yAxis->range().lower; }
+    double currentYMax() const { return m_plot->yAxis->range().upper; }
+
+    void resetZoom();
+#ifdef SPECTRUM_AXIS_RANGE_TESTING
+    void setZoomedForTest(bool zoomed) { m_userHasZoomed = zoomed; }
+#endif
 
 signals:
     void cursorPosition(double x, double intensity);
@@ -92,7 +103,7 @@ private:
     void updateCursor(double x, double y);
     double widgetToDataX(int widgetX) const;
     QVector<double> extractRowData(const QImage &image) const;
-    void applyXAxisRange();
+    void applyAxisRange();
     void resetZoomToFit();
 
     QCustomPlot *m_plot;
@@ -104,11 +115,14 @@ private:
     bool m_dataValid;
     QString m_xAxisLabel;
     QString m_yAxisLabel;
-    XAxisRangeMode m_xAxisRangeMode = XAxisRangeMode::Auto;
+    AxisRangeMode m_xAxisRangeMode = AxisRangeMode::Auto;
+    AxisRangeMode m_yAxisRangeMode = AxisRangeMode::Auto;
     LineStyle m_lineStyle = LineStyle::Line;
     IntensityScaleType m_intensityScaleType = IntensityScaleType::Auto;
-    double m_customXMin = 0;
-    double m_customXMax = 100;
+    double m_manualXMin = 0.0;
+    double m_manualXMax = 100.0;
+    double m_manualYMin = 0.0;
+    double m_manualYMax = 100.0;
 
     QRubberBand *m_rubberBand = nullptr;
     QPoint m_rubberBandOrigin;
