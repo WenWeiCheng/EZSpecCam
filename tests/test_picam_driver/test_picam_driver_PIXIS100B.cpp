@@ -1349,6 +1349,33 @@ private slots:
         QVERIFY2(captureStoppedSpy.count() == 1, "captureStopped not emitted exactly once");
         QCOMPARE(int(m_driver->state()), int(CameraState::Connected));
     }
+
+    //==========================================================================
+    // Frame Payload Tests
+    //==========================================================================
+
+    void test_frame_ready_includes_parameters()
+    {
+        QVERIFY2(!m_params.isEmpty(),
+                 "Sanity: driver should expose parameters after connect");
+
+        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
+        QVERIFY2(m_driver->startCapture(1), "startCapture(1)");
+        QVERIFY2(frameSpy.wait(10000) || frameSpy.count() > 0,
+                 "Single frame: no frame received within 10s");
+        QCOMPARE(frameSpy.count(), 1);
+
+        const QList<QVariant> args = frameSpy.takeFirst();
+        QVERIFY2(args.size() >= 5,
+                 qPrintable(QString("frameReady should carry 5 args, got %1").arg(args.size())));
+        QVariantMap params = args.at(4).toMap();
+        QVERIFY2(!params.isEmpty(),
+                 "frameReady must carry the committed parameter snapshot, not an empty map");
+        QVERIFY2(params.contains("exposure"),
+                 "frameReady parameters should include 'exposure'");
+
+        m_driver->stopCapture();
+    }
 };
 
 QTEST_MAIN(TestPicamDriver)

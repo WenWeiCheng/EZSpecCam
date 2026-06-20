@@ -120,6 +120,12 @@ private:
 
     void syncAllValuesFromHardware();
 
+    /**
+     * @brief Take a thread-safe copy of the committed parameter cache
+     * @return QVariantMap snapshot of m_parameters, safe to emit across threads
+     */
+    QVariantMap captureParametersSnapshot() const;
+
     // ——— ROI Sub-Parameter Helpers ———
 
     /**

@@ -660,7 +660,8 @@ void PicamDriver::processFrame(const PicamAvailableData& data)
             int frameNum = m_framesCaptured.fetch_add(1);
             quint64 timestamp = QDateTime::currentMSecsSinceEpoch();
             emit frameReady(QSharedPointer<QImage>(new QImage(image8.copy())),
-                           timestamp, frameNum, m_connectedCameraId, QVariantMap());
+                           timestamp, frameNum, m_connectedCameraId,
+                           captureParametersSnapshot());
             continue;
         }
 
@@ -674,7 +675,7 @@ void PicamDriver::processFrame(const PicamAvailableData& data)
                        timestamp,
                        frameNum,
                        m_connectedCameraId,
-                       QVariantMap());
+                       captureParametersSnapshot());
     }
 }
 
@@ -1131,6 +1132,12 @@ void PicamDriver::syncAllValuesFromHardware()
             m_parameters.insert(name, value);
         }
     }
+}
+
+QVariantMap PicamDriver::captureParametersSnapshot() const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_parameters;
 }
 
 QVariant PicamDriver::readParameterValueFromHardware(const QString &name) const
