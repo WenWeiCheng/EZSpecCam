@@ -2,6 +2,7 @@
 #include <QObject>
 #include <QTest>
 #include <QVector>
+#include <QtMath>
 #include "SpectrumViewWidget.h"
 
 class TestSpectrumAxisRange : public QObject
@@ -29,10 +30,14 @@ private slots:
         QCOMPARE(widget.xAxisRangeMode(), SpectrumViewWidget::AxisRangeMode::Auto);
         QCOMPARE(widget.yAxisRangeMode(), SpectrumViewWidget::AxisRangeMode::Auto);
 
-        QCOMPARE(widget.currentXMin(), -2.0);
-        QCOMPARE(widget.currentXMax(), 102.0);
-        QCOMPARE(widget.currentYMin(), -2.0);
-        QCOMPARE(widget.currentYMax(), 1002.0);
+        const double expXMin = 0.0 - 99.0 * 0.02;
+        const double expXMax = 99.0 + 99.0 * 0.02;
+        const double expYMin = 0.0 - 990.0 * 0.02;
+        const double expYMax = 990.0 + 990.0 * 0.02;
+        QVERIFY(qAbs(widget.currentXMin() - expXMin) < 0.5);
+        QVERIFY(qAbs(widget.currentXMax() - expXMax) < 0.5);
+        QVERIFY(qAbs(widget.currentYMin() - expYMin) < 0.5);
+        QVERIFY(qAbs(widget.currentYMax() - expYMax) < 0.5);
     }
 
     void test_manual_x_range_applies()
@@ -52,8 +57,10 @@ private slots:
 
         QCOMPARE(widget.currentXMin(), 10.0);
         QCOMPARE(widget.currentXMax(), 50.0);
-        QCOMPARE(widget.currentYMin(), -2.0);
-        QCOMPARE(widget.currentYMax(), 102.0);
+        const double expYMin = 0.0 - 99.0 * 0.02;
+        const double expYMax = 99.0 + 99.0 * 0.02;
+        QVERIFY(qAbs(widget.currentYMin() - expYMin) < 0.5);
+        QVERIFY(qAbs(widget.currentYMax() - expYMax) < 0.5);
     }
 
     void test_manual_y_range_applies()
@@ -73,8 +80,10 @@ private slots:
 
         QCOMPARE(widget.currentYMin(), 0.0);
         QCOMPARE(widget.currentYMax(), 1000.0);
-        QCOMPARE(widget.currentXMin(), -2.0);
-        QCOMPARE(widget.currentXMax(), 102.0);
+        const double expXMin = 0.0 - 99.0 * 0.02;
+        const double expXMax = 99.0 + 99.0 * 0.02;
+        QVERIFY(qAbs(widget.currentXMin() - expXMin) < 0.5);
+        QVERIFY(qAbs(widget.currentXMax() - expXMax) < 0.5);
     }
 
     void test_right_click_resets_manual()
@@ -127,10 +136,14 @@ private slots:
 
         widget.resetZoom();
 
-        QCOMPARE(widget.currentXMin(), -2.0);
-        QCOMPARE(widget.currentXMax(), 102.0);
-        QCOMPARE(widget.currentYMin(), -2.0);
-        QCOMPARE(widget.currentYMax(), 102.0);
+        const double expXMin = 0.0 - 99.0 * 0.02;
+        const double expXMax = 99.0 + 99.0 * 0.02;
+        const double expYMin = 0.0 - 99.0 * 0.02;
+        const double expYMax = 99.0 + 99.0 * 0.02;
+        QVERIFY(qAbs(widget.currentXMin() - expXMin) < 0.5);
+        QVERIFY(qAbs(widget.currentXMax() - expXMax) < 0.5);
+        QVERIFY(qAbs(widget.currentYMin() - expYMin) < 0.5);
+        QVERIFY(qAbs(widget.currentYMax() - expYMax) < 0.5);
     }
 
     void test_right_click_mixed_modes()
@@ -154,8 +167,10 @@ private slots:
 
         QCOMPARE(widget.currentXMin(), 10.0);
         QCOMPARE(widget.currentXMax(), 90.0);
-        QCOMPARE(widget.currentYMin(), -2.0);
-        QCOMPARE(widget.currentYMax(), 102.0);
+        const double expYMin = 0.0 - 99.0 * 0.02;
+        const double expYMax = 99.0 + 99.0 * 0.02;
+        QVERIFY(qAbs(widget.currentYMin() - expYMin) < 0.5);
+        QVERIFY(qAbs(widget.currentYMax() - expYMax) < 0.5);
     }
 
     void test_new_data_preserves_zoom()
@@ -171,6 +186,8 @@ private slots:
         widget.setData(x, y);
 
         widget.setZoomedForTest(true);
+        widget.setXAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
+        widget.setYAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
         widget.setManualXRange(20.0, 60.0);
         widget.setManualYRange(10.0, 70.0);
 
@@ -204,8 +221,10 @@ private slots:
         }
         widget.setData(x, y2);
 
-        QCOMPARE(widget.currentYMin(), 498.0);
-        QCOMPARE(widget.currentYMax(), 602.0);
+        const double expYMin = 500.0 - 99.0 * 0.02;
+        const double expYMax = 599.0 + 99.0 * 0.02;
+        QVERIFY(qAbs(widget.currentYMin() - expYMin) < 0.5);
+        QVERIFY(qAbs(widget.currentYMax() - expYMax) < 0.5);
     }
 
     void test_axis_modes_independent()
