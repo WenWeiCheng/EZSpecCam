@@ -6,8 +6,8 @@
 #include <QStringList>
 #include <QJsonObject>
 
-#include "../IImageFormatHandler.h"
-#include "../SaveTypes.h"
+#include "IImageFormatHandler.h"
+#include "SaveTypes.h"
 
 /**
  * @class TiffFormatHandler

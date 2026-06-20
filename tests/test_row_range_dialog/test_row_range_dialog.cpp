@@ -8,9 +8,9 @@
 
 #include "widgets/dialogs/RowRangeDialog.h"
 #include "widgets/PostProcess.h"
-#include "workers/FileLoaderWorker.h"
-#include "workers/formats/TiffFormatHandler.h"
-#include "workers/SaveTypes.h"
+#include "gui/workers/FileLoaderWorker.h"
+#include "formats/TiffFormatHandler.h"
+#include "formats/SaveTypes.h"
 
 class TestRowRangeDialogEdgeCases : public QObject
 {

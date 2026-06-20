@@ -15,9 +15,12 @@ add_executable(test_row_range_dialog
 )
 
 target_include_directories(test_row_range_dialog PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/app
     ${CMAKE_SOURCE_DIR}/src/gui
     ${CMAKE_SOURCE_DIR}/src/core
     ${CMAKE_SOURCE_DIR}/src/gui/workers
+    ${CMAKE_SOURCE_DIR}/src/app/formats
 )
 
 target_link_libraries(test_row_range_dialog PRIVATE

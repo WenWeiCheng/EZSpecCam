@@ -13,6 +13,11 @@ target_link_libraries(ezspeccam_gui PRIVATE
     OpenGL::GL
 )
 
+target_include_directories(ezspeccam_gui PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/app
+)
+
 target_compile_definitions(ezspeccam_gui PRIVATE QCUSTOMPLOT_USE_OPENGL)
 
 target_sources(ezspeccam_gui PRIVATE
@@ -40,8 +45,8 @@ target_sources(ezspeccam_gui PRIVATE
     widgets/dialogs/DisplayStyleDialog.h widgets/dialogs/DisplayStyleDialog.cpp
     workers/FileSaverWorker.h workers/FileSaverWorker.cpp
     workers/FileLoaderWorker.h workers/FileLoaderWorker.cpp
-    workers/SaveTypes.h
-    workers/IImageFormatHandler.h
-    workers/formats/CsvFormatHandler.h workers/formats/CsvFormatHandler.cpp
-    workers/formats/TiffFormatHandler.h workers/formats/TiffFormatHandler.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/formats/SaveTypes.h
+    ${CMAKE_SOURCE_DIR}/src/app/formats/IImageFormatHandler.h
+    ${CMAKE_SOURCE_DIR}/src/app/formats/CsvFormatHandler.h ${CMAKE_SOURCE_DIR}/src/app/formats/CsvFormatHandler.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/formats/TiffFormatHandler.h ${CMAKE_SOURCE_DIR}/src/app/formats/TiffFormatHandler.cpp
 )

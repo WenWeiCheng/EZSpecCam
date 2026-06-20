@@ -10,8 +10,8 @@
 #include <vector>
 #include <memory>
 
-#include "IImageFormatHandler.h"
-#include "SaveTypes.h"
+#include "formats/IImageFormatHandler.h"
+#include "formats/SaveTypes.h"
 
 /**
  * @class FileSaverWorker
