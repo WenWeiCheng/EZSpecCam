@@ -8,7 +8,6 @@
 #include "display/StatisticsDialog.h"
 #include "display/ProfileWindow.h"
 #include "dialogs/RowRangeDialog.h"
-#include "dialogs/CustomRangeDialog.h"
 #include "dialogs/ScaleControlDialog.h"
 #include "dialogs/DisplayStyleDialog.h"
 #include "config/CameraConfigDialog.h"
@@ -76,6 +75,8 @@ MainWindow::MainWindow(QWidget *parent)
     m_scaleDialog->setImageScaleType(0);
     m_scaleDialog->setImageColorScaleMode(0);
     m_scaleDialog->setSpectrumScaleType(0);
+    m_scaleDialog->setSpectrumXRangeMode(0);
+    m_scaleDialog->setSpectrumYRangeMode(0);
 
     connect(m_scaleDialog, &ScaleControlDialog::imageScaleTypeChanged,
             this, [this](int type) {
@@ -103,6 +104,38 @@ MainWindow::MainWindow(QWidget *parent)
                     m_spectrumViewWidget->setIntensityScaleType(
                         type == 0 ? SpectrumViewWidget::IntensityScaleType::Auto
                                   : SpectrumViewWidget::IntensityScaleType::Log);
+                }
+            });
+
+    connect(m_scaleDialog, &ScaleControlDialog::spectrumXRangeModeChanged,
+            this, [this](int mode) {
+                if (m_spectrumViewWidget) {
+                    m_spectrumViewWidget->setXAxisRangeMode(
+                        mode == 0 ? SpectrumViewWidget::AxisRangeMode::Auto
+                                  : SpectrumViewWidget::AxisRangeMode::Manual);
+                }
+            });
+
+    connect(m_scaleDialog, &ScaleControlDialog::spectrumYRangeModeChanged,
+            this, [this](int mode) {
+                if (m_spectrumViewWidget) {
+                    m_spectrumViewWidget->setYAxisRangeMode(
+                        mode == 0 ? SpectrumViewWidget::AxisRangeMode::Auto
+                                  : SpectrumViewWidget::AxisRangeMode::Manual);
+                }
+            });
+
+    connect(m_scaleDialog, &ScaleControlDialog::spectrumManualXRangeChanged,
+            this, [this](double min, double max) {
+                if (m_spectrumViewWidget) {
+                    m_spectrumViewWidget->setManualXRange(min, max);
+                }
+            });
+
+    connect(m_scaleDialog, &ScaleControlDialog::spectrumManualYRangeChanged,
+            this, [this](double min, double max) {
+                if (m_spectrumViewWidget) {
+                    m_spectrumViewWidget->setManualYRange(min, max);
                 }
             });
 
