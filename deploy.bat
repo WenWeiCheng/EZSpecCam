@@ -28,16 +28,16 @@ mkdir "%DEPLOY_DIR%\plugins\drivers"
 
 :: Copy main executable (exe is in bin\Release subdirectory for release, bin\Debug for debug)
 echo Copying executable...
-if exist "%BUILD_DIR%\bin\Release\ezspeccam_gui.exe" (
-    set "GUI_EXE=%BUILD_DIR%\bin\Release\ezspeccam_gui.exe"
+if exist "%BUILD_DIR%\bin\Release\ezspeccam.exe" (
+    set "APP_EXE=%BUILD_DIR%\bin\Release\ezspeccam.exe"
 ) else (
-    set "GUI_EXE=%BUILD_DIR%\bin\Debug\ezspeccam_gui.exe"
+    set "APP_EXE=%BUILD_DIR%\bin\Debug\ezspeccam.exe"
 )
-if not exist "%GUI_EXE%" (
-    echo ERROR: ezspeccam_gui.exe not found
+if not exist "%APP_EXE%" (
+    echo ERROR: ezspeccam.exe not found
     exit /b 1
 )
-copy /Y "%GUI_EXE%" "%DEPLOY_DIR%\"
+copy /Y "%APP_EXE%" "%DEPLOY_DIR%\"
 
 :: windeployqt - collect Qt runtime DLLs
 echo Running windeployqt...
@@ -51,7 +51,7 @@ if not exist "%QT_DIR%\bin\windeployqt.exe" (
     --no-translations ^
     --no-compiler-runtime ^
     --no-opengl-sw ^
-    "%DEPLOY_DIR%\ezspeccam_gui.exe"
+    "%DEPLOY_DIR%\ezspeccam.exe"
 
 if errorlevel 1 (
     echo ERROR: windeployqt failed
