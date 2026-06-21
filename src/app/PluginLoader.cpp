@@ -14,11 +14,36 @@ namespace
 QVector<app::plugins::Entry> g_entries;
 QStringList g_extraRoots;
 app::plugins::LoadFailedCallback g_loadFailedCallback;
+app::plugins::ScanProgressCallback g_scanProgressCallback;
 
 QStringList defaultRoots()
 {
     const QString appDir = QCoreApplication::applicationDirPath();
     return { appDir + "/plugins/drivers", appDir + "/../plugins/drivers" };
+}
+
+QStringList gatherCandidateFiles(const QStringList &roots, QSet<QString> &seenFiles)
+{
+    QStringList out;
+    for (const QString &root : roots)
+    {
+        QDir dir(root);
+        if (!dir.exists())
+            continue;
+
+        const QStringList nameFilters = QStringList()
+            << "*.dll" << "*.so" << "*.dylib";
+        for (const QFileInfo &fi : dir.entryInfoList(nameFilters, QDir::Files))
+        {
+            const QString path = fi.absoluteFilePath();
+            const QString canon = QFileInfo(path).canonicalFilePath();
+            if (seenFiles.contains(canon))
+                continue;
+            seenFiles.insert(canon);
+            out.append(path);
+        }
+    }
+    return out;
 }
 
 }
@@ -36,55 +61,52 @@ void setLoadFailedCallback(LoadFailedCallback cb)
     g_loadFailedCallback = std::move(cb);
 }
 
+void setScanProgressCallback(ScanProgressCallback cb)
+{
+    g_scanProgressCallback = std::move(cb);
+}
+
 int scan(const QStringList &roots)
 {
     unloadAll();
 
-    int loaded = 0;
     QSet<QString> seenFiles;
+    const QStringList candidates = gatherCandidateFiles(roots, seenFiles);
+    const int total = candidates.size();
 
-    for (const QString &root : roots)
+    int loaded = 0;
+    for (int i = 0; i < total; ++i)
     {
-        QDir dir(root);
-        if (!dir.exists())
-            continue;
+        const QString &path = candidates[i];
 
-        const QStringList nameFilters = QStringList()
-            << "*.dll" << "*.so" << "*.dylib";
-        for (const QFileInfo &fi : dir.entryInfoList(nameFilters, QDir::Files))
+        if (g_scanProgressCallback)
+            g_scanProgressCallback(i + 1, total, path);
+
+        auto *loader = new QPluginLoader(path);
+        if (!loader->load())
         {
-            const QString path = fi.absoluteFilePath();
-            const QString canon = QFileInfo(path).canonicalFilePath();
-            if (seenFiles.contains(canon))
-                continue;
-            seenFiles.insert(canon);
-
-            auto *loader = new QPluginLoader(path);
-            if (!loader->load())
-            {
-                const QString error = loader->errorString();
-                if (g_loadFailedCallback) g_loadFailedCallback(path, error);
-                delete loader;
-                continue;
-            }
-
-            QObject *obj = loader->instance();
-            auto *driver = qobject_cast<ICameraDriver *>(obj);
-            if (!driver)
-            {
-                if (g_loadFailedCallback) g_loadFailedCallback(path, "Plugin does not implement ICameraDriver");
-                loader->unload();
-                delete loader;
-                continue;
-            }
-
-            Entry e;
-            e.filePath = path;
-            e.cameraIds = driver->enumerate();
-            e.instance = driver;
-            g_entries.append(e);
-            ++loaded;
+            const QString error = loader->errorString();
+            if (g_loadFailedCallback) g_loadFailedCallback(path, error);
+            delete loader;
+            continue;
         }
+
+        QObject *obj = loader->instance();
+        auto *driver = qobject_cast<ICameraDriver *>(obj);
+        if (!driver)
+        {
+            if (g_loadFailedCallback) g_loadFailedCallback(path, "Plugin does not implement ICameraDriver");
+            loader->unload();
+            delete loader;
+            continue;
+        }
+
+        Entry e;
+        e.filePath = path;
+        e.cameraIds = driver->enumerate();
+        e.instance = driver;
+        g_entries.append(e);
+        ++loaded;
     }
     return loaded;
 }

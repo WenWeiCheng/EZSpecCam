@@ -21,6 +21,7 @@ private slots:
     void missing_root_does_not_crash();
     void empty_dir_returns_zero();
     void scan_default_roots_includes_default_paths();
+    void scan_invokes_progress_callback_for_each_file();
 
 private:
     QTemporaryDir m_tempDir;
@@ -100,6 +101,34 @@ void TestPluginLoader::scan_default_roots_includes_default_paths() {
     int loaded = app::plugins::scanDefaultRoots();
     QVERIFY(loaded >= 1);
     QVERIFY(app::plugins::findByCamera("mock-001") != nullptr);
+}
+
+void TestPluginLoader::scan_invokes_progress_callback_for_each_file() {
+    app::plugins::unloadAll();
+    app::plugins::setScanProgressCallback({});
+
+    QVector<QPair<int, int>> observations;   // (current, total) seen
+    QStringList filesSeen;
+    app::plugins::setScanProgressCallback(
+        [&](int current, int total, const QString &file) {
+            observations.append({ current, total });
+            filesSeen.append(file);
+        });
+
+    int loaded = app::plugins::scan({ m_pluginDir });
+    QVERIFY(loaded >= 1);
+
+    QVERIFY(!observations.isEmpty());
+    const int reportedTotal = observations.first().second;
+    QCOMPARE(observations.size(), reportedTotal);
+
+    // current must monotonically increase from 1 to total
+    for (int i = 0; i < observations.size(); ++i)
+        QCOMPARE(observations[i].first, i + 1);
+    QSet<QString> unique(filesSeen.begin(), filesSeen.end());
+    QCOMPARE(unique.size(), observations.size());
+
+    app::plugins::setScanProgressCallback({});
 }
 
 QTEST_MAIN(TestPluginLoader)

@@ -30,6 +30,10 @@ void AppController::scanPlugins()
         [this](const QString &filePath, const QString &error) {
             emit pluginLoadFailed(filePath, error);
         });
+    app::plugins::setScanProgressCallback(
+        [this](int current, int total, const QString &currentFile) {
+            emit pluginScanProgress(current, total, currentFile);
+        });
     int loaded = app::plugins::scanDefaultRoots();
     emit pluginScanCompleted(loaded, loaded);
 }
