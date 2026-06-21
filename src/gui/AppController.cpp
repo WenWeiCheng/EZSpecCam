@@ -13,7 +13,6 @@
 
 AppController::AppController(QObject *parent)
     : QObject(parent)
-    , m_pluginDir(QCoreApplication::applicationDirPath() + "/plugins/drivers")
 {
 }
 
@@ -23,76 +22,31 @@ AppController::~AppController()
         disconnectCamera();
         saveDynamicConfig(m_cameraId, m_parameters);
     }
-    clearPlugins();
-}
-
-void AppController::setPluginDirectory(const QString &path)
-{
-    m_pluginDir = path;
 }
 
 void AppController::scanPlugins()
 {
-    clearPlugins();
-
-    QDir pluginsDir(m_pluginDir);
-    if (!pluginsDir.exists()) {
-        qWarning() << "AppController: Plugin directory does not exist:" << m_pluginDir;
-        emit pluginScanCompleted(0, 0);
-        return;
-    }
-
-    QStringList dllFilters;
-    dllFilters << "*.dll";
-
-    QFileInfoList fileList = pluginsDir.entryInfoList(dllFilters, QDir::Files);
-    int totalPlugins = fileList.size();
-    int loadedPlugins = 0;
-
-    for (int i = 0; i < fileList.size(); ++i) {
-        QString filePath = fileList[i].absoluteFilePath();
-
-        bool alreadyLoaded = false;
-        for (const auto &existing : m_plugins) {
-            if (QFileInfo(existing.filePath).canonicalFilePath() == QFileInfo(filePath).canonicalFilePath()) {
-                alreadyLoaded = true;
-                break;
-            }
-        }
-        if (alreadyLoaded) {
-            loadedPlugins++;
-            continue;
-        }
-
-        emit pluginScanProgress(i + 1, totalPlugins, filePath);
-
-        if (loadPlugin(filePath)) {
-            loadedPlugins++;
-        }
-    }
-
-    emit pluginScanCompleted(totalPlugins, loadedPlugins);
+    app::plugins::setLoadFailedCallback(
+        [this](const QString &filePath, const QString &error) {
+            emit pluginLoadFailed(filePath, error);
+        });
+    int loaded = app::plugins::scanDefaultRoots();
+    emit pluginScanCompleted(loaded, loaded);
 }
 
 QStringList AppController::availableCameras() const
 {
-    QStringList cameras;
-    for (const PluginInfo &info : m_plugins) {
-        if (!info.cameraIds.isEmpty()) {
-            cameras.append(info.cameraIds);
-        }
-    }
-    return cameras;
+    return app::plugins::enumerateCameras();
 }
 
-QList<PluginInfo> AppController::loadedPlugins() const
+QVector<app::plugins::Entry> AppController::loadedPlugins() const
 {
-    return m_plugins;
+    return app::plugins::entries();
 }
 
 bool AppController::hasPlugins() const
 {
-    return !m_plugins.isEmpty();
+    return !app::plugins::entries().isEmpty();
 }
 
 bool AppController::connectCamera(const QString &cameraId)
@@ -117,7 +71,7 @@ bool AppController::connectCamera(const QString &cameraId)
     enterConnectingState();
     m_cameraId = cameraId;
 
-    const PluginInfo *pluginInfo = findPluginForCamera(cameraId);
+    const app::plugins::Entry *pluginInfo = app::plugins::findByCamera(cameraId);
     if (!pluginInfo) {
         enterErrorState(CameraError::makeError(
             CameraError::Code::PluginLoadFailed,
@@ -128,16 +82,6 @@ bool AppController::connectCamera(const QString &cameraId)
 
     if (pluginInfo->instance) {
         m_driver = pluginInfo->instance;
-    } else if (pluginInfo->loader && pluginInfo->loader->isLoaded()) {
-        QObject *plugin = pluginInfo->loader->instance();
-        m_driver = qobject_cast<ICameraDriver*>(plugin);
-        if (!m_driver) {
-            enterErrorState(CameraError::makeError(
-                CameraError::Code::PluginLoadFailed,
-                "Plugin does not implement ICameraDriver"));
-            emit connectCameraFinished(cameraId, false, QStringLiteral("Plugin does not implement ICameraDriver"));
-            return false;
-        }
     } else {
         enterErrorState(CameraError::makeError(
             CameraError::Code::PluginLoadFailed,
@@ -309,87 +253,6 @@ void AppController::cleanupDriver()
         m_driver = nullptr;
     }
     m_cameraId.clear();
-}
-
-const PluginInfo *AppController::findPluginForCamera(const QString &cameraId) const
-{
-    for (const PluginInfo &info : m_plugins) {
-        if (info.cameraIds.contains(cameraId)) {
-            return &info;
-        }
-    }
-    return nullptr;
-}
-
-bool AppController::loadPlugin(const QString &filePath)
-{
-    QPluginLoader *loader = new QPluginLoader(filePath, this);
-
-    if (!loader->load()) {
-        QString error = loader->errorString();
-        qWarning() << "AppController: Failed to load plugin" << filePath << "-" << error;
-        emit pluginLoadFailed(filePath, error);
-        loader->deleteLater();
-        return false;
-    }
-
-    QObject *plugin = loader->instance();
-    if (!plugin) {
-        QString error = loader->errorString();
-        qWarning() << "AppController: Failed to get plugin instance from" << filePath << "-" << error;
-        loader->unload();
-        loader->deleteLater();
-        emit pluginLoadFailed(filePath, error);
-        return false;
-    }
-
-    ICameraDriver *driver = qobject_cast<ICameraDriver*>(plugin);
-    if (!driver) {
-        qWarning() << "AppController: Plugin does not implement ICameraDriver";
-        loader->unload();
-        loader->deleteLater();
-        emit pluginLoadFailed(filePath, "Plugin does not implement ICameraDriver");
-        return false;
-    }
-
-    QStringList cameraIds = driver->enumerate();
-    if (cameraIds.isEmpty()) {
-        qWarning() << "AppController: Plugin returned no cameras";
-    }
-
-    PluginInfo info;
-    info.filePath = filePath;
-    info.cameraIds = cameraIds;
-    info.loader = loader;
-    info.instance = nullptr;
-
-    m_plugins.append(info);
-
-    qDebug() << "AppController: Loaded plugin" << filePath << "with cameras:" << cameraIds;
-    return true;
-}
-
-void AppController::unloadPlugin(const PluginInfo &info)
-{
-    if (info.loader) {
-        if (info.loader->isLoaded()) {
-            info.loader->unload();
-        }
-        info.loader->deleteLater();
-    }
-}
-
-void AppController::clearPlugins()
-{
-    for (auto it = m_plugins.begin(); it != m_plugins.end(); ) {
-        const PluginInfo &info = *it;
-        if (m_driver && info.loader && info.loader->instance() == m_driver) {
-            ++it;
-            continue;
-        }
-        unloadPlugin(info);
-        it = m_plugins.erase(it);
-    }
 }
 
 QString AppController::getConfigDirectory()

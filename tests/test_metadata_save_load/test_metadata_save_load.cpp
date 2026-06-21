@@ -10,10 +10,10 @@
 #include <QtTest>
 
 #include "CameraTypes.h"
-#include "SaveTypes.h"
+#include "formats/SaveTypes.h"
 #include "formats/TiffFormatHandler.h"
 #include "formats/CsvFormatHandler.h"
-#include "FileLoaderWorker.h"
+#include "gui/workers/FileLoaderWorker.h"
 
 class TestMetadataSoftwareSettings : public QObject
 {

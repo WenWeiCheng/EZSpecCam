@@ -1,5 +1,7 @@
 #include "SequenceRunner.h"
 
+#include "CliFormat.h"
+
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -28,7 +30,7 @@ bool SequenceRunner::loadFromFile(const QString &filePath)
     {
         QJsonObject s = root["settings"].toObject();
         if (s.contains("output")) defaultOutputDir = s["output"].toString();
-        if (s.contains("format")) defaultFormat = s["format"].toString();
+        if (s.contains("format"))  defaultOutputExtension = app::cliFormatToExtension(s["format"].toString());
         if (s.contains("prefix")) defaultPrefix = s["prefix"].toString();
         if (s.contains("suffix")) defaultSuffix = s["suffix"].toString();
         // save_metadata 字段已废弃，被忽略（metadata 总是随帧一起保存）
@@ -40,7 +42,7 @@ bool SequenceRunner::loadFromFile(const QString &filePath)
         QJsonObject stepObj = stepVal.toObject();
         SequenceStep step;
         step.outputDir = defaultOutputDir;
-        step.format = defaultFormat;
+        step.outputExtension = defaultOutputExtension;
         step.prefix = defaultPrefix;
         step.suffix = defaultSuffix;
 
@@ -57,7 +59,7 @@ bool SequenceRunner::loadFromFile(const QString &filePath)
             QJsonObject cap = stepObj["capture"].toObject();
             if (cap.contains("frames")) step.frames = cap["frames"].toInt(1);
             if (cap.contains("output")) step.outputDir = cap["output"].toString();
-            if (cap.contains("format")) step.format = cap["format"].toString();
+            if (cap.contains("format"))  step.outputExtension = app::cliFormatToExtension(cap["format"].toString());
             if (cap.contains("prefix")) step.prefix = cap["prefix"].toString();
             if (cap.contains("suffix")) step.suffix = cap["suffix"].toString();
             // save_metadata 字段已废弃，被忽略

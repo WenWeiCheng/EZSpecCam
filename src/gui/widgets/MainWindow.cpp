@@ -14,9 +14,9 @@
 #include "PostProcess.h"
 #include "../workers/FileSaverWorker.h"
 #include "../workers/FileLoaderWorker.h"
-#include "../workers/SaveTypes.h"
-#include "../workers/formats/CsvFormatHandler.h"
-#include "../workers/formats/TiffFormatHandler.h"
+#include "formats/SaveTypes.h"
+#include "formats/CsvFormatHandler.h"
+#include "formats/TiffFormatHandler.h"
 
 #include <QMessageBox>
 #include <QCloseEvent>

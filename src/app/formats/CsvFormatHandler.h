@@ -4,8 +4,8 @@
 #include <QObject>
 #include <QString>
 
-#include "../IImageFormatHandler.h"
-#include "../SaveTypes.h"
+#include "IImageFormatHandler.h"
+#include "SaveTypes.h"
 
 class CsvFormatHandler : public IImageFormatHandler
 {

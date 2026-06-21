@@ -188,7 +188,7 @@ void PluginTab::updatePluginsTable()
     if (!m_appController) {
         return;
     }
-    const QList<PluginInfo> plugins = m_appController->loadedPlugins();
+    const auto plugins = m_appController->loadedPlugins();
     pluginsTableWidget->setRowCount(plugins.size());
 
     for (int i = 0; i < plugins.size(); ++i) {

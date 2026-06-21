@@ -87,10 +87,10 @@ endif()
 # Plugin DLL → plugins/drivers/
 add_custom_command(TARGET picam_camera_driver POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
-        "$<TARGET_FILE_DIR:ezspeccam_gui>/plugins/drivers"
+        "$<TARGET_FILE_DIR:ezspeccam>/plugins/drivers"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:picam_camera_driver>"
-        "$<TARGET_FILE_DIR:ezspeccam_gui>/plugins/drivers/"
+        "$<TARGET_FILE_DIR:ezspeccam>/plugins/drivers/"
     COMMENT "Deploying picam_camera_driver to plugins/drivers/"
 )
 
@@ -100,7 +100,7 @@ if(EXISTS "${PICAM_RUNTIME_DLL}")
     add_custom_command(TARGET picam_camera_driver POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${PICAM_RUNTIME_DLL}"
-            "$<TARGET_FILE_DIR:ezspeccam_gui>/plugins/drivers/"
+        "$<TARGET_FILE_DIR:ezspeccam>/plugins/drivers/"
         COMMENT "Deploying picam.dll to plugins/drivers/"
     )
 else()

@@ -33,7 +33,7 @@ cd EZSpecCam
 
 Run the application:
 ```bash
-./build/gui/EZSpecCam.exe
+./build/msvc-debug/bin/Debug/ezspeccam.exe
 ```
 
 > Ensure Visual C++ v14 Redistributable and camera drivers are installed.
@@ -43,12 +43,19 @@ Run the application:
 ```
 src/
 ├── core/           Camera driver interface + data types (static library)
-├── cli/            Headless camera control (QCoreApplication)
-├── gui/            Qt GUI application
+├── app/            Unified application (CLI + GUI in one binary)
+│   ├── AppMode     Runtime mode dispatch (no args → GUI, CLI flags → headless)
+│   ├── plugins     Plugin loader (stateless namespace)
+│   ├── formats     TIFF/CSV frame writers + dispatcher
+│   ├── HeadlessController  connect → capture → save → disconnect pipeline
+│   └── formats/    Format handlers + metadata sidecar (with softwareSettings)
+├── cli/            CLI mode: QCommandLineParser + cli::run
+├── gui/            GUI mode: QApplication + MainWindow + AppController
 └── plugins/        Camera driver plugins
     ├── mock/       Simulated camera (for testing)
     ├── qhyccd/     QHYCCD camera driver
-    └── hamamatsu/  Hamamatsu camera driver
+    ├── hamamatsu/  Hamamatsu camera driver
+    └── picam/      Princeton Instruments camera driver
 ```
 
 ### Core (`src/core/`)
@@ -57,7 +64,7 @@ Static library defining the camera driver contract (`ICameraDriver`) and core da
 
 ### CLI (`src/cli/`)
 
-Headless command-line tool (`QCoreApplication`) for scripted capture, single-shot parameter sweeps, and JSON event sequences (e.g. configure → wait-for-stable-temperature → capture). See `src/cli/README.md` for options and the sequence schema.
+Headless command-line mode of the unified `ezspeccam.exe` for scripted capture, single-shot parameter sweeps, and JSON event sequences (e.g. configure → wait-for-stable-temperature → capture). See `src/cli/README.md` for options and the sequence schema.
 
 ### GUI (`src/gui/`)
 
@@ -88,8 +95,7 @@ Each camera driver is a Qt plugin implementing `ICameraDriver`. Drivers are load
 | Option | Default | Description |
 |--------|---------|-------------|
 | `EZSPECCAM_BUILD_TESTS` | ON | Build test executables |
-| `EZSPECCAM_BUILD_GUI` | ON | Build GUI application |
-| `EZSPECCAM_BUILD_CLI` | ON | Build headless CLI application (`ezspeccam_cli`) |
+| `EZSPECCAM_BUILD_APP` | ON | Build the unified `ezspeccam` application (CLI + GUI) |
 | `EZSPECCAM_BUILD_PLUGINS` | ON | Build camera driver plugins |
 
 ## License

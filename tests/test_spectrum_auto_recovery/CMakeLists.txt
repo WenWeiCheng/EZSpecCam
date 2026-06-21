@@ -9,20 +9,21 @@ find_package(Qt6 COMPONENTS Core Gui Test REQUIRED)
 
 add_executable(test_spectrum_auto_recovery
     test_spectrum_auto_recovery.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/workers/formats/TiffFormatHandler.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/workers/formats/CsvFormatHandler.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/formats/TiffFormatHandler.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/formats/CsvFormatHandler.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/workers/FileLoaderWorker.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/workers/IImageFormatHandler.h
-    ${CMAKE_SOURCE_DIR}/src/gui/workers/SaveTypes.h
+    ${CMAKE_SOURCE_DIR}/src/app/formats/IImageFormatHandler.h
+    ${CMAKE_SOURCE_DIR}/src/app/formats/SaveTypes.h
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/PostProcess.cpp
 )
 
 target_include_directories(test_spectrum_auto_recovery PRIVATE
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/app
     ${CMAKE_SOURCE_DIR}/src/gui
     ${CMAKE_SOURCE_DIR}/src/gui/widgets
     ${CMAKE_SOURCE_DIR}/src/gui/workers
-    ${CMAKE_SOURCE_DIR}/src/gui/workers/formats
+    ${CMAKE_SOURCE_DIR}/src/app/formats
 )
 
 target_link_libraries(test_spectrum_auto_recovery PRIVATE

@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "CameraTypes.h"
+#include "formats/SaveTypes.h"
 
 /**
  * @struct LoadResult

@@ -6,16 +6,16 @@ Headless camera control via command-line interface. Stateless — each run conne
 
 ```bash
 # List available cameras
-ezspeccam_cli --list
+ezspeccam --list
 
 # Show all parameters for a camera
-ezspeccam_cli --camera mock-001 --list-params
+ezspeccam --camera mock-001 --list-params
 
 # Capture 3 frames as TIFF to ./output/
-ezspeccam_cli --camera mock-001 --frames 3 --output ./output
+ezspeccam --camera mock-001 --frames 3 --output ./output
 
 # Capture with custom parameters
-ezspeccam_cli --camera mock-001 --set exposure=500 --set gain=5.5 --frames 5
+ezspeccam --camera mock-001 --set exposure=500 --set gain=5.5 --frames 5
 ```
 
 ## Options
@@ -204,6 +204,12 @@ Extrinsic parameters (e.g. sensor temperature) are ideal targets for `wait_stabl
 .\build_preset.bat debug
 ```
 
-The CLI binary is at `build/msvc-debug/bin/Debug/ezspeccam_cli.exe`. The Mock plugin is deployed alongside it automatically so `--list` and a `mock-001` camera are usable out of the box.
+The CLI binary is at `build/msvc-debug/bin/Debug/ezspeccam.exe`. The Mock plugin is deployed alongside it automatically so `--list` and a `mock-001` camera are usable out of the box.
 
-CLI is enabled by default in the `msvc-debug` and `msvc-release` presets (`EZSPECCAM_BUILD_CLI: ON`); only `msvc-debug-gui` sets it to `OFF`. To disable it in another preset, set `EZSPECCAM_BUILD_CLI` to `"OFF"`.
+The CLI is part of the unified `ezspeccam` application; the build flag is `EZSPECCAM_BUILD_APP` (default `ON`). To build without the GUI dependency, set `EZSPECCAM_HEADLESS_ONLY` to `ON` (not yet implemented — for now, `ezspeccam` always links Qt Widgets).
+
+## Notes for Migrating from Pre-Merge CLI
+
+- The binary is now `ezspeccam.exe` (was `ezspeccam_cli.exe`).
+- CSV output is now the **wide format** (one line per image row, values comma-separated, no header). The previous CLI wrote a long format with `Row,Col,Value` header and one line per pixel; that format is no longer produced.
+- The metadata sidecar (`_metadata.json`) now always contains a `softwareSettings` object (empty `{}` in headless mode). The previous CLI schema did not include this key.
