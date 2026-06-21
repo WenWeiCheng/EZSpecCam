@@ -60,6 +60,8 @@ void CameraTab::setAppController(AppController *controller)
                 this, &CameraTab::onDisconnectCameraFinished);
         connect(controller, &AppController::pluginScanProgress,
                 this, &CameraTab::onScanProgress);
+        connect(controller, &AppController::pluginScanStarted,
+                this, &CameraTab::onScanStarted);
         connect(controller, &AppController::pluginScanCompleted,
                 this, &CameraTab::onScanCompleted);
         connect(controller, &AppController::pluginLoadFailed,
@@ -483,6 +485,15 @@ void CameraTab::onScanProgress(int current, int total, const QString &currentFil
     if (ui->m_scanStatusLabel) {
         ui->m_scanStatusLabel->setText(
             QString("Scanning plugins... (%1/%2)").arg(current).arg(total));
+        ui->m_scanStatusLabel->setVisible(true);
+    }
+}
+
+void CameraTab::onScanStarted()
+{
+    ui->cameraComboBox->setEnabled(false);
+    if (ui->m_scanStatusLabel) {
+        ui->m_scanStatusLabel->setText("Scanning plugins...");
         ui->m_scanStatusLabel->setVisible(true);
     }
 }

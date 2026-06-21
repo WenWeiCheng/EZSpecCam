@@ -50,6 +50,7 @@ protected slots:
     void onConnectCameraFinished(const QString &cameraId, bool success, const QString &error);
     void onDisconnectCameraFinished(const QString &cameraId);
     void onScanProgress(int current, int total, const QString &currentFile);
+    void onScanStarted();
     void onScanCompleted(int totalPlugins, int loadedPlugins);
 
 private:

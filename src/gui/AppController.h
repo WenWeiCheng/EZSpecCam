@@ -257,6 +257,14 @@ signals:
     void pluginScanCompleted(int totalPlugins, int loadedPlugins);
 
     /**
+     * @brief Emitted when a plugin scan begins (before any progress events).
+     *
+     * Consumers can use this to disable UI elements that would be stale
+     * mid-scan (e.g., the cameraComboBox).
+     */
+    void pluginScanStarted();
+
+    /**
      * @brief Emitted when a plugin fails to load
      * @param filePath Plugin file path
      * @param error Error message

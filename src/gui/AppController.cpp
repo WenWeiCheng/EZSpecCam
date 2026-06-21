@@ -26,6 +26,8 @@ AppController::~AppController()
 
 void AppController::scanPlugins()
 {
+    emit pluginScanStarted();
+
     app::plugins::setLoadFailedCallback(
         [this](const QString &filePath, const QString &error) {
             emit pluginLoadFailed(filePath, error);
