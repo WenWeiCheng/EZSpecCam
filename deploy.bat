@@ -58,18 +58,22 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: Copy plugins (camera drivers from lib\Release or lib\Debug)
-echo Copying camera driver plugins...
-if exist "%BUILD_DIR%\lib\Release\qhyccd_camera_driver.dll" (
-    copy /Y "%BUILD_DIR%\lib\Release\qhyccd_camera_driver.dll" "%DEPLOY_DIR%\plugins\drivers\"
-    copy /Y "%BUILD_DIR%\lib\Release\mock_camera_driver.dll" "%DEPLOY_DIR%\plugins\drivers\"
-    copy /Y "%BUILD_DIR%\lib\Release\hamamatsu_camera_driver.dll" "%DEPLOY_DIR%\plugins\drivers\"
+:: Copy camera driver plugins (auto-discover *.dll from build's deployed location)
+set "PLUGIN_SRC_DIR="
+if exist "%BUILD_DIR%\bin\Release\plugins\drivers" (
+    set "PLUGIN_SRC_DIR=%BUILD_DIR%\bin\Release\plugins\drivers"
 ) else (
-    if exist "%BUILD_DIR%\lib\Debug\qhyccd_camera_driver.dll" (
-        copy /Y "%BUILD_DIR%\lib\Debug\qhyccd_camera_driver.dll" "%DEPLOY_DIR%\plugins\drivers\"
-        copy /Y "%BUILD_DIR%\lib\Debug\mock_camera_driver.dll" "%DEPLOY_DIR%\plugins\drivers\"
-        copy /Y "%BUILD_DIR%\lib\Debug\hamamatsu_camera_driver.dll" "%DEPLOY_DIR%\plugins\drivers\"
-    )
+    set "PLUGIN_SRC_DIR=%BUILD_DIR%\bin\Debug\plugins\drivers"
+)
+echo Copying camera driver plugins from %PLUGIN_SRC_DIR%...
+set "PLUGIN_COUNT=0"
+for %%f in ("%PLUGIN_SRC_DIR%\*.dll") do (
+    echo   %%~nxf
+    copy /Y "%%f" "%DEPLOY_DIR%\plugins\drivers\" >nul
+    set /a PLUGIN_COUNT+=1
+)
+if "!PLUGIN_COUNT!"=="0" (
+    echo WARNING: No camera driver DLLs found in %PLUGIN_SRC_DIR%
 )
 
 :: Copy QHYCCD SDK DLLs
