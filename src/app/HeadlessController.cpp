@@ -54,7 +54,7 @@ void listParameters(ICameraDriver *driver)
 }
 
 int captureFrames(ICameraDriver *driver, int frameCount,
-                  const QString &outputDir, const QString &format,
+                  const QString &outputDir, const QString &outputExtension,
                   const QString &prefix, const QString &suffix)
 {
     if (frameCount <= 0) { qCritical() << "Frame count must be > 0"; return -1; }
@@ -75,8 +75,7 @@ int captureFrames(ICameraDriver *driver, int frameCount,
             frame.frameNumber = frameNumber;
             frame.cameraId = cameraId;
             frame.parameters = parameters;
-            const QString ext = app::formats::extensionForCliFormat(format);
-            const QString filePath = app::formats::generateFilename(outputDir, prefix, suffix, ext);
+            const QString filePath = app::formats::generateFilename(outputDir, prefix, suffix, outputExtension);
             if (!app::formats::saveFrame(frame, filePath)) errors++;
             captured++;
             qInfo() << "Frame" << captured << "/" << frameCount;
@@ -132,11 +131,11 @@ int runSequence(ICameraDriver *driver, const HeadlessOptions &opts,
             break;
         case SequenceStep::Capture:
         {
-            QString outDir = step.outputDir.isEmpty() ? opts.outputDir : step.outputDir;
-            QString fmt    = step.format.isEmpty()    ? opts.format    : step.format;
-            QString pfx    = step.prefix.isEmpty()    ? opts.prefix    : step.prefix;
-            QString sfx    = step.suffix.isEmpty()    ? opts.suffix    : step.suffix;
-            if (captureFrames(driver, step.frames, outDir, fmt, pfx, sfx) < 0)
+            QString outDir = step.outputDir.isEmpty()    ? opts.outputDir         : step.outputDir;
+            QString ext    = step.outputExtension.isEmpty() ? opts.outputExtension : step.outputExtension;
+            QString pfx    = step.prefix.isEmpty()       ? opts.prefix            : step.prefix;
+            QString sfx    = step.suffix.isEmpty()       ? opts.suffix            : step.suffix;
+            if (captureFrames(driver, step.frames, outDir, ext, pfx, sfx) < 0)
                 return -1;
             break;
         }
@@ -192,7 +191,7 @@ int run(const HeadlessOptions &opts)
     if (!opts.sequence.isEmpty())
         rc = runSequence(driver, opts, opts.sequence);
     else
-        rc = captureFrames(driver, opts.frames, opts.outputDir, opts.format, opts.prefix, opts.suffix);
+        rc = captureFrames(driver, opts.frames, opts.outputDir, opts.outputExtension, opts.prefix, opts.suffix);
 
     driver->disconnectCamera();
     return (rc >= 0) ? 0 : 1;

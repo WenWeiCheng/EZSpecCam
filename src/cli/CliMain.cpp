@@ -5,6 +5,7 @@
 
 #include "app/HeadlessController.h"
 #include "app/MessageHandler.h"
+#include "app/CliFormat.h"
 #include "SequenceRunner.h"
 
 namespace cli
@@ -62,7 +63,7 @@ int run(int argc, char *argv[], QCoreApplication & /*app*/)
     opts.cameraId = parser.value(cameraOpt);
     opts.frames = parser.value(framesOpt).toInt();
     opts.outputDir = parser.value(outputOpt);
-    opts.format = parser.value(formatOpt).toLower();
+    opts.outputExtension = app::cliFormatToExtension(parser.value(formatOpt));
     opts.prefix = parser.value(prefixOpt);
     opts.suffix = parser.value(suffixOpt);
 
@@ -82,7 +83,9 @@ int run(int argc, char *argv[], QCoreApplication & /*app*/)
         }
         opts.sequence = seq.steps();
         if (opts.outputDir == "." && !seq.defaultOutputDir.isEmpty()) opts.outputDir = seq.defaultOutputDir;
-        if (opts.format == "tiff" && !seq.defaultFormat.isEmpty())      opts.format = seq.defaultFormat;
+        // Per-step format was already translated by SequenceRunner::loadFromFile; we only need
+        // to fall back to the sequence's default output extension if the per-step one is empty.
+        if (!seq.defaultOutputExtension.isEmpty()) opts.outputExtension = seq.defaultOutputExtension;
         if (opts.prefix.isEmpty() && !seq.defaultPrefix.isEmpty())      opts.prefix = seq.defaultPrefix;
         if (opts.suffix.isEmpty() && !seq.defaultSuffix.isEmpty())      opts.suffix = seq.defaultSuffix;
     }

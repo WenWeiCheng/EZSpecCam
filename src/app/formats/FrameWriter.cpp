@@ -53,13 +53,6 @@ QStringList supportedSaveExtensions()
     return { "tiff", "tif", "csv" };
 }
 
-QString extensionForCliFormat(const QString &cliFormat)
-{
-    const QString f = cliFormat.toLower();
-    if (f == "csv") return "csv";
-    return "tiff";
-}
-
 QString generateFilename(const QString &outputDir,
                          const QString &prefix,
                          const QString &suffix,

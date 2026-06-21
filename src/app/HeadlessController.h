@@ -17,7 +17,7 @@ struct HeadlessOptions
     QVariantMap setParameters;
     int frames = 1;
     QString outputDir = ".";
-    QString format = "tiff";
+    QString outputExtension = "tiff";   ///< file extension ("tiff"/"csv"), already translated by caller
     QString prefix;
     QString suffix;
     QVector<SequenceStep> sequence;

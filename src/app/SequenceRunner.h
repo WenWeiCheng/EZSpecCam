@@ -19,7 +19,7 @@ struct SequenceStep
     double stableTimeoutSec = 300.0;
 
     QString outputDir;
-    QString format;
+    QString outputExtension;   ///< file extension ("tiff"/"csv"), translated from JSON "format" at load time
     QString prefix;
     QString suffix;
 };
@@ -41,6 +41,10 @@ struct SequenceStep
  * @endcode
  *
  * 注：save_metadata 字段已废弃（被忽略），metadata 总是随帧一起保存。
+ *
+ * The JSON `format` field is translated to a file extension via
+ * app::cliFormatToExtension at load time; consumers receive `outputExtension`
+ * already in extension form.
  */
 class SequenceRunner
 {
@@ -51,7 +55,7 @@ public:
     QString errorString() const { return m_error; }
 
     QString defaultOutputDir;
-    QString defaultFormat;
+    QString defaultOutputExtension;
     QString defaultPrefix;
     QString defaultSuffix;
 
