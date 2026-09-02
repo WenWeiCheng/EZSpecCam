@@ -35,10 +35,13 @@ if(EZSPECCAM_BUILD_TESTS)
     list(APPEND QT_COMPONENTS Test)
 endif()
 
-find_package(Qt6 6.8 COMPONENTS ${QT_COMPONENTS} REQUIRED)
-if(Qt6_VERSION VERSION_LESS 6.8)
-    message(FATAL_ERROR "Qt version ${Qt6_VERSION} is too old. Requires Qt 6.8 or higher.")
+find_package(Qt6 6.2 COMPONENTS ${QT_COMPONENTS} REQUIRED)
+if(Qt6_VERSION VERSION_LESS 6.2)
+    message(FATAL_ERROR "Qt version ${Qt6_VERSION} is too old. Requires Qt 6.2 or higher.")
 endif()
+# Note: project originally required Qt 6.8 on Windows. Lowered to 6.2 so the
+# Linux build (system Qt 6.2.4) can configure; Windows builds may now also
+# use 6.2 or higher. Bump back up if a feature requires it.
 
 # ===========================================
 # Find External Dependencies

@@ -1,5 +1,5 @@
 {
-    "version": 6,
+    "version": 3,
     "cmakeMinimumRequired": {
         "major": 3,
         "minor": 20,
@@ -65,11 +65,47 @@
                 "EZSPECCAM_BUILD_TESTS": "OFF",
                 "EZSPECCAM_PICAM_DEMO": "ON"
             }
-        }
-    ],
-    "buildPresets": [
+        },
         {
-            "name": "msvc-debug",
+            "name": "linux-debug",
+            "displayName": "Linux Debug",
+            "description": "GCC + Ninja, Debug configuration (mock driver only)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/linux-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_PREFIX_PATH": "/usr",
+                "QT_NO_PACKAGE_VERSION_CHECK": "TRUE",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_POLICY_VERSION_MINIMUM": "3.20",
+                "EZSPECCAM_BUILD_APP": "ON",
+                "EZSPECCAM_BUILD_PLUGINS": "ON",
+                "EZSPECCAM_BUILD_TESTS": "ON",
+                "EZSPECCAM_PICAM_DEMO": "OFF"
+            }
+        },
+        {
+            "name": "linux-release",
+            "displayName": "Linux Release",
+            "description": "GCC + Ninja, Release configuration (mock driver only)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/linux-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_PREFIX_PATH": "/usr",
+                "QT_NO_PACKAGE_VERSION_CHECK": "TRUE",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_POLICY_VERSION_MINIMUM": "3.20",
+                "EZSPECCAM_BUILD_APP": "ON",
+                "EZSPECCAM_BUILD_PLUGINS": "ON",
+                "EZSPECCAM_BUILD_TESTS": "ON",
+                "EZSPECCAM_PICAM_DEMO": "OFF"
+            }
+        }
+     ],
+     "buildPresets": [
+         {
+             "name": "msvc-debug",
             "configurePreset": "msvc-debug",
             "description": "Build MSVC Debug configuration",
             "configuration": "Debug"
@@ -85,6 +121,18 @@
             "configurePreset": "msvc-debug-gui",
             "description": "Build MSVC Debug GUI configuration",
             "configuration": "Debug"
+        },
+        {
+            "name": "linux-debug",
+            "configurePreset": "linux-debug",
+            "description": "Build Linux Debug configuration",
+            "configuration": "Debug"
+        },
+        {
+            "name": "linux-release",
+            "configurePreset": "linux-release",
+            "description": "Build Linux Release configuration",
+            "configuration": "Release"
         }
     ],
     "testPresets": [

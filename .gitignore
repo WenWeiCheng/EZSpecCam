@@ -85,6 +85,7 @@ desktop.ini
 # ===========================================
 # IDE Specific
 # ===========================================
+.vscode/
 .opencode/
 .trae/
 .idea/
@@ -164,5 +165,5 @@ driver-sdk/
 # ============================================
 !src/plugins/qhyccd/sdk/winlib/x64/*.lib
 !src/plugins/qhyccd/sdk/winlib/x86/*.lib
-!src/plugins/hamamatsu/sdk/winlib/x64/*.lib
-!src/plugins/hamamatsu/sdk/winlib/x86/*.lib.vscode/
+!src/plugins/hamamatsu/sdk/winlib/x86/*.lib
+

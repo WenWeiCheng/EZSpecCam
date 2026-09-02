@@ -21,9 +21,9 @@ else()
     qt_add_executable(${EZSPECCAM_TARGET} WIN32)
 endif()
 
-find_package(Qt6 6.8 COMPONENTS Core Gui Widgets PrintSupport OpenGL REQUIRED)
-if(Qt6_VERSION VERSION_LESS 6.8)
-    message(FATAL_ERROR "Qt version ${Qt6_VERSION} is too old. Requires Qt 6.8 or higher.")
+find_package(Qt6 6.2 COMPONENTS Core Gui Widgets PrintSupport OpenGL REQUIRED)
+if(Qt6_VERSION VERSION_LESS 6.2)
+    message(FATAL_ERROR "Qt version ${Qt6_VERSION} is too old. Requires Qt 6.2 or higher.")
 endif()
 
 find_package(OpenGL REQUIRED)

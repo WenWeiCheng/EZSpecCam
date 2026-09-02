@@ -96,7 +96,9 @@ void CameraTabUi::setupUi(CameraTab *tab)
     formLayout->addRow("Capture Mode:", captureModeComboBox);
     m_countRow = formLayout->rowCount();
     formLayout->addRow("Count:", captureCountSpinBox);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     formLayout->setRowVisible(m_countRow, false);
+#endif
 
     parameterGroup = new QGroupBox("Parameters", tab);
     m_dynamicParametersLayout = new QVBoxLayout();

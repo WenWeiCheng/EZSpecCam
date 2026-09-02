@@ -180,7 +180,9 @@ void CameraTab::onCaptureModeChanged(int index)
     Q_UNUSED(index);
     if (ui->captureModeComboBox && ui->formLayout && ui->m_countRow >= 0) {
         bool isBurst = (ui->captureModeComboBox->currentText() == "Burst");
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
         ui->formLayout->setRowVisible(ui->m_countRow, isBurst);
+#endif
     }
 }
 

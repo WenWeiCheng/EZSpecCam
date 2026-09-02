@@ -8,6 +8,7 @@ target_link_libraries(mock_camera_driver PRIVATE
 
 target_include_directories(mock_camera_driver PRIVATE
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/gui
 )
 
 target_sources(mock_camera_driver PRIVATE
