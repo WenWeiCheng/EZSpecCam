@@ -6,6 +6,7 @@
 # ===========================================
 build/
 build/*/
+deploy/
 
 # ===========================================
 # Qt Generated Files
@@ -164,4 +165,4 @@ driver-sdk/
 !src/plugins/qhyccd/sdk/winlib/x64/*.lib
 !src/plugins/qhyccd/sdk/winlib/x86/*.lib
 !src/plugins/hamamatsu/sdk/winlib/x64/*.lib
-!src/plugins/hamamatsu/sdk/winlib/x86/*.lib
+!src/plugins/hamamatsu/sdk/winlib/x86/*.lib.vscode/
