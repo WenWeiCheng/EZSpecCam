@@ -676,7 +676,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.displayName = "Pixel Width";
         param.description = "Pixel width in microns";
         param.category = ParameterCategory::Info;
-        param.type = ParameterType::FloatRange;
+        param.type = ParameterType::IntRange;
         param.isReadOnly = true;
         param.order = 7.0f;
         param.defaultValue = m_pixelWidth;
@@ -688,7 +688,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
         param.displayName = "Pixel Height";
         param.description = "Pixel height in microns";
         param.category = ParameterCategory::Info;
-        param.type = ParameterType::FloatRange;
+        param.type = ParameterType::IntRange;
         param.isReadOnly = true;
         param.order = 8.0f;
         param.defaultValue = m_pixelHeight;

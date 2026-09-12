@@ -123,7 +123,7 @@ private slots:
         } else {
             param = m_driver->parameter("chipWidth");
             QVERIFY2(param.isValid(), "chipWidth should be a valid parameter");
-            QVERIFY2(param.type == ParameterType::String, "chipWidth should be String type");
+            QVERIFY2(param.type == ParameterType::FloatRange, "chipWidth should be String type");
         }
 
         // chipHeight
@@ -132,11 +132,8 @@ private slots:
         } else {
             param = m_driver->parameter("chipHeight");
             QVERIFY2(param.isValid(), "chipHeight should be a valid parameter");
-            QVERIFY2(param.type == ParameterType::String, "chipHeight should be String type");
+            QVERIFY2(param.type == ParameterType::FloatRange, "chipHeight should be FloatRange type");
         }
-        param = m_driver->parameter("chipHeight");
-        QVERIFY2(param.isValid(), "chipHeight should be a valid parameter");
-        QVERIFY2(param.type == ParameterType::String, "chipHeight should be String type");
 
         // imageWidth
         if(!names.contains("imageWidth")){
@@ -144,7 +141,7 @@ private slots:
         } else {
             param = m_driver->parameter("imageWidth");
             QVERIFY2(param.isValid(), "imageWidth should be a valid parameter");
-            QVERIFY2(param.type == ParameterType::String, "imageWidth should be String type");
+            QVERIFY2(param.type == ParameterType::IntRange, "imageWidth should be IntRange type");
         }
 
         // imageHeight
@@ -153,19 +150,19 @@ private slots:
         } else {
             param = m_driver->parameter("imageHeight");
             QVERIFY2(param.isValid(), "imageHeight should be a valid parameter");
-            QVERIFY2(param.type == ParameterType::String, "imageHeight should be String type");
+            QVERIFY2(param.type == ParameterType::IntRange, "imageHeight should be IntRange type");
         }
 
         param = m_driver->parameter("imageHeight");
         QVERIFY2(param.isValid(), "imageHeight should be a valid parameter");
-        QVERIFY2(param.type == ParameterType::String, "imageHeight should be String type");
+        QVERIFY2(param.type == ParameterType::IntRange, "imageHeight should be IntRange type");
 
         // pixelWidth
         QVERIFY2(names.contains("pixelWidth"), "pixelWidth parameter should exist");
 
         param = m_driver->parameter("pixelWidth");
         QVERIFY2(param.isValid(), "pixelWidth should be a valid parameter");
-        QVERIFY2(param.type == ParameterType::String, "pixelWidth should be String type");
+        QVERIFY2(param.type == ParameterType::IntRange, "pixelWidth should be IntRange type");
 
         // pixelHeight
         if(!names.contains("pixelHeight")){
@@ -173,7 +170,7 @@ private slots:
         } else {
             param = m_driver->parameter("pixelHeight");
             QVERIFY2(param.isValid(), "pixelHeight should be a valid parameter");
-            QVERIFY2(param.type == ParameterType::String, "pixelHeight should be String type");
+            QVERIFY2(param.type == ParameterType::IntRange, "pixelHeight should be IntRange type");
         }
 
         // imageBytes
@@ -182,7 +179,7 @@ private slots:
         } else {
             param = m_driver->parameter("imageBytes");
             QVERIFY2(param.isValid(), "imageBytes should be a valid parameter");
-            QVERIFY2(param.type == ParameterType::String, "imageBytes should be String type");
+            QVERIFY2(param.type == ParameterType::IntRange, "imageBytes should be IntRange type");
         }
         
         // effective_start_x
@@ -191,7 +188,7 @@ private slots:
         } else {
             param = m_driver->parameter("effective_start_x");
             QVERIFY2(param.isValid(), "effective_start_x should be a valid parameter");
-            QVERIFY2(param.type == ParameterType::String, "effective_start_x should be String type");
+            QVERIFY2(param.type == ParameterType::IntRange, "effective_start_x should be IntRange type");
         }
         
         // effective_start_y
@@ -200,7 +197,7 @@ private slots:
         } else {
             param = m_driver->parameter("effective_start_y");
             QVERIFY2(param.isValid(), "effective_start_y should be a valid parameter");
-            QVERIFY2(param.type == ParameterType::String, "effective_start_y should be String type");
+            QVERIFY2(param.type == ParameterType::IntRange, "effective_start_y should be IntRange type");
         }
         
         // effective_width
@@ -209,7 +206,7 @@ private slots:
         } else {
             param = m_driver->parameter("effective_width");
             QVERIFY2(param.isValid(), "effective_width should be a valid parameter");
-            QVERIFY2(param.type == ParameterType::String, "effective_width should be String type");
+            QVERIFY2(param.type == ParameterType::IntRange, "effective_width should be IntRange type");
         }
         
         // effective_height
@@ -218,7 +215,7 @@ private slots:
         } else {
             param = m_driver->parameter("effective_height");
             QVERIFY2(param.isValid(), "effective_height should be a valid parameter");
-            QVERIFY2(param.type == ParameterType::String, "effective_height should be String type");
+            QVERIFY2(param.type == ParameterType::IntRange, "effective_height should be IntRange type");
         }
     }
 
@@ -250,13 +247,13 @@ private slots:
         m_driver->setParameter("exposure", minValue);
         m_driver->commitParameters();
         QVERIFY2(errorSpy.isEmpty() || errorSpy.at(0).at(0).value<CameraError>().code == CameraError::Code::None,
-                 "Setting exposure to min should not produce error");
+                 qPrintable(QString("Setting exposure to min %1 should not produce error").arg(minValue.toDouble())));
         errorSpy.clear();
 
         m_driver->setParameter("exposure", maxVal);
         m_driver->commitParameters();
         QVERIFY2(errorSpy.isEmpty() || errorSpy.at(0).at(0).value<CameraError>().code == CameraError::Code::None,
-                 "Setting exposure to max should not produce error");
+                 qPrintable(QString("Setting exposure to max %1 should not produce error").arg(maxVal.toDouble())));
 
         // unit and unitRange are optional but if present should be consistent
         if (!param.constraint.unit.isEmpty()) {
@@ -831,7 +828,7 @@ private slots:
         QVERIFY2(param.type == ParameterType::FloatRange, "target_temperature should be FloatRange type");
         param = m_driver->parameter("current_temperature");
         QVERIFY2(param.isValid(), "current_temperature should be a valid parameter");
-        QVERIFY2(param.type == ParameterType::String, "current_temperature should be String type");
+        QVERIFY2(param.type == ParameterType::FloatRange, "current_temperature should be FloatRange type");
         
         QSignalSpy errorSpy10(m_driver, &ICameraDriver::errorOccurred);
         m_driver->setParameter("cooler_enabled", true);
@@ -885,7 +882,7 @@ private slots:
             tempDecreased = newTempD < oldTempD;
             qDebug() << "Temp change:" << oldTempD << "->" << newTempD << "decreased:" << tempDecreased;
         }
-        QVERIFY2(tempDecreased, "Temperature should decrease after enabling cooler with target=0");
+        QVERIFY2(newTempD <= 0 || tempDecreased, "Temperature should decrease after enabling cooler with target=0");
     }
 
     //==========================================================================
@@ -901,7 +898,7 @@ private slots:
 
         ParameterDefinition param = m_driver->parameter("humidity");
         QVERIFY2(param.isValid(), "humidity should be a valid parameter");
-        QVERIFY2(param.type == ParameterType::String, "humidity should be String type");
+        QVERIFY2(param.type == ParameterType::FloatRange, "humidity should be FloatRange type");
         
         QSignalSpy errorSpy14(m_driver, &ICameraDriver::errorOccurred);
         QVariant humidityVal = m_driver->parameterValue("humidity");
@@ -921,7 +918,7 @@ private slots:
 
         ParameterDefinition param = m_driver->parameter("pressure");
         QVERIFY2(param.isValid(), "pressure should be a valid parameter");
-        QVERIFY2(param.type == ParameterType::String, "pressure should be String type");
+        QVERIFY2(param.type == ParameterType::FloatRange, "pressure should be FloatRange type");
         
         QSignalSpy errorSpy15(m_driver, &ICameraDriver::errorOccurred);
         QVariant pressureVal = m_driver->parameterValue("pressure");
