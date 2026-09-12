@@ -119,6 +119,11 @@ private:
     bool m_vBinEnabled = false;
     int m_vBinStartRow = 0;
     int m_vBinEndRow = -1;
+    
+    QShortcut *shortcutConfig = nullptr;
+    QShortcut *shortcutLive = nullptr;
+    QShortcut *shortcutSingle = nullptr;
+    QShortcut *shortcutBurst = nullptr;
 };
 
 #endif // MAINWINDOW_H

@@ -54,16 +54,16 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->centralStackedWidget->hide();
 
-    auto *shortcutConfig = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_C), this);
+    shortcutConfig = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_C), this);
     connect(shortcutConfig, &QShortcut::activated, this, &MainWindow::on_actionConfig_triggered);
 
-    auto *shortcutLive = new QShortcut(QKeySequence(Qt::Key_L), this);
+    shortcutLive = new QShortcut(QKeySequence(Qt::Key_L), this);
     connect(shortcutLive, &QShortcut::activated, this, &MainWindow::onLiveModeTriggered);
 
-    auto *shortcutSingle = new QShortcut(QKeySequence(Qt::Key_S), this);
+    shortcutSingle = new QShortcut(QKeySequence(Qt::Key_S), this);
     connect(shortcutSingle, &QShortcut::activated, this, &MainWindow::onSingleModeTriggered);
 
-    auto *shortcutBurst = new QShortcut(QKeySequence(Qt::Key_B), this);
+    shortcutBurst = new QShortcut(QKeySequence(Qt::Key_B), this);
     connect(shortcutBurst, &QShortcut::activated, this, &MainWindow::onBurstModeTriggered);
 
     m_appController = new AppController(nullptr);
@@ -731,12 +731,24 @@ void MainWindow::onCameraStateChanged(CameraState newState)
         m_fpsFrameCount = 0;
         m_fpsValue = 0;
         updateFpsDisplay();
+        
+        // disable capture related shortcut
+        shortcutConfig->setEnabled(false);
+        shortcutLive->setEnabled(false);
+        shortcutSingle->setEnabled(false);
+        shortcutBurst->setEnabled(false);
         break;
     case CameraState::Connecting:
         stateText = tr("Connecting...");
         break;
     case CameraState::Connected:
         stateText = tr("Connected");
+
+        // enable capture related shortcut
+        shortcutConfig->setEnabled(true);
+        shortcutLive->setEnabled(true);
+        shortcutSingle->setEnabled(true);
+        shortcutBurst->setEnabled(true);
         break;
     case CameraState::Acquiring:
         stateText = tr("Acquiring");
@@ -744,10 +756,22 @@ void MainWindow::onCameraStateChanged(CameraState newState)
         m_fpsValue = 0;
         m_fpsTimer->start(1000);
         updateFpsDisplay();
+        
+        // disable capture related shortcut
+        shortcutConfig->setEnabled(false);
+        shortcutLive->setEnabled(false);
+        shortcutSingle->setEnabled(false);
+        shortcutBurst->setEnabled(false);
         break;
     case CameraState::Error:
         stateText = tr("Error");
         m_fpsTimer->stop();
+        
+        // disable capture related shortcut
+        shortcutConfig->setEnabled(false);
+        shortcutLive->setEnabled(false);
+        shortcutSingle->setEnabled(false);
+        shortcutBurst->setEnabled(false);
         break;
     }
     ui->stateLabel->setText(stateText);
