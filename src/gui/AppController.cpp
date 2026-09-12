@@ -652,9 +652,9 @@ void AppController::onDriverError(const CameraError &error)
 {
     if (error.severity == CameraError::Severity::Error ||
         error.severity == CameraError::Severity::Fatal) {
-        enterErrorState(error);
+        enterErrorState(error);                       // 内部已 emit
+    } else {
+        m_lastError = error;
+        emit errorOccurred(error);                    // 仅 Warning/Info 走这里
     }
-    // Warning / Info: stash and re-emit so MainWindow/tabs can surface without flipping state.
-    m_lastError = error;
-    emit errorOccurred(error);
 }
