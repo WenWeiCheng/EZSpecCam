@@ -74,6 +74,15 @@ void CameraConfigDialog::setAppController(AppController *controller)
                 this, &CameraConfigDialog::onSetParametersFinished);
         connect(controller, &AppController::commitParametersFinished,
                 this, &CameraConfigDialog::onCommitParametersFinished);
+        connect(controller, &AppController::stateChanged,
+                this, [this](CameraState state) {
+                    if (state == CameraState::Acquiring) {
+                        ui->buttonBox->setEnabled(false);
+                    }
+                    if (state == CameraState::Connected) {
+                        ui->buttonBox->setEnabled(true);
+                    }
+                });
     }
 }
 
