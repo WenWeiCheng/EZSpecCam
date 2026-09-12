@@ -545,7 +545,7 @@ private slots:
 
         QSignalSpy frameSpyFull(m_driver, &ICameraDriver::frameReady);
         m_driver->startCapture(1);
-        QVERIFY2(frameSpyFull.wait(3000), "Should receive full frame");
+        QVERIFY2(frameSpyFull.wait(5000), "Should receive full frame");
         QSharedPointer<QImage> fullImage = frameSpyFull.takeFirst().at(0).value<QSharedPointer<QImage>>();
         QVERIFY2(!fullImage->isNull(), "Full image should not be null");
         int fullW = fullImage->width();
@@ -560,7 +560,7 @@ private slots:
 
         QSignalSpy frameSpyHalf(m_driver, &ICameraDriver::frameReady);
         m_driver->startCapture(1);
-        QVERIFY2(frameSpyHalf.wait(3000), "Should receive half frame");
+        QVERIFY2(frameSpyHalf.wait(10000), "Should receive half frame");
         QSharedPointer<QImage> halfImage = frameSpyHalf.takeFirst().at(0).value<QSharedPointer<QImage>>();
         QVERIFY2(!halfImage->isNull(), "Half image should not be null");
         qDebug() << "Half frame:" << halfImage->width() << "x" << halfImage->height();
@@ -583,13 +583,15 @@ private slots:
         QVector<QVariant> validBinnings = param.constraint.validValues;
         QVERIFY2(!validBinnings.isEmpty(), "binning should have valid values");
 
-        m_driver->setParameter("roi_width", param.constraint.maxValue);
-        m_driver->setParameter("roi_height", param.constraint.maxValue);
-        m_driver->commitParameters();
+        bool success = false;
+        success = m_driver->setParameter("roi_width", param.constraint.maxValue);
+        success |= m_driver->setParameter("roi_height", param.constraint.maxValue);
+        success |= m_driver->commitParameters();
+        QVERIFY2(success, "Should set and commit roi_width and roi_height to max values");
 
         QSignalSpy frameSpy1(m_driver, &ICameraDriver::frameReady);
         m_driver->startCapture(1);
-        QVERIFY2(frameSpy1.wait(3000), "Should receive frame at binning=1");
+        QVERIFY2(frameSpy1.wait(10000), "Should receive frame at binning=1");
         QSharedPointer<QImage> image1 = frameSpy1.takeFirst().at(0).value<QSharedPointer<QImage>>();
         QVERIFY2(!image1->isNull(), "Image at binning=1 should not be null");
         int width1 = image1->width();

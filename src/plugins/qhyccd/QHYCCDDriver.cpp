@@ -805,6 +805,81 @@ void QHYCCDDriver::initializeParameterDefinitions()
         return;
     }
 
+    uint32_t numReadModes = 0;
+    ret = GetQHYCCDNumberOfReadModes(m_cameraHandle, &numReadModes);
+    ret |= SetQHYCCDReadMode(m_cameraHandle, 0); // Set to default read mode
+    DRIVER_DEBUG << "Number of read modes:" << numReadModes;
+
+    m_readModeNames.clear();
+    if (ret == QHYCCD_SUCCESS && numReadModes > 0) {
+        char modeName[64] = {0};
+        for (uint32_t i = 0; i < numReadModes; i++) {
+            memset(modeName, 0, 64);
+            ret = GetQHYCCDReadModeName(m_cameraHandle, i, modeName);
+            if (ret == QHYCCD_SUCCESS) {
+                m_readModeNames.append(QString::fromLatin1(modeName));
+                DRIVER_DEBUG << "Read mode" << i << ":" << modeName;
+            } else {
+                emit errorOccurred(CameraError::makeError(
+                    CameraError::Code::DriverError,
+                    QString("Failed to get read mode name")));
+                return;
+            }
+        }
+    } else {
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::DriverError,
+            QString("Failed to get read modes")));
+        return;
+    }
+
+    // read mode
+    param = ParameterDefinition();
+    param.name = "read_mode";
+    param.displayName = "Read Mode";
+    param.description = "Camera readout mode (affects speed/quality). When read mode is changed, need to re-init camera and re-commit parameters. So this takes a while.";
+    param.category = ParameterCategory::Core;
+    param.type = ParameterType::StringCollection;
+    for (const QString &name : m_readModeNames) {
+        param.constraint.validValues.append(name);
+    }
+    param.defaultValue = m_readModeNames.isEmpty() ? "Default" : m_readModeNames.first();
+    param.order = 0.1f;
+    m_parameterDefinitions.insert("read_mode", param);
+    m_parameters.insert("read_mode", param.defaultValue);
+    
+    // stream mode
+    param = ParameterDefinition();
+    param.name = "stream_mode";
+    param.displayName = "Stream Mode";
+    param.description = "Camera stream mode (Single Frame or Live Video). When stream mode is changed, need to re-init camera and re-commit parameters. So this takes a while.";
+    param.category = ParameterCategory::Core;
+    param.type = ParameterType::StringCollection;
+    ret = IsQHYCCDControlAvailable(m_cameraHandle, CAM_SINGLEFRAMEMODE);
+    ret |= SetQHYCCDStreamMode(m_cameraHandle, 0); // Set to default stream mode
+    if(ret == QHYCCD_SUCCESS){
+        m_streamModeNames.append("Single Frame");
+        param.constraint.validValues.append("Single Frame");   
+        param.defaultValue = "Single Frame";
+    }
+    ret = IsQHYCCDControlAvailable(m_cameraHandle, CAM_LIVEVIDEOMODE);
+    if(ret == QHYCCD_SUCCESS){
+        m_streamModeNames.append("Live Video");
+        param.constraint.validValues.append("Live Video");   
+    }
+    param.order = 0.2f;
+    m_parameterDefinitions.insert("stream_mode", param);
+    m_parameters.insert("stream_mode", param.defaultValue);
+    
+    // Must call GetQHYCCDChipInfo first to get the correct sensor dimensions
+    ret = InitQHYCCD(m_cameraHandle);
+    if (ret != QHYCCD_SUCCESS) {
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::DriverError,
+            QString("Failed to initialize camera")));
+        return;
+    }
+
     // Get sensor dimensions
     ret = GetQHYCCDChipInfo(m_cameraHandle, &m_chipWidth, &m_chipHeight,
                             &m_imageWidth, &m_imageHeight, &m_pixelWidth, &m_pixelHeight, &m_imageBytes);
@@ -899,70 +974,6 @@ void QHYCCDDriver::initializeParameterDefinitions()
             QString("Failed to get sensor dimensions")));
         return;
     }
-
-    uint32_t numReadModes = 0;
-    ret = GetQHYCCDNumberOfReadModes(m_cameraHandle, &numReadModes);
-    DRIVER_DEBUG << "Number of read modes:" << numReadModes;
-
-    m_readModeNames.clear();
-    if (ret == QHYCCD_SUCCESS && numReadModes > 0) {
-        char modeName[64] = {0};
-        for (uint32_t i = 0; i < numReadModes; i++) {
-            memset(modeName, 0, 64);
-            ret = GetQHYCCDReadModeName(m_cameraHandle, i, modeName);
-            if (ret == QHYCCD_SUCCESS) {
-                m_readModeNames.append(QString::fromLatin1(modeName));
-                DRIVER_DEBUG << "Read mode" << i << ":" << modeName;
-            } else {
-                emit errorOccurred(CameraError::makeError(
-                    CameraError::Code::DriverError,
-                    QString("Failed to get read mode name")));
-                return;
-            }
-        }
-    } else {
-        emit errorOccurred(CameraError::makeError(
-            CameraError::Code::DriverError,
-            QString("Failed to get read modes")));
-        return;
-    }
-
-    // read mode
-    param = ParameterDefinition();
-    param.name = "read_mode";
-    param.displayName = "Read Mode";
-    param.description = "Camera readout mode (affects speed/quality). When read mode is changed, need to re-init camera and re-commit parameters. So this takes a while.";
-    param.category = ParameterCategory::Core;
-    param.type = ParameterType::StringCollection;
-    for (const QString &name : m_readModeNames) {
-        param.constraint.validValues.append(name);
-    }
-    param.defaultValue = m_readModeNames.isEmpty() ? "Default" : m_readModeNames.first();
-    param.order = 0.1f;
-    m_parameterDefinitions.insert("read_mode", param);
-    m_parameters.insert("read_mode", param.defaultValue);
-    
-    // stream mode
-    param = ParameterDefinition();
-    param.name = "stream_mode";
-    param.displayName = "Stream Mode";
-    param.description = "Camera stream mode (Single Frame or Live Video). When stream mode is changed, need to re-init camera and re-commit parameters. So this takes a while.";
-    param.category = ParameterCategory::Core;
-    param.type = ParameterType::StringCollection;
-    ret = IsQHYCCDControlAvailable(m_cameraHandle, CAM_SINGLEFRAMEMODE);
-    if(ret == QHYCCD_SUCCESS){
-        m_streamModeNames.append("Single Frame");
-        param.constraint.validValues.append("Single Frame");   
-        param.defaultValue = "Single Frame";
-    }
-    ret = IsQHYCCDControlAvailable(m_cameraHandle, CAM_LIVEVIDEOMODE);
-    if(ret == QHYCCD_SUCCESS){
-        m_streamModeNames.append("Live Video");
-        param.constraint.validValues.append("Live Video");   
-    }
-    param.order = 0.2f;
-    m_parameterDefinitions.insert("stream_mode", param);
-    m_parameters.insert("stream_mode", param.defaultValue);
 
     // Exposure
     ret = IsQHYCCDControlAvailable(m_cameraHandle, CONTROL_EXPOSURE);
