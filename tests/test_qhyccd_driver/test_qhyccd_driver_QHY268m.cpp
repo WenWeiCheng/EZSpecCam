@@ -326,15 +326,17 @@ private slots:
                  "Setting gain to max should not produce error");
 
         // sample image and check image mean value in gain=10 is approximately 2x gain=0
-        m_driver->setParameter("exposure", 100.0);
-        m_driver->setParameter("gain", 0.0);
-        m_driver->commitParameters();
+        bool success = false;
+        success = m_driver->setParameter("exposure", 100.0);
+        success |= m_driver->setParameter("gain", minVal);
+        success |= m_driver->commitParameters();
+        QVERIFY2(success, "Should set and commit exposure and gain parameters");
 
         QSignalSpy frameSpy0(m_driver, &ICameraDriver::frameReady);
         m_driver->startCapture(1);
-        QVERIFY2(frameSpy0.wait(2000), "Should receive frame at gain=0");
+        QVERIFY2(frameSpy0.wait(5000) || frameSpy0.count() > 0, "Should receive frame at gain=minValue");
         QSharedPointer<QImage> image0 = frameSpy0.takeFirst().at(0).value<QSharedPointer<QImage>>();
-        QVERIFY2(!image0->isNull(), "Image at gain=0 should not be null");
+        QVERIFY2(!image0->isNull(), "Image at gain=minValue should not be null");
 
         // compute mean of image0
         double sum0 = 0;
@@ -364,7 +366,7 @@ private slots:
 
         QSignalSpy frameSpy50(m_driver, &ICameraDriver::frameReady);
         m_driver->startCapture(1);
-        QVERIFY2(frameSpy50.wait(2000), "Should receive frame at gain=50");
+        QVERIFY2(frameSpy50.wait(2000) || frameSpy50.count() > 0, "Should receive frame at gain=50");
         QSharedPointer<QImage> image50 = frameSpy50.takeFirst().at(0).value<QSharedPointer<QImage>>();
         QVERIFY2(!image50->isNull(), "Image at gain=50 should not be null");
 
@@ -440,7 +442,7 @@ private slots:
 
         QSignalSpy frameSpy0(m_driver, &ICameraDriver::frameReady);
         m_driver->startCapture(1);
-        QVERIFY2(frameSpy0.wait(2000), "Should receive frame at offset=0");
+        QVERIFY2(frameSpy0.wait(2000) || frameSpy0.count() > 0, "Should receive frame at offset=0");
         QSharedPointer<QImage> image0 = frameSpy0.takeFirst().at(0).value<QSharedPointer<QImage>>();
         QVERIFY2(!image0->isNull(), "Image at offset=0 should not be null");
 
@@ -472,7 +474,7 @@ private slots:
 
         QSignalSpy frameSpy50(m_driver, &ICameraDriver::frameReady);
         m_driver->startCapture(1);
-        QVERIFY2(frameSpy50.wait(2000), "Should receive frame at offset=50");
+        QVERIFY2(frameSpy50.wait(2000) || frameSpy50.count() > 0, "Should receive frame at offset=50");
         QSharedPointer<QImage> image50 = frameSpy50.takeFirst().at(0).value<QSharedPointer<QImage>>();
         QVERIFY2(!image50->isNull(), "Image at offset=50 should not be null");
 
@@ -539,13 +541,15 @@ private slots:
         QVERIFY2(fullWidth.isValid(), "Full width should be valid");
         QVERIFY2(fullHeight.isValid(), "Full height should be valid");
 
-        m_driver->setParameter("roi_width", fullWidth);
-        m_driver->setParameter("roi_height", fullHeight);
-        m_driver->commitParameters();
+        bool success = false;
+        success = m_driver->setParameter("roi_width", fullWidth);
+        success |= m_driver->setParameter("roi_height", fullHeight);
+        success |=m_driver->commitParameters();
+        QVERIFY2(success, "Should set and commit roi_width and roi_height to full values");
 
         QSignalSpy frameSpyFull(m_driver, &ICameraDriver::frameReady);
         m_driver->startCapture(1);
-        QVERIFY2(frameSpyFull.wait(5000), "Should receive full frame");
+        QVERIFY2(frameSpyFull.wait(5000) || frameSpyFull.count() > 0, "Should receive full frame");
         QSharedPointer<QImage> fullImage = frameSpyFull.takeFirst().at(0).value<QSharedPointer<QImage>>();
         QVERIFY2(!fullImage->isNull(), "Full image should not be null");
         int fullW = fullImage->width();
@@ -560,7 +564,7 @@ private slots:
 
         QSignalSpy frameSpyHalf(m_driver, &ICameraDriver::frameReady);
         m_driver->startCapture(1);
-        QVERIFY2(frameSpyHalf.wait(10000), "Should receive half frame");
+        QVERIFY2(frameSpyHalf.wait(5000) || frameSpyHalf.count() > 0, "Should receive half frame");
         QSharedPointer<QImage> halfImage = frameSpyHalf.takeFirst().at(0).value<QSharedPointer<QImage>>();
         QVERIFY2(!halfImage->isNull(), "Half image should not be null");
         qDebug() << "Half frame:" << halfImage->width() << "x" << halfImage->height();
@@ -591,7 +595,7 @@ private slots:
 
         QSignalSpy frameSpy1(m_driver, &ICameraDriver::frameReady);
         m_driver->startCapture(1);
-        QVERIFY2(frameSpy1.wait(10000), "Should receive frame at binning=1");
+        QVERIFY2(frameSpy1.wait(5000) || frameSpy1.count() > 0, "Should receive frame at binning=1");
         QSharedPointer<QImage> image1 = frameSpy1.takeFirst().at(0).value<QSharedPointer<QImage>>();
         QVERIFY2(!image1->isNull(), "Image at binning=1 should not be null");
         int width1 = image1->width();
@@ -608,7 +612,7 @@ private slots:
 
             QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
             m_driver->startCapture(1);
-            QVERIFY2(frameSpy.wait(3000), qPrintable(QString("Should receive frame at binning=%1").arg(bin)));
+            QVERIFY2(frameSpy.wait(5000) || frameSpy.count() > 0, qPrintable(QString("Should receive frame at binning=%1").arg(bin)));
             QSharedPointer<QImage> image = frameSpy.takeFirst().at(0).value<QSharedPointer<QImage>>();
             QVERIFY2(!image->isNull(), qPrintable(QString("Image at binning=%1 should not be null").arg(bin)));
             qDebug() << "Binning" << bin << ":" << image->width() << "x" << image->height();

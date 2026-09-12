@@ -1416,8 +1416,19 @@ void QHYCCDDriver::captureLoop()
             }
         }
         if(m_parameters["stream_mode"] == "Single Frame"){
-            ExpQHYCCDSingleFrame(m_cameraHandle);
+            // int retryCount = 0;
+            ret = ExpQHYCCDSingleFrame(m_cameraHandle);
+            // while(retryCount++ < 100 && ret != QHYCCD_SUCCESS){
+            //     QThread::msleep(10);
+            //     ret = ExpQHYCCDSingleFrame(m_cameraHandle);
+            // }
+
+            // retryCount = 0;
             ret = GetQHYCCDSingleFrame(m_cameraHandle, &width, &height, &bpp, &channels, m_frameBuffer.data());
+            // while(retryCount++ < 100 && ret != QHYCCD_SUCCESS){
+            //     QThread::msleep(10);
+            //     ret = GetQHYCCDSingleFrame(m_cameraHandle, &width, &height, &bpp, &channels, m_frameBuffer.data());
+            // }
 
             if (ret != QHYCCD_SUCCESS) {
                 DRIVER_DEBUG << "Failed to get frame (" << m_framesAcquired << "): " << ret;
