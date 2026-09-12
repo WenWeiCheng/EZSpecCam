@@ -348,7 +348,7 @@ struct CameraError
 
     Code code = Code::None;
     Severity severity = Severity::Info;
-    QString parameterName;
+    QStringList failedParameters;  ///< Names of parameters that failed during a batched set/commit
     QString description;
     bool recoverable = true;
 
@@ -357,19 +357,21 @@ struct CameraError
     static CameraError success() { return CameraError(); }
 
     static CameraError makeError(Code errorCode, const QString &errorDescription,
-                                 Severity errorSeverity = Severity::Error)
+                                 Severity errorSeverity = Severity::Error,
+                                 QStringList failedParameters = {})
     {
         CameraError error;
         error.code = errorCode;
         error.description = errorDescription;
         error.severity = errorSeverity;
+        error.failedParameters = std::move(failedParameters);
         return error;
     }
 
     bool operator==(const CameraError &other) const
     {
         return code == other.code && severity == other.severity &&
-               parameterName == other.parameterName && description == other.description &&
+               failedParameters == other.failedParameters && description == other.description &&
                recoverable == other.recoverable;
     }
 

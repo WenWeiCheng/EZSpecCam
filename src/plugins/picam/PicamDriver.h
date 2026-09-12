@@ -67,10 +67,12 @@ public:
     QStringList parameterNames() const override;
     ParameterDefinition parameter(const QString &name) const override;
     QVariant parameterValue(const QString &name) const override;
-    bool setParameter(const QString &name, const QVariant &value) override;
+    bool setParameter(const QString &name, const QVariant &value,
+                      QStringList *failedParameters = nullptr) override;
+    bool setParameters(const QVariantMap &parameters,
+                       QStringList *failedParameters = nullptr) override;
     bool validateParameters() override;
-    bool commitParameters() override;
-
+    bool commitParameters(QStringList *failedParameters = nullptr) override;
     // ——— Capture ———
     bool startCapture(int captureCount = 0) override;
     void stopCapture(int timeoutMs = 5000) override;

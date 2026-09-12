@@ -52,15 +52,20 @@ protected slots:
     void onScanProgress(int current, int total, const QString &currentFile);
     void onScanStarted();
     void onScanCompleted(int totalPlugins, int loadedPlugins);
+    void onSetParametersFinished(const QStringList &failedParameters);
+    void onCommitParametersFinished(const QStringList &failedParameters);
 
 private:
     void updateConnectionState();
     void clearDynamicParameterPanel();
     void applyCaptureMode();
     void rebuildParameterWidget(const QString &paramName);
+    void restoreWidgetsFromConfig(const QVariantMap &config, const QStringList &onlyNames = QStringList());
+    void refreshCommittedConfigFromController();
 
     QPointer<AppController> m_appController;
     QVariantMap m_bufferedConfig;
+    QVariantMap m_committedConfig;
 
     QHash<QString, QWidget*> m_parameterWidgets;
     QMap<ParameterCategory, QGroupBox*> m_categoryGroups;

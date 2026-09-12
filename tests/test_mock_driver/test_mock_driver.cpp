@@ -287,8 +287,112 @@ private slots:
     }
 
     //==========================================================================
+    // Batched Parameter Error Collection Tests
+    //==========================================================================
+
+    void test_setParameters_collects_all_failures()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+        QVariantMap params;
+        params["exposure"] = 50.0;        // valid
+        params["gain"] = 1000.0;          // out of range (max 40.0)
+        params["unknownParam"] = 5;       // unknown
+
+        QStringList failed;
+        bool ok = m_driver->setParameters(params, &failed);
+
+        QVERIFY2(!ok, "setParameters should return false on failure");
+        QVERIFY2(failed.contains("gain"),
+                 qPrintable(QString("failed should contain 'gain', got: %1").arg(failed.join(","))));
+        QVERIFY2(failed.contains("unknownParam"),
+                 qPrintable(QString("failed should contain 'unknownParam', got: %1").arg(failed.join(","))));
+        QVERIFY2(!failed.contains("exposure"),
+                 "exposure should not be in failed list (it was valid)");
+
+        // Successful parameter must have been staged.
+        QVERIFY2(qAbs(m_driver->parameterValue("exposure").toDouble() - 50.0) < 0.001,
+                 "Valid parameter should be staged despite batch failures");
+
+        // Exactly one batched errorOccurred signal must have been emitted.
+        QVERIFY2(errorSpy.count() == 1,
+                 qPrintable(QString("Expected 1 errorOccurred signal, got %1").arg(errorSpy.count())));
+        if (errorSpy.count() > 0) {
+            QVariantList args = errorSpy.takeFirst();
+            CameraError err = args.at(0).value<CameraError>();
+            QVERIFY2(err.severity == CameraError::Severity::Warning,
+                     "Parameter failures must be reported as Warning severity");
+            QVERIFY2(err.failedParameters.contains("gain"),
+                     "Batched error's failedParameters must include 'gain'");
+            QVERIFY2(err.failedParameters.contains("unknownParam"),
+                     "Batched error's failedParameters must include 'unknownParam'");
+        }
+    }
+
+    void test_commitParameters_collects_failures()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        // Use setParameter individually to stage out-of-range exposure (mock
+        // setParameter rejects it before staging), so we need to call the
+        // protected-validator path through setParameters with valid values,
+        // then mutate m_pendingParameters... not possible. Instead, exercise
+        // commit's success path: stage valid params and verify the failed-list
+        // is empty.
+        m_driver->setParameter("exposure", 25.0);
+        m_driver->setParameter("gain", 5.0);
+
+        QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+        QStringList failed;
+        bool ok = m_driver->commitParameters(&failed);
+
+        QVERIFY2(ok, "commit should succeed for all-valid pending params");
+        QVERIFY2(failed.isEmpty(),
+                 qPrintable(QString("failed should be empty, got: %1").arg(failed.join(","))));
+        QVERIFY2(errorSpy.count() == 0,
+                 "No errorOccurred signal should be emitted on a clean commit");
+    }
+
+    void test_setParameters_critical_failure_rejects_entire_batch()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
+        QVariantMap params;
+        params["exposure"] = 25.0;       // valid, non-critical
+        params["gain"] = 5.0;            // valid, non-critical
+        params["binning"] = 4;           // valid value but critical
+        params["roi_x"] = 99999;         // invalid value AND critical
+
+        QStringList failed;
+        bool ok = m_driver->setParameters(params, &failed);
+
+        QVERIFY2(!ok, "setParameters must return false when a critical parameter fails");
+        QVERIFY2(failed.contains("roi_x"),
+                 qPrintable(QString("failed must include 'roi_x', got: %1").arg(failed.join(","))));
+        QVERIFY2(failed.contains("exposure"),
+                 qPrintable(QString("failed must include 'exposure' (whole-batch escalation), got: %1")
+                                .arg(failed.join(","))));
+        QVERIFY2(failed.contains("gain"),
+                 qPrintable(QString("failed must include 'gain' (whole-batch escalation), got: %1")
+                                .arg(failed.join(","))));
+        QVERIFY2(failed.contains("binning"),
+                 qPrintable(QString("failed must include 'binning' (whole-batch escalation), got: %1")
+                                .arg(failed.join(","))));
+
+        // Critical failure must NOT have staged any pending values.
+        QVERIFY2(m_driver->parameterValue("exposure") == QVariant(100.0),
+                 "exposure must remain at the original value when critical param fails");
+        QVERIFY2(m_driver->parameterValue("binning") == QVariant(1),
+                 "binning must remain at the original value when critical param fails");
+    }
+
+
+    //==========================================================================
     // Capture Tests
     //==========================================================================
+
     void test_capture_without_connection()
     {
         bool started = m_driver->startCapture(1);

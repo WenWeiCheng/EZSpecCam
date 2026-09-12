@@ -111,12 +111,34 @@ public:
      * @brief Set a parameter to a new value.
      * @param name Parameter identifier.
      * @param value New value to assign.
-     * @return true if the value was accepted, false otherwise (e.g., out of range).
+     * @param failedParameters Optional output list; when non-null and the value is
+     *        rejected, the parameter name is appended to this list.
+     * @return true if the value was accepted, false otherwise.
      *
-     * The driver may emit errorOccurred if the value is invalid.
+     * On rejection the driver emits errorOccurred carrying Severity::Warning with
+     * the parameter name in failedParameters. Drivers MUST NOT emit Severity::Error
+     * or higher from this path.
      * Changes may be staged until commitParameters() is called.
      */
-    virtual bool setParameter(const QString &name, const QVariant &value) = 0;
+    virtual bool setParameter(const QString &name, const QVariant &value,
+                              QStringList *failedParameters = nullptr) = 0;
+
+    /**
+     * @brief Stage a batch of parameters at once.
+     * @param parameters Map of name -> value pairs.
+     * @param failedParameters Optional output list; when non-null, names that
+     *        failed validation are appended (does not include parameters that
+     *        passed validation but later fail at commit time).
+     * @return true if all parameters were staged successfully.
+     *
+     * Drivers iterate the map, validate each entry against its constraints, and
+     * collect failures into *failedParameters. On any rejection the driver emits
+     * a single errorOccurred carrying Severity::Warning with the failed names in
+     * failedParameters; the driver never emits Severity::Error or higher from
+     * this path.
+     */
+    virtual bool setParameters(const QVariantMap &parameters,
+                               QStringList *failedParameters = nullptr) = 0;
 
     /**
      * @brief Validate all current parameter values.
@@ -129,13 +151,19 @@ public:
 
     /**
      * @brief Commit all staged parameter changes to the camera.
-     * @return true if all changes were successfully applied, false otherwise.
+     * @param failedParameters Optional output list; when non-null, names that
+     *        the hardware rejected are appended.
+     * @return true if every staged parameter was applied successfully.
      *
-     * Some drivers may stage changes locally until commit is called.
-     * After commit, parameters should reflect the new values.
+     * Drivers drive every staged parameter; per-parameter hardware failures are
+     * accumulated into *failedParameters (when non-null) rather than causing an
+     * early return. A single errorOccurred carrying Severity::Warning is emitted
+     * with the accumulated names in failedParameters when any parameter failed.
+     * True hardware faults (SDK open failure, ROI validation crash, etc.) may
+     * still emit Severity::Error and short-circuit. Severity::Fatal is never
+     * emitted from this path.
      */
-    virtual bool commitParameters() = 0;
-
+    virtual bool commitParameters(QStringList *failedParameters = nullptr) = 0;
     // ——— Capture ———
 
     /**

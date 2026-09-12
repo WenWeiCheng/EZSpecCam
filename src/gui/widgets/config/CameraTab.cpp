@@ -68,15 +68,19 @@ void CameraTab::setAppController(AppController *controller)
                 this, [this](const QString &, const QString &) {
             m_lastScanFailed++;
         });
+        connect(controller, &AppController::setParametersFinished,
+                this, &CameraTab::onSetParametersFinished);
+        connect(controller, &AppController::commitParametersFinished,
+                this, &CameraTab::onCommitParametersFinished);
 
         if (controller->isConnected()) {
             setBufferedConfig(controller->allParameters());
+            m_committedConfig = controller->allParameters();
             updateConnectionState();
             buildDynamicParameterPanel();
             m_coolingTimer->start(100);
         }
     }
-
     updateConnectionState();
 }
 
@@ -542,4 +546,67 @@ void CameraTab::onParametersCommitted()
             }
         }
     }
+}
+
+void CameraTab::onSetParametersFinished(const QStringList &failedParameters)
+{
+    if (!failedParameters.isEmpty()) {
+        if (ui && ui->m_statusLabel) {
+            ui->m_statusLabel->setText(tr("Invalid parameters: %1")
+                .arg(failedParameters.join(", ")));
+            ui->m_statusLabel->setVisible(true);
+        }
+        restoreWidgetsFromConfig(m_committedConfig, failedParameters);
+    }
+}
+
+void CameraTab::onCommitParametersFinished(const QStringList &failedParameters)
+{
+    if (ui && ui->m_statusLabel) {
+        if (failedParameters.isEmpty()) {
+            ui->m_statusLabel->setVisible(false);
+        } else {
+            ui->m_statusLabel->setText(tr("Camera rejected: %1")
+                .arg(failedParameters.join(", ")));
+            ui->m_statusLabel->setVisible(true);
+        }
+    }
+
+    if (failedParameters.isEmpty()) {
+        refreshCommittedConfigFromController();
+    } else {
+        restoreWidgetsFromConfig(m_committedConfig, failedParameters);
+    }
+
+    onParametersCommitted();
+}
+
+void CameraTab::restoreWidgetsFromConfig(const QVariantMap &config, const QStringList &onlyNames)
+{
+    const bool onlyFilter = !onlyNames.isEmpty();
+    for (auto it = m_parameterWidgets.constBegin(); it != m_parameterWidgets.constEnd(); ++it) {
+        const QString &name = it.key();
+        if (onlyFilter && !onlyNames.contains(name)) {
+            continue;
+        }
+        QWidget *widget = it.value();
+        if (!widget || !m_parameterDefinitions.contains(name)) {
+            continue;
+        }
+        const ParameterDefinition &def = m_parameterDefinitions.value(name);
+        if (def.isReadOnly) {
+            continue;
+        }
+        QVariant value = config.value(name, def.defaultValue);
+        ParameterWidgetFactory::setWidgetValue(widget, value, def);
+    }
+}
+
+void CameraTab::refreshCommittedConfigFromController()
+{
+    if (!m_appController) {
+        return;
+    }
+    m_committedConfig = m_appController->allParameters();
+    setBufferedConfig(m_committedConfig);
 }

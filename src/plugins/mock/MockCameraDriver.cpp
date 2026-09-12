@@ -7,8 +7,9 @@
 #include <QDebug>
 #include <cmath>
 #include <cstring>
+#include <QSet>
 
-Q_LOGGING_CATEGORY(parameterCategory, "Parameter")
+ Q_LOGGING_CATEGORY(parameterCategory, "Parameter")
 Q_LOGGING_CATEGORY(cameraCategory, "Camera")
 Q_LOGGING_CATEGORY(configCategory, "Config")
 Q_LOGGING_CATEGORY(displayCategory, "Display")
@@ -140,15 +141,30 @@ QVariant MockCameraDriver::parameterValue(const QString &name) const
     return m_parameters.value(name);
 }
 
-bool MockCameraDriver::setParameter(const QString &name, const QVariant &value)
+namespace {
+const QSet<QString> &mockCriticalParameters()
+{
+    static const QSet<QString> set = {
+        "binning", "roi_x", "roi_y", "roi_width", "roi_height"
+    };
+    return set;
+}
+}
+
+bool MockCameraDriver::setParameter(const QString &name, const QVariant &value,
+                                    QStringList *failedParameters)
 {
     QMutexLocker locker(&m_mutex);
 
     if (!m_parameterDefinitions.contains(name)) {
-        m_lastError = CameraError::makeError(
+        if (failedParameters) {
+            failedParameters->append(name);
+        }
+        emit errorOccurred(CameraError::makeError(
             CameraError::Code::InvalidParameter,
-            QString("Unknown parameter: %1").arg(name));
-        emit errorOccurred(m_lastError);
+            QString("Unknown parameter: %1").arg(name),
+            CameraError::Severity::Warning,
+            QStringList{ name }));
         return false;
     }
 
@@ -159,15 +175,98 @@ bool MockCameraDriver::setParameter(const QString &name, const QVariant &value)
     }
 
     if (!validateValue(value, def)) {
-        m_lastError = CameraError::makeError(
+        if (failedParameters) {
+            failedParameters->append(name);
+        }
+        emit errorOccurred(CameraError::makeError(
             CameraError::Code::ValueOutOfRange,
-            QString("Invalid value for parameter: %1").arg(name));
-        emit errorOccurred(m_lastError);
+            QString("Invalid value for parameter: %1").arg(name),
+            CameraError::Severity::Warning,
+            QStringList{ name }));
         return false;
     }
 
     m_pendingParameters.insert(name, value);
     return true;
+}
+
+bool MockCameraDriver::setParameters(const QVariantMap &parameters,
+                                     QStringList *failedParameters)
+{
+    QMutexLocker locker(&m_mutex);
+
+    QStringList localFailed;
+    QStringList criticalFailure;
+    QStringList namesInOrder;
+    namesInOrder.reserve(parameters.size());
+
+    for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
+        const QString &name = it.key();
+        const QVariant &value = it.value();
+        namesInOrder.append(name);
+
+        if (!m_parameterDefinitions.contains(name)) {
+            localFailed.append(name);
+            if (mockCriticalParameters().contains(name)) {
+                criticalFailure.append(name);
+            }
+            continue;
+        }
+
+        const ParameterDefinition &def = m_parameterDefinitions.value(name);
+        if (def.isReadOnly) {
+            continue;
+        }
+
+        if (!validateValue(value, def)) {
+            localFailed.append(name);
+            if (mockCriticalParameters().contains(name)) {
+                criticalFailure.append(name);
+            }
+            continue;
+        }
+    }
+
+    if (!criticalFailure.isEmpty()) {
+        QStringList allFailed;
+        for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
+            const QString &name = it.key();
+            const ParameterDefinition &def = m_parameterDefinitions.value(name);
+            if (!def.isReadOnly && !allFailed.contains(name)) {
+                allFailed.append(name);
+            }
+        }
+        QString desc = QString("Failed to set parameters: critical parameter(s) "
+                               "%1 failed; the entire batch was rejected to keep "
+                               "the camera geometry consistent. Failed: %2")
+                           .arg(criticalFailure.join(", "), allFailed.join(", "));
+        if (failedParameters) {
+            failedParameters->append(allFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::InvalidParameter, desc,
+            CameraError::Severity::Error, allFailed));
+        return false;
+    }
+
+    for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
+        if (!localFailed.contains(it.key())) {
+            m_pendingParameters.insert(it.key(), it.value());
+        }
+    }
+
+    if (!localFailed.isEmpty()) {
+        if (failedParameters) {
+            failedParameters->append(localFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::InvalidParameter,
+            QString("Failed to set parameters: %1").arg(localFailed.join(", ")),
+            CameraError::Severity::Warning,
+            localFailed));
+    }
+
+    return localFailed.isEmpty();
 }
 
 bool MockCameraDriver::validateParameters()
@@ -191,33 +290,75 @@ bool MockCameraDriver::validateParameters()
     return true;
 }
 
-bool MockCameraDriver::commitParameters()
+bool MockCameraDriver::commitParameters(QStringList *failedParameters)
 {
     QMutexLocker locker(&m_mutex);
+
+    QStringList localFailed;
+    QStringList criticalFailure;
+
+    // Snapshot pending keys so we can escalate every one of them to "failed"
+    // when a critical parameter fails the second-pass validate.
+    QStringList pendingSnapshot;
+    for (auto it = m_pendingParameters.constBegin(); it != m_pendingParameters.constEnd(); ++it) {
+        pendingSnapshot.append(it.key());
+    }
 
     for (auto it = m_pendingParameters.constBegin(); it != m_pendingParameters.constEnd(); ++it) {
         const QString &name = it.key();
         const QVariant &value = it.value();
 
         if (!m_parameterDefinitions.contains(name)) {
-            m_lastError = CameraError::makeError(
-                CameraError::Code::CommitFailed,
-                "Parameter validation failed during commit");
-            emit errorOccurred(m_lastError);
-            m_pendingParameters.clear();
-            return false;
+            localFailed.append(name);
+            if (mockCriticalParameters().contains(name)) {
+                criticalFailure.append(name);
+            }
+            continue;
         }
 
         const ParameterDefinition &def = m_parameterDefinitions.value(name);
         if (!validateValue(value, def)) {
-            m_lastError = CameraError::makeError(
-                CameraError::Code::CommitFailed,
-                QString("Invalid value for parameter: %1").arg(name));
-            emit errorOccurred(m_lastError);
-            m_pendingParameters.clear();
-            return false;
+            localFailed.append(name);
+            if (mockCriticalParameters().contains(name)) {
+                criticalFailure.append(name);
+            }
+            continue;
         }
+    }
 
+    if (!criticalFailure.isEmpty()) {
+        QStringList allFailed = pendingSnapshot;
+        QString desc = QString("Failed to commit parameters: critical parameter(s) "
+                               "%1 failed; the entire batch was rejected to keep "
+                               "the camera geometry consistent. Failed: %2")
+                           .arg(criticalFailure.join(", "), allFailed.join(", "));
+        if (failedParameters) {
+            failedParameters->append(allFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::CommitFailed, desc,
+            CameraError::Severity::Error, allFailed));
+        m_pendingParameters.clear();
+        return false;
+    }
+
+    if (!localFailed.isEmpty()) {
+        if (failedParameters) {
+            failedParameters->append(localFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::CommitFailed,
+            QString("Failed to commit parameters: %1").arg(localFailed.join(", ")),
+            CameraError::Severity::Warning,
+            localFailed));
+
+        // Drop only the failed keys; merge the rest.
+        for (const QString &name : localFailed) {
+            m_pendingParameters.remove(name);
+        }
+        m_parameters.insert(m_pendingParameters);
+        m_pendingParameters.clear();
+        return false;
     }
 
     if(!m_pendingParameters.isEmpty()){

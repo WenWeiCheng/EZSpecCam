@@ -292,15 +292,20 @@ QVariant PicamDriver::parameterValue(const QString &name) const
     return QVariant();
 }
 
-bool PicamDriver::setParameter(const QString &name, const QVariant &value)
+bool PicamDriver::setParameter(const QString &name, const QVariant &value,
+                               QStringList *failedParameters)
 {
     QMutexLocker locker(&m_mutex);
 
     if (!m_parameterDefinitions.contains(name)) {
-        m_lastError = CameraError::makeError(
+        if (failedParameters) {
+            failedParameters->append(name);
+        }
+        emit errorOccurred(CameraError::makeError(
             CameraError::Code::InvalidParameter,
-            QString("Unknown parameter: %1").arg(name));
-        emit errorOccurred(m_lastError);
+            QString("Unknown parameter: %1").arg(name),
+            CameraError::Severity::Warning,
+            QStringList{ name }));
         return false;
     }
 
@@ -311,10 +316,14 @@ bool PicamDriver::setParameter(const QString &name, const QVariant &value)
     }
 
     if (!validate(value, def.constraint, def.type)) {
-        m_lastError = CameraError::makeError(
+        if (failedParameters) {
+            failedParameters->append(name);
+        }
+        emit errorOccurred(CameraError::makeError(
             CameraError::Code::InvalidParameter,
-            QString("Invalid value for %1").arg(name));
-        emit errorOccurred(m_lastError);
+            QString("Invalid value for %1").arg(name),
+            CameraError::Severity::Warning,
+            QStringList{ name }));
         return false;
     }
 
@@ -326,6 +335,93 @@ bool PicamDriver::setParameter(const QString &name, const QVariant &value)
 
     m_pendingParameters.insert(name, value);
     return true;
+}
+
+bool PicamDriver::setParameters(const QVariantMap &parameters,
+                                QStringList *failedParameters)
+{
+    QMutexLocker locker(&m_mutex);
+
+    QStringList localFailed;
+    QStringList criticalFailure;
+
+    for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
+        const QString &name = it.key();
+        const QVariant &value = it.value();
+
+        if (!m_parameterDefinitions.contains(name)) {
+            localFailed.append(name);
+            if (isRoiSubParam(name)) {
+                criticalFailure.append(name);
+            }
+            continue;
+        }
+
+        const ParameterDefinition &def = m_parameterDefinitions.value(name);
+        if (def.isReadOnly) {
+            continue;
+        }
+
+        if (!validate(value, def.constraint, def.type)) {
+            localFailed.append(name);
+            if (isRoiSubParam(name)) {
+                criticalFailure.append(name);
+            }
+            continue;
+        }
+    }
+
+    // ROI is the only critical parameter group for PICam: if any ROI sub-param
+    // fails validation, reject the whole batch.
+    if (!criticalFailure.isEmpty()) {
+        QStringList allFailed;
+        for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
+            const QString &name = it.key();
+            const ParameterDefinition &def = m_parameterDefinitions.value(name);
+            if (!def.isReadOnly && !allFailed.contains(name)) {
+                allFailed.append(name);
+            }
+        }
+        QString desc = QString("Failed to set parameters: critical ROI parameter(s) "
+                               "%1 failed; the entire batch was rejected. "
+                               "Failed: %2")
+                           .arg(criticalFailure.join(", "), allFailed.join(", "));
+        if (failedParameters) {
+            failedParameters->append(allFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::InvalidParameter, desc,
+            CameraError::Severity::Error, allFailed));
+        return false;
+    }
+
+    for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
+        if (localFailed.contains(it.key())) {
+            continue;
+        }
+        const QString &name = it.key();
+        const QVariant &value = it.value();
+
+        if (isRoiSubParam(name)) {
+            setRoiSubValue(name, value);
+            m_roiDirty = true;
+        }
+
+        m_pendingParameters.insert(name, value);
+    }
+
+    if (!localFailed.isEmpty()) {
+        if (failedParameters) {
+            failedParameters->append(localFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::InvalidParameter,
+            QString("Failed to set parameters: %1").arg(localFailed.join(", ")),
+            CameraError::Severity::Warning,
+            localFailed));
+    }
+
+    return localFailed.isEmpty();
 }
 
 bool PicamDriver::validateParameters()
@@ -348,13 +444,22 @@ bool PicamDriver::validateParameters()
     }
     return true;
 }
-
-bool PicamDriver::commitParameters()
+bool PicamDriver::commitParameters(QStringList *failedParameters)
 {
     QMutexLocker locker(&m_mutex);
 
     if (m_handle == nullptr) {
         return false;
+    }
+
+    QStringList localFailed;
+    bool criticalRoiFailed = false;
+
+    // Snapshot pending keys so we can escalate every one of them to "failed"
+    // when the ROI commit fails.
+    QStringList pendingSnapshot;
+    for (auto it = m_pendingParameters.constBegin(); it != m_pendingParameters.constEnd(); ++it) {
+        pendingSnapshot.append(it.key());
     }
 
     if (m_roiDirty) {
@@ -366,15 +471,30 @@ bool PicamDriver::commitParameters()
             m_handle, PicamParameter_Rois, &rois);
         if (err != PicamError_None) {
             m_lastError = CameraError::makeError(
-                CameraError::Code::CommitFailed,
-                QString("Failed to set ROI: %1").arg(err));
+                CameraError::Code::HardwareFault,
+                QString("Failed to set ROI: %1").arg(err),
+                CameraError::Severity::Error);
             emit errorOccurred(m_lastError);
+
+            // Critical failure: ROI is the geometry-defining parameter group.
+            // Reject the entire pending batch so callers can revert UI.
+            QStringList allFailed = pendingSnapshot;
+            QString desc = QString("Failed to commit parameters: critical ROI "
+                                   "parameter(s) failed (code %1); the entire "
+                                   "batch was rejected. Failed: %2")
+                               .arg(err)
+                               .arg(allFailed.join(", "));
+            if (failedParameters) {
+                failedParameters->append(allFailed);
+            }
+            emit errorOccurred(CameraError::makeError(
+                CameraError::Code::CommitFailed, desc,
+                CameraError::Severity::Error, allFailed));
+            m_pendingParameters.clear();
             return false;
         }
         m_roiDirty = false;
     }
-
-    bool hasPendingError = false;
 
     for (auto it = m_pendingParameters.constBegin(); it != m_pendingParameters.constEnd(); ++it) {
         const QString& name = it.key();
@@ -415,36 +535,56 @@ bool PicamDriver::commitParameters()
 
         if (err != PicamError_None) {
             qCWarning(parameterCategory) << "Failed to set" << name << ":" << err;
-            m_lastError = CameraError::makeError(
-                CameraError::Code::CommitFailed,
-                QString("Failed to set parameter %1: %2").arg(name).arg(err),
-                CameraError::Severity::Warning);
-            emit errorOccurred(m_lastError);
-            hasPendingError = true;
+            localFailed.append(name);
         }
     }
 
-    const PicamParameter* failedParams = nullptr;
-    piint failedCount = 0;
-    PicamError err = Picam_CommitParameters(m_handle, &failedParams, &failedCount);
+    const PicamParameter* sdkFailedParams = nullptr;
+    piint sdkFailedCount = 0;
+    PicamError err = Picam_CommitParameters(m_handle, &sdkFailedParams, &sdkFailedCount);
 
     if (err != PicamError_None) {
-        if(failedCount > 0 && failedParams != nullptr) {
-            QStringList failedParamNames;
-            for(int i=0; i<failedCount; ++i) {
-                const PicamParameter& p = failedParams[i];
-                const PicamParameterRecord* rcd = findByPicamParam(p);
+        if (sdkFailedCount > 0 && sdkFailedParams != nullptr) {
+            for (piint i = 0; i < sdkFailedCount; ++i) {
+                const PicamParameter &p = sdkFailedParams[i];
+                const PicamParameterRecord *rcd = findByPicamParam(p);
                 QString paramName = rcd ? rcd->displayName : QString("UnknownParam");
+                if (!localFailed.contains(paramName)) {
+                    localFailed.append(paramName);
+                }
                 DRIVER_DEBUG << "Parameter commit failed for: " << paramName << " (PICAM param: " << p << ")";
-                failedParamNames.append(paramName);
             }
-            m_lastError = CameraError::makeError(
-                CameraError::Code::CommitFailed,
-                QString("Commit failed: %1 (%2 params failed)").arg(err).arg(failedParamNames.join(", ")));
-            Picam_DestroyParameters(failedParams);
+            Picam_DestroyParameters(sdkFailedParams);
         }
-        emit errorOccurred(m_lastError);
+    }
+
+    if (criticalRoiFailed) {
+        QStringList allFailed = pendingSnapshot;
+        if (failedParameters) {
+            failedParameters->append(allFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::CommitFailed,
+            QString("Failed to commit parameters: critical ROI parameter(s) failed; "
+                    "the entire batch was rejected. Failed: %1")
+                .arg(allFailed.join(", ")),
+            CameraError::Severity::Error, allFailed));
+        m_pendingParameters.clear();
         return false;
+    }
+
+    if (!localFailed.isEmpty()) {
+        if (failedParameters) {
+            failedParameters->append(localFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::CommitFailed,
+            QString("Failed to commit parameters: %1").arg(localFailed.join(", ")),
+            CameraError::Severity::Warning,
+            localFailed));
+        for (const QString &name : localFailed) {
+            m_pendingParameters.remove(name);
+        }
     }
 
     for (auto it = m_pendingParameters.constBegin(); it != m_pendingParameters.constEnd(); ++it) {
@@ -454,12 +594,8 @@ bool PicamDriver::commitParameters()
 
     syncAllValuesFromHardware();
 
-    return !hasPendingError;
+    return localFailed.isEmpty();
 }
-
-//==============================================================================
-// Capture
-//==============================================================================
 
 bool PicamDriver::startCapture(int captureCount)
 {

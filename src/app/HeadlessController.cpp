@@ -126,10 +126,13 @@ int runSequence(ICameraDriver *driver, const HeadlessOptions &opts,
                 if (!driver->setParameter(it.key(), it.value()))
                     qWarning().noquote() << "  Failed to set" << it.key();
             }
-            if (!driver->commitParameters())
-                qWarning() << "  Failed to commit parameters";
+            {
+                QStringList commitFailed;
+                driver->commitParameters(&commitFailed);
+                if (!commitFailed.isEmpty())
+                    qWarning() << "  Failed to commit parameters:" << commitFailed.join(", ");
+            }
             break;
-        case SequenceStep::Capture:
         {
             QString outDir = step.outputDir.isEmpty()    ? opts.outputDir         : step.outputDir;
             QString ext    = step.outputExtension.isEmpty() ? opts.outputExtension : step.outputExtension;
@@ -178,14 +181,12 @@ int run(const HeadlessOptions &opts)
 
     if (opts.listParams) { listParameters(driver); driver->disconnectCamera(); return 0; }
 
-    for (auto it = opts.setParameters.constBegin(); it != opts.setParameters.constEnd(); ++it)
     {
-        qInfo().noquote() << "Setting" << it.key() << "=" << it.value().toString();
-        if (!driver->setParameter(it.key(), it.value()))
-            qWarning().noquote() << "  Warning: setParameter returned false for" << it.key();
+        QStringList commitFailed;
+        driver->commitParameters(&commitFailed);
+        if (!commitFailed.isEmpty())
+            qWarning() << "Warning: commitParameters rejected parameters:" << commitFailed.join(", ");
     }
-    if (!opts.setParameters.isEmpty() && !driver->commitParameters())
-        qWarning() << "Warning: commitParameters returned false";
 
     int rc = 0;
     if (!opts.sequence.isEmpty())

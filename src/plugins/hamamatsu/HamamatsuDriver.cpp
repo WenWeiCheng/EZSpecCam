@@ -10,9 +10,9 @@
 #include <qtmetamacros.h>
 #include <qtypes.h>
 #include <qvariant.h>
+#include <QSet>
 
-Q_LOGGING_CATEGORY(parameterCategory, "Parameter")
-Q_LOGGING_CATEGORY(cameraCategory, "Camera")
+ Q_LOGGING_CATEGORY(parameterCategory, "Parameter")
 Q_LOGGING_CATEGORY(configCategory, "Config")
 Q_LOGGING_CATEGORY(displayCategory, "Display")
 Q_LOGGING_CATEGORY(captureCategory, "Capture")
@@ -475,14 +475,28 @@ QVariant HamamatsuDriver::parameterValue(const QString &name) const
     return QVariant();
 }
 
-bool HamamatsuDriver::setParameter(const QString &name, const QVariant &value)
+namespace {
+const QSet<QString> &hamamatsuCriticalParameters()
+{
+    static const QSet<QString> set = { "binning" };
+    return set;
+}
+}
+
+bool HamamatsuDriver::setParameter(const QString &name, const QVariant &value,
+                                   QStringList *failedParameters)
 {
     QMutexLocker locker(&m_mutex);
 
     if (!m_parameterDefinitions.contains(name)) {
+        if (failedParameters) {
+            failedParameters->append(name);
+        }
         emit errorOccurred(CameraError::makeError(
             CameraError::Code::InvalidParameter,
-            QString("Unknown parameter: %1").arg(name)));
+            QString("Unknown parameter: %1").arg(name),
+            CameraError::Severity::Warning,
+            QStringList{ name }));
         return false;
     }
 
@@ -493,14 +507,95 @@ bool HamamatsuDriver::setParameter(const QString &name, const QVariant &value)
     }
 
     if (!validate(value, def.constraint, def.type)) {
+        if (failedParameters) {
+            failedParameters->append(name);
+        }
         emit errorOccurred(CameraError::makeError(
             CameraError::Code::ValueOutOfRange,
-            QString("Invalid value for parameter: %1").arg(name)));
+            QString("Invalid value for parameter: %1").arg(name),
+            CameraError::Severity::Warning,
+            QStringList{ name }));
         return false;
     }
 
     m_pendingParameters.insert(name, value);
     return true;
+}
+
+bool HamamatsuDriver::setParameters(const QVariantMap &parameters,
+                                    QStringList *failedParameters)
+{
+    QMutexLocker locker(&m_mutex);
+
+    QStringList localFailed;
+    QStringList criticalFailure;
+
+    for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
+        const QString &name = it.key();
+        const QVariant &value = it.value();
+
+        if (!m_parameterDefinitions.contains(name)) {
+            localFailed.append(name);
+            if (hamamatsuCriticalParameters().contains(name)) {
+                criticalFailure.append(name);
+            }
+            continue;
+        }
+
+        const ParameterDefinition &def = m_parameterDefinitions.value(name);
+        if (def.isReadOnly) {
+            continue;
+        }
+
+        if (!validate(value, def.constraint, def.type)) {
+            localFailed.append(name);
+            if (hamamatsuCriticalParameters().contains(name)) {
+                criticalFailure.append(name);
+            }
+            continue;
+        }
+    }
+
+    if (!criticalFailure.isEmpty()) {
+        QStringList allFailed;
+        for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
+            const QString &name = it.key();
+            const ParameterDefinition &def = m_parameterDefinitions.value(name);
+            if (!def.isReadOnly && !allFailed.contains(name)) {
+                allFailed.append(name);
+            }
+        }
+        QString desc = QString("Failed to set parameters: critical parameter(s) "
+                               "%1 failed; the entire batch was rejected to keep "
+                               "the camera geometry consistent. Failed: %2")
+                           .arg(criticalFailure.join(", "), allFailed.join(", "));
+        if (failedParameters) {
+            failedParameters->append(allFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::InvalidParameter, desc,
+            CameraError::Severity::Error, allFailed));
+        return false;
+    }
+
+    for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
+        if (!localFailed.contains(it.key())) {
+            m_pendingParameters.insert(it.key(), it.value());
+        }
+    }
+
+    if (!localFailed.isEmpty()) {
+        if (failedParameters) {
+            failedParameters->append(localFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::InvalidParameter,
+            QString("Failed to set parameters: %1").arg(localFailed.join(", ")),
+            CameraError::Severity::Warning,
+            localFailed));
+    }
+
+    return localFailed.isEmpty();
 }
 
 bool HamamatsuDriver::validateParameters()
@@ -514,8 +609,9 @@ bool HamamatsuDriver::validateParameters()
         if (!m_parameterDefinitions.contains(name)) {
             emit errorOccurred(CameraError::makeError(
                 CameraError::Code::CommitFailed,
-                QString("Unknown parameter: %1").arg(name)));
-            m_pendingParameters.clear();
+                QString("Unknown parameter: %1").arg(name),
+                CameraError::Severity::Warning,
+                QStringList{ name }));
             return false;
         }
 
@@ -523,8 +619,9 @@ bool HamamatsuDriver::validateParameters()
         if (!validate(value, def.constraint, def.type)) {
             emit errorOccurred(CameraError::makeError(
                 CameraError::Code::CommitFailed,
-                QString("Invalid value for parameter: %1").arg(name)));
-            m_pendingParameters.clear();
+                QString("Invalid value for parameter: %1").arg(name),
+                CameraError::Severity::Warning,
+                QStringList{ name }));
             return false;
         }
     }
@@ -532,7 +629,7 @@ bool HamamatsuDriver::validateParameters()
     return true;
 }
 
-bool HamamatsuDriver::commitParameters()
+bool HamamatsuDriver::commitParameters(QStringList *failedParameters)
 {
     QMutexLocker locker(&m_mutex);
 
@@ -540,10 +637,19 @@ bool HamamatsuDriver::commitParameters()
         return false;
     }
 
-    // Validate first
-    if (!validateParameters()) {
-        return false;
+    // Snapshot pending keys so we can escalate every one of them to "failed"
+    // when a critical parameter fails.
+    QStringList pendingSnapshot;
+    for (auto it = m_pendingParameters.constBegin(); it != m_pendingParameters.constEnd(); ++it) {
+        pendingSnapshot.append(it.key());
     }
+
+    QStringList localFailed;
+    QStringList criticalFailure;
+    auto recordCriticalFailure = [&](const QString &name) {
+        localFailed.append(name);
+        criticalFailure.append(name);
+    };
 
     // Apply each pending parameter to the camera
     for (auto it = m_pendingParameters.constBegin(); it != m_pendingParameters.constEnd(); ++it) {
@@ -570,41 +676,75 @@ bool HamamatsuDriver::commitParameters()
             break;
         case ParameterType::StringCollection: {
             QString key = def.displayName + "::" + value.toString();
-            auto it = m_stringCollectionValueMap.find(key);
-            if (it != m_stringCollectionValueMap.end()) {
-                dcamValue = it.value();
+            auto sit = m_stringCollectionValueMap.find(key);
+            if (sit != m_stringCollectionValueMap.end()) {
+                dcamValue = sit.value();
             } else {
                 qCWarning(parameterCategory) << "StringCollection value not found in cache:" << key;
-                return false;
+                if (hamamatsuCriticalParameters().contains(name)) {
+                    recordCriticalFailure(name);
+                } else {
+                    localFailed.append(name);
+                }
+                continue;
             }
             break;
         }
         default:
             continue;
         }
-        
+
         if(name == "exposure"){
             dcamValue /= 1000000.0;
         }
 
         if (!setDcamPropertyValue(iProp, dcamValue)) {
-            emit errorOccurred(CameraError::makeError(
-                CameraError::Code::CommitFailed,
-                QString("Failed to set parameter: %1").arg(name)));
-            m_pendingParameters.clear();
-            return false;
+            if (hamamatsuCriticalParameters().contains(name)) {
+                recordCriticalFailure(name);
+            } else {
+                localFailed.append(name);
+            }
+            continue;
         }
 
-            m_parameters.insert(name, value);
+        m_parameters.insert(name, value);
+    }
+
+    if (!criticalFailure.isEmpty()) {
+        // Critical parameter failed: every pending parameter is reported as
+        // failed so the caller can revert its UI to the last good values.
+        QStringList allFailed = pendingSnapshot;
+        QString desc = QString("Failed to commit parameters: critical parameter(s) "
+                               "%1 failed; the entire batch was rejected to keep "
+                               "the camera geometry consistent. Failed: %2")
+                           .arg(criticalFailure.join(", "), allFailed.join(", "));
+        if (failedParameters) {
+            failedParameters->append(allFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::CommitFailed, desc,
+            CameraError::Severity::Error, allFailed));
+        m_pendingParameters.clear();
+        return false;
+    }
+
+    if (!localFailed.isEmpty()) {
+        if (failedParameters) {
+            failedParameters->append(localFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::CommitFailed,
+            QString("Failed to commit parameters: %1").arg(localFailed.join(", ")),
+            CameraError::Severity::Warning,
+            localFailed));
+        for (const QString &name : localFailed) {
+            m_pendingParameters.remove(name);
+        }
     }
 
     m_pendingParameters.clear();
-    return true;
+    return localFailed.isEmpty();
 }
-
-//==============================================================================
-// Capture
-//==============================================================================
 
 bool HamamatsuDriver::startCapture(int captureCount)
 {
@@ -619,7 +759,6 @@ bool HamamatsuDriver::startCapture(int captureCount)
     if (m_capturing.load()) {
         return true;  // Already capturing
     }
-
     // Read image dimensions dynamically
     double width = 0, height = 0;
     getDcamPropertyValue(DCAM_IDPROP_IMAGE_WIDTH, width);

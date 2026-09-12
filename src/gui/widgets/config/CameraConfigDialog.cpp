@@ -176,7 +176,7 @@ void CameraConfigDialog::on_restoreButton_clicked()
     }
 }
 
-void CameraConfigDialog::onSetParametersFinished(bool success)
+void CameraConfigDialog::onSetParametersFinished(const QStringList &failedParameters)
 {
     AppController *controller = appController();
     if (!controller || !ui) {
@@ -184,29 +184,35 @@ void CameraConfigDialog::onSetParametersFinished(bool success)
         return;
     }
 
-    if (!success) {
-        qWarning() << "CameraConfigDialog: setParameters failed";
-        ui->hideLoading();
-        m_pendingConfig.clear();
-        if (m_acceptAfterCommit) {
-            m_acceptAfterCommit = false;
-            accept();
-        }
+    if (!failedParameters.isEmpty()) {
+        qWarning() << "CameraConfigDialog: setParameters rejected parameters:"
+                   << failedParameters.join(", ");
+    }
+
+    if (failedParameters.isEmpty()) {
+        QMetaObject::invokeMethod(controller, "commitParameters",
+                                 Qt::QueuedConnection);
         return;
     }
 
-    QMetaObject::invokeMethod(controller, "commitParameters",
-                             Qt::QueuedConnection);
+    // Set failed; if user pressed OK (accept path), still close the dialog.
+    ui->hideLoading();
+    m_pendingConfig.clear();
+    if (m_acceptAfterCommit) {
+        m_acceptAfterCommit = false;
+        accept();
+    }
 }
 
-void CameraConfigDialog::onCommitParametersFinished(bool success)
+void CameraConfigDialog::onCommitParametersFinished(const QStringList &failedParameters)
 {
     if (!ui) {
         return;
     }
 
-    if (!success) {
-        qWarning() << "CameraConfigDialog: commitParameters failed";
+    if (!failedParameters.isEmpty()) {
+        qWarning() << "CameraConfigDialog: commitParameters rejected parameters:"
+                   << failedParameters.join(", ");
     }
 
     ui->hideLoading();

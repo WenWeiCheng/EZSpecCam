@@ -127,12 +127,23 @@ public:
      * @brief Set parameter value (stages it for commit)
      * @param name Parameter identifier
      * @param value New value
+     * @param failedParameters Optional; on rejection the parameter name is appended here.
      * @return true if value was accepted
      *
      * Values are staged in pendingParameters until commitParameters() is called.
      * Read-only parameters are silently accepted without staging.
      */
-    bool setParameter(const QString &name, const QVariant &value) override;
+    bool setParameter(const QString &name, const QVariant &value,
+                      QStringList *failedParameters = nullptr) override;
+
+    /**
+     * @brief Stage a batch of parameters at once.
+     * @param parameters Map of name -> value pairs.
+     * @param failedParameters Optional; names of entries that failed validation are appended here.
+     * @return true if all parameters were staged successfully.
+     */
+    bool setParameters(const QVariantMap &parameters,
+                       QStringList *failedParameters = nullptr) override;
 
     /**
      * @brief Validate all pending parameter changes
@@ -142,11 +153,10 @@ public:
 
     /**
      * @brief Commit pending parameters to camera hardware
-     * @return true if commit successful
+     * @param failedParameters Optional; names of parameters the hardware rejected are appended here.
+     * @return true if every staged parameter was applied successfully.
      */
-    bool commitParameters() override;
-
-    // ——— Capture ———
+    bool commitParameters(QStringList *failedParameters = nullptr) override;
 
     /**
      * @brief Start capture operation

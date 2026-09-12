@@ -11,8 +11,9 @@
 #include <qtmetamacros.h>
 #include <qtypes.h>
 #include <qvariant.h>
+#include <QSet>
 
-Q_LOGGING_CATEGORY(parameterCategory, "Parameter")
+ Q_LOGGING_CATEGORY(parameterCategory, "Parameter")
 Q_LOGGING_CATEGORY(cameraCategory, "Camera")
 Q_LOGGING_CATEGORY(configCategory, "Config")
 Q_LOGGING_CATEGORY(displayCategory, "Display")
@@ -166,14 +167,35 @@ QVariant QHYCCDDriver::parameterValue(const QString &name) const
     return QVariant();
 }
 
-bool QHYCCDDriver::setParameter(const QString &name, const QVariant &value)
+namespace {
+// Parameters whose commit failure means the rest of the pending batch
+// cannot be safely merged: the camera geometry / readout state would be
+// inconsistent. When any of these fails, every other pending parameter
+// is also reported as failed.
+const QSet<QString> &qhyccdCriticalParameters()
+{
+    static const QSet<QString> set = {
+        "read_mode", "stream_mode", "binning",
+        "roi_x", "roi_y", "roi_width", "roi_height"
+    };
+    return set;
+}
+}
+
+bool QHYCCDDriver::setParameter(const QString &name, const QVariant &value,
+                                QStringList *failedParameters)
 {
     QMutexLocker locker(&m_mutex);
 
     if (!m_parameterDefinitions.contains(name)) {
+        if (failedParameters) {
+            failedParameters->append(name);
+        }
         emit errorOccurred(CameraError::makeError(
             CameraError::Code::InvalidParameter,
-            QString("Unknown parameter: %1").arg(name)));
+            QString("Unknown parameter: %1").arg(name),
+            CameraError::Severity::Warning,
+            QStringList{ name }));
         return false;
     }
 
@@ -184,14 +206,97 @@ bool QHYCCDDriver::setParameter(const QString &name, const QVariant &value)
     }
 
     if (!validate(value, def.constraint, def.type)) {
+        if (failedParameters) {
+            failedParameters->append(name);
+        }
         emit errorOccurred(CameraError::makeError(
             CameraError::Code::ValueOutOfRange,
-            QString("Invalid value for parameter: %1").arg(name)));
+            QString("Invalid value for parameter: %1").arg(name),
+            CameraError::Severity::Warning,
+            QStringList{ name }));
         return false;
     }
 
     m_pendingParameters.insert(name, value);
     return true;
+}
+
+bool QHYCCDDriver::setParameters(const QVariantMap &parameters,
+                                 QStringList *failedParameters)
+{
+    QMutexLocker locker(&m_mutex);
+
+    QStringList localFailed;
+    QStringList criticalFailure;
+
+    for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
+        const QString &name = it.key();
+        const QVariant &value = it.value();
+
+        if (!m_parameterDefinitions.contains(name)) {
+            localFailed.append(name);
+            if (qhyccdCriticalParameters().contains(name)) {
+                criticalFailure.append(name);
+            }
+            continue;
+        }
+
+        const ParameterDefinition &def = m_parameterDefinitions.value(name);
+        if (def.isReadOnly) {
+            continue;
+        }
+
+        if (!validate(value, def.constraint, def.type)) {
+            localFailed.append(name);
+            if (qhyccdCriticalParameters().contains(name)) {
+                criticalFailure.append(name);
+            }
+            continue;
+        }
+    }
+
+    // If a critical parameter failed, every key in this batch is treated as
+    // failed -- the camera geometry cannot be assumed consistent.
+    if (!criticalFailure.isEmpty()) {
+        QStringList allFailed;
+        for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
+            const QString &name = it.key();
+            const ParameterDefinition &def = m_parameterDefinitions.value(name);
+            if (!def.isReadOnly && !allFailed.contains(name)) {
+                allFailed.append(name);
+            }
+        }
+        QString desc = QString("Failed to set parameters: critical parameter(s) %1 "
+                               "failed; the entire batch was rejected to keep the "
+                               "camera geometry consistent. Failed: %2")
+                           .arg(criticalFailure.join(", "), allFailed.join(", "));
+        if (failedParameters) {
+            failedParameters->append(allFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::InvalidParameter, desc,
+            CameraError::Severity::Warning, allFailed));
+        return false;
+    }
+
+    for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
+        if (!localFailed.contains(it.key())) {
+            m_pendingParameters.insert(it.key(), it.value());
+        }
+    }
+
+    if (!localFailed.isEmpty()) {
+        if (failedParameters) {
+            failedParameters->append(localFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::InvalidParameter,
+            QString("Failed to set parameters: %1").arg(localFailed.join(", ")),
+            CameraError::Severity::Warning,
+            localFailed));
+    }
+
+    return localFailed.isEmpty();
 }
 
 bool QHYCCDDriver::validateParameters()
@@ -205,8 +310,9 @@ bool QHYCCDDriver::validateParameters()
         if (!m_parameterDefinitions.contains(name)) {
             emit errorOccurred(CameraError::makeError(
                 CameraError::Code::CommitFailed,
-                QString("Unknown parameter: %1").arg(name)));
-            m_pendingParameters.clear();
+                QString("Unknown parameter: %1").arg(name),
+                CameraError::Severity::Warning,
+                QStringList{ name }));
             return false;
         }
 
@@ -214,8 +320,9 @@ bool QHYCCDDriver::validateParameters()
         if (!validate(value, def.constraint, def.type)) {
             emit errorOccurred(CameraError::makeError(
                 CameraError::Code::CommitFailed,
-                QString("Invalid value for parameter: %1").arg(name)));
-            m_pendingParameters.clear();
+                QString("Invalid value for parameter: %1").arg(name),
+                CameraError::Severity::Warning,
+                QStringList{ name }));
             return false;
         }
     }
@@ -223,18 +330,29 @@ bool QHYCCDDriver::validateParameters()
     return true;
 }
 
-bool QHYCCDDriver::commitParameters()
+bool QHYCCDDriver::commitParameters(QStringList *failedParameters)
 {
     QMutexLocker locker(&m_mutex);
 
-    // Validate all pending parameters first
-    validateParameters();
+    // Snapshot pending keys so we can escalate every one of them to "failed"
+    // when a critical parameter fails.
+    QStringList pendingSnapshot;
+    for (auto it = m_pendingParameters.constBegin(); it != m_pendingParameters.constEnd(); ++it) {
+        pendingSnapshot.append(it.key());
+    }
+
+    QStringList localFailed;
+    QStringList criticalFailure;
+    auto recordCriticalFailure = [&](const QString &name) {
+        localFailed.append(name);
+        criticalFailure.append(name);
+    };
 
     // Apply parameters to camera
     uint32_t ret = QHYCCD_ERROR;
     bool readModeChanged = m_pendingParameters.contains("read_mode");
     bool streamModeChanged = m_pendingParameters.contains("stream_mode");
-    
+
     // If read mode or stream mode changed, we need to reinit camera and reset all parameters.
     if(readModeChanged || streamModeChanged){
         QString readModeName = m_pendingParameters.value("read_mode", m_parameters["read_mode"]).toString();
@@ -245,42 +363,74 @@ bool QHYCCDDriver::commitParameters()
         int streamModeIndex = m_streamModeNames.indexOf(streamModeName);
         if(streamModeIndex < 0) streamModeIndex = 0;
 
-        m_parameters.insert("read_mode", readModeName);
-        m_parameters.insert("stream_mode", streamModeName);
-
         // set read mode
         ret = SetQHYCCDReadMode(m_cameraHandle, readModeIndex);
         if(ret != QHYCCD_SUCCESS){
             DRIVER_DEBUG << "Failed to set read mode: " << ret;
+            // Critical failure: abandon the entire pending batch.
+            QString desc = QString("Failed to commit parameters: critical parameter "
+                                   "'read_mode' failed (code %1); the entire batch "
+                                   "was rejected to keep the camera geometry "
+                                   "consistent. Failed: %2")
+                               .arg(ret)
+                               .arg(pendingSnapshot.join(", "));
+            QStringList allFailed = pendingSnapshot;
+            if (failedParameters) {
+                failedParameters->append(allFailed);
+            }
             emit errorOccurred(CameraError::makeError(
-                CameraError::Code::DriverError,
-                QString("Failed to set read mode: %1").arg(ret)));
+                CameraError::Code::CommitFailed, desc,
+                CameraError::Severity::Error, allFailed));
             return false;
         }
 
         // set stream mode
-        uint32_t ret = SetQHYCCDStreamMode(m_cameraHandle, streamModeIndex);
+        ret = SetQHYCCDStreamMode(m_cameraHandle, streamModeIndex);
         if(ret != QHYCCD_SUCCESS){
             DRIVER_DEBUG << "Failed to set stream mode: " << ret;
+            QString desc = QString("Failed to commit parameters: critical parameter "
+                                  "'stream_mode' failed (code %1); the entire "
+                                  "batch was rejected to keep the camera geometry "
+                                  "consistent. Failed: %2")
+                               .arg(ret)
+                               .arg(pendingSnapshot.join(", "));
+            QStringList allFailed = pendingSnapshot;
+            if (failedParameters) {
+                failedParameters->append(allFailed);
+            }
             emit errorOccurred(CameraError::makeError(
-                CameraError::Code::DriverError,
-                QString("Failed to set stream mode: %1").arg(ret)));
+                CameraError::Code::CommitFailed, desc,
+                CameraError::Severity::Error, allFailed));
             return false;
         }
-        
+
         // reinit camera
         ret = InitQHYCCD(m_cameraHandle);
         if(ret != QHYCCD_SUCCESS){
             DRIVER_DEBUG << "Failed to reinitialize camera: " << ret;
+            QString desc = QString("Failed to commit parameters: critical parameter "
+                                  "'read_mode/stream_mode' failed to reinitialize "
+                                  "the camera (code %1); the entire batch was "
+                                  "rejected. Failed: %2")
+                               .arg(ret)
+                               .arg(pendingSnapshot.join(", "));
+            QStringList allFailed = pendingSnapshot;
+            if (failedParameters) {
+                failedParameters->append(allFailed);
+            }
             emit errorOccurred(CameraError::makeError(
-                CameraError::Code::DriverError,
-                QString("Failed to reinitialize camera: %1").arg(ret)));
+                CameraError::Code::CommitFailed, desc,
+                CameraError::Severity::Error, allFailed));
+            m_pendingParameters.clear();
             return false;
         }
-        
+
+        m_parameters.insert("read_mode", readModeName);
+        m_parameters.insert("stream_mode", streamModeName);
+
         m_pendingParameters.remove("read_mode");
         m_pendingParameters.remove("stream_mode");
-        
+
         // reinit parameters
         for(auto it = m_parameterDefinitions.constBegin(); it != m_parameterDefinitions.constEnd(); ++it){
             const QString &name = it.key();
@@ -292,7 +442,7 @@ bool QHYCCDDriver::commitParameters()
             }
 
             // already set above
-            if(name == "read_mode" || name == "stream_mode") continue; 
+            if(name == "read_mode" || name == "stream_mode") continue;
 
             if(def.isReadOnly) continue;
 
@@ -301,7 +451,7 @@ bool QHYCCDDriver::commitParameters()
             m_pendingParameters.insert(name, value);
         }
     }
-    
+
     // binning validation and apply. Apply binning before roi
     bool binningChanged = m_pendingParameters.contains("binning");
     if(binningChanged){
@@ -327,40 +477,40 @@ bool QHYCCDDriver::commitParameters()
         ret = SetQHYCCDBinMode(m_cameraHandle, binFactor, binFactor);
         ret |= SetQHYCCDResolution(m_cameraHandle , roiX, roiY, roiW, roiH);
         if(ret != QHYCCD_SUCCESS){
-            emit errorOccurred(CameraError::makeError(
-                CameraError::Code::DriverError,
-                QString("Failed to set binning: %1").arg(ret)));
-            return false;
+            DRIVER_DEBUG << "Failed to set binning: " << ret;
+            recordCriticalFailure("binning");
+            m_pendingParameters.remove("binning");
+        } else {
+            m_pendingParameters.remove("binning");
         }
-        m_pendingParameters.remove("binning");
     }
 
     // roi validation and apply
-    bool roiChanged = m_pendingParameters.contains("roi_x") || 
+    bool roiChanged = m_pendingParameters.contains("roi_x") ||
                       m_pendingParameters.contains("roi_y") ||
-                      m_pendingParameters.contains("roi_width") || 
+                      m_pendingParameters.contains("roi_width") ||
                       m_pendingParameters.contains("roi_height");
-    
+
     if (roiChanged) {
-        int binning = m_pendingParameters.contains("binning") 
+        int binning = m_pendingParameters.contains("binning")
             ? m_pendingParameters.value("binning").toInt()
             : m_parameters.value("binning", 1).toInt();
         int imageWidth = m_imageWidth / binning;
         int imageHeight = m_imageHeight / binning;
-        
-        int roiX = m_pendingParameters.contains("roi_x") 
+
+        int roiX = m_pendingParameters.contains("roi_x")
             ? m_pendingParameters.value("roi_x").toInt()
             : m_parameters.value("roi_x", 0).toInt();
-        int roiY = m_pendingParameters.contains("roi_y") 
+        int roiY = m_pendingParameters.contains("roi_y")
             ? m_pendingParameters.value("roi_y").toInt()
             : m_parameters.value("roi_y", 0).toInt();
-        int roiW = m_pendingParameters.contains("roi_width") 
+        int roiW = m_pendingParameters.contains("roi_width")
             ? m_pendingParameters.value("roi_width").toInt()
             : m_parameters.value("roi_width", imageWidth).toInt();
-        int roiH = m_pendingParameters.contains("roi_height") 
+        int roiH = m_pendingParameters.contains("roi_height")
             ? m_pendingParameters.value("roi_height").toInt()
             : m_parameters.value("roi_height", imageHeight).toInt();
-        
+
         // roi width must be even, if not, the data will be abnormal according to experiment
         if(roiW % 2 != 0){
             roiW++;
@@ -373,31 +523,40 @@ bool QHYCCDDriver::commitParameters()
               roiH >= 1 && roiH <= imageHeight &&
               roiX + roiW <= imageWidth &&
               roiY + roiH <= imageHeight)) {
-            emit errorOccurred(CameraError::makeError(
-                CameraError::Code::InvalidParameter,
-                "roi parameters is invalid"));
-            DRIVER_DEBUG << "ROI validation failed - x:" << roiX << "y:" << roiY 
+            DRIVER_DEBUG << "ROI validation failed - x:" << roiX << "y:" << roiY
                        << "w:" << roiW << "h:" << roiH << "image:" << imageWidth << "x" << imageHeight;
-            return false;
+            recordCriticalFailure("roi_x");
+            recordCriticalFailure("roi_y");
+            recordCriticalFailure("roi_width");
+            recordCriticalFailure("roi_height");
+            m_pendingParameters.remove("roi_x");
+            m_pendingParameters.remove("roi_y");
+            m_pendingParameters.remove("roi_width");
+            m_pendingParameters.remove("roi_height");
+        } else {
+            uint32_t ret = SetQHYCCDResolution(m_cameraHandle , roiX, roiY, roiW, roiH);
+            if (ret != QHYCCD_SUCCESS) {
+                recordCriticalFailure("roi_x");
+                recordCriticalFailure("roi_y");
+                recordCriticalFailure("roi_width");
+                recordCriticalFailure("roi_height");
+                DRIVER_DEBUG << "Failed to set camera roi: " << ret;
+                m_pendingParameters.remove("roi_x");
+                m_pendingParameters.remove("roi_y");
+                m_pendingParameters.remove("roi_width");
+                m_pendingParameters.remove("roi_height");
+            } else {
+                m_parameters.insert("roi_x", roiX);
+                m_parameters.insert("roi_y", roiY);
+                m_parameters.insert("roi_width", roiW);
+                m_parameters.insert("roi_height", roiH);
+
+                m_pendingParameters.remove("roi_x");
+                m_pendingParameters.remove("roi_y");
+                m_pendingParameters.remove("roi_width");
+                m_pendingParameters.remove("roi_height");
+            }
         }
-        
-        uint32_t ret = SetQHYCCDResolution(m_cameraHandle , roiX, roiY, roiW, roiH);
-        if (ret != QHYCCD_SUCCESS) {
-            emit errorOccurred(CameraError::makeError(
-                CameraError::Code::CommitFailed,
-                QString("Failed to set camera roi, try to reconnect camera").arg(ret)));
-            return false;
-        }
-        m_parameters.insert("roi_x", roiX);
-        m_parameters.insert("roi_y", roiY);
-        m_parameters.insert("roi_width", roiW);
-        m_parameters.insert("roi_height", roiH);
-        
-        // remove roi parameters from pending, as they have been applied
-        m_pendingParameters.remove("roi_x");
-        m_pendingParameters.remove("roi_y");
-        m_pendingParameters.remove("roi_width");
-        m_pendingParameters.remove("roi_height");
     }
 
     for (auto it = m_pendingParameters.constBegin(); it != m_pendingParameters.constEnd(); ++it) {
@@ -439,22 +598,49 @@ bool QHYCCDDriver::commitParameters()
         }
 
         if (ret != QHYCCD_SUCCESS) {
-            emit errorOccurred(CameraError::makeError(
-                CameraError::Code::CommitFailed,
-                QString("Failed to set parameter: %1").arg(name)));
-            m_pendingParameters.clear();
-            return false;
+            localFailed.append(name);
         }
-        
     }
 
-    // Move pending to actual
+    if (!criticalFailure.isEmpty()) {
+        // Critical parameter failed: every pending parameter is reported as
+        // failed so the caller can revert its UI to the last good values.
+        QStringList allFailed = pendingSnapshot;
+        QString desc = QString("Failed to commit parameters: critical parameter(s) "
+                              "%1 failed; the entire batch was rejected to keep "
+                              "the camera geometry consistent. Failed: %2")
+                           .arg(criticalFailure.join(", "), allFailed.join(", "));
+        if (failedParameters) {
+            failedParameters->append(allFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::CommitFailed, desc,
+            CameraError::Severity::Error, allFailed));
+        m_pendingParameters.clear();
+        return false;
+    }
+
+    if (!localFailed.isEmpty()) {
+        if (failedParameters) {
+            failedParameters->append(localFailed);
+        }
+        emit errorOccurred(CameraError::makeError(
+            CameraError::Code::CommitFailed,
+            QString("Failed to commit parameters: %1").arg(localFailed.join(", ")),
+            CameraError::Severity::Warning,
+            localFailed));
+        for (const QString &name : localFailed) {
+            m_pendingParameters.remove(name);
+        }
+    }
+
+    // Move remaining pending to actual
     for (auto it = m_pendingParameters.constBegin(); it != m_pendingParameters.constEnd(); ++it) {
         m_parameters.insert(it.key(), it.value());
     }
     m_pendingParameters.clear();
 
-    return true;
+    return localFailed.isEmpty();
 }
 
 bool QHYCCDDriver::startCapture(int captureCount)

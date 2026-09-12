@@ -294,17 +294,18 @@ signals:
     void disconnectCameraFinished(const QString &cameraId);
 
     /**
-     * @brief Emitted when async commitParameters completes
-     * @param success true if commit succeeded
+     * @brief Emitted when async commitParameters completes.
+     * @param failedParameters Names of parameters that the driver rejected;
+     *        empty list means the commit succeeded fully.
      */
-    void commitParametersFinished(bool success);
+    void commitParametersFinished(const QStringList &failedParameters);
 
     /**
-     * @brief Emitted when async setParameters completes
-     * @param success true if all parameters were set successfully
+     * @brief Emitted when async setParameters completes.
+     * @param failedParameters Names of parameters that failed validation;
+     *        empty list means every parameter was staged successfully.
      */
-    void setParametersFinished(bool success);
-
+    void setParametersFinished(const QStringList &failedParameters);
 private slots:
     void onDriverFrameReady(const QSharedPointer<QImage> &image,
                            quint64 timestamp,

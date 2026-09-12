@@ -525,15 +525,27 @@ bool AppController::setParameter(const QString &name, const QVariant &value)
 
 bool AppController::setParameters(const QVariantMap &params)
 {
-    for (auto it = params.constBegin(); it != params.constEnd(); ++it) {
-        if (!setParameter(it.key(), it.value())) {
-            emit setParametersFinished(false);
-            return false;
+    if (!m_driver) {
+        emit setParametersFinished(params.keys());
+        return false;
+    }
+
+    QStringList failed;
+    bool ok = m_driver->setParameters(params, &failed);
+
+    if (failed.isEmpty()) {
+        for (auto it = params.constBegin(); it != params.constEnd(); ++it) {
+            m_pendingParameters[it.key()] = it.value();
+        }
+    } else {
+        for (const QString &name : failed) {
+            m_pendingParameters.remove(name);
         }
     }
-    emit setParametersFinished(true);
+
     m_fisrtSetParameter = false;
-    return true;
+    emit setParametersFinished(failed);
+    return ok && failed.isEmpty();
 }
 
 bool AppController::validateParameters()
@@ -547,21 +559,33 @@ bool AppController::validateParameters()
 bool AppController::commitParameters()
 {
     if (!m_driver || !m_driver->isConnected()) {
-        emit commitParametersFinished(false);
+        emit commitParametersFinished(QStringList{ QStringLiteral("<not-connected>") });
         return false;
     }
-    bool ok = m_driver->commitParameters();
-    if (ok) {
+
+    QStringList failed;
+    bool ok = m_driver->commitParameters(&failed);
+
+    if (failed.isEmpty()) {
         for (auto it = m_pendingParameters.constBegin(); it != m_pendingParameters.constEnd(); ++it) {
             m_parameters[it.key()] = it.value();
         }
         m_pendingParameters.clear();
         saveDynamicConfig(m_cameraId, m_parameters);
     } else {
+        QStringList stagedNames = m_pendingParameters.keys();
+        for (const QString &name : failed) {
+            m_pendingParameters.remove(name);
+        }
+        for (auto it = m_pendingParameters.constBegin(); it != m_pendingParameters.constEnd(); ++it) {
+            m_parameters[it.key()] = it.value();
+        }
         m_pendingParameters.clear();
+        Q_UNUSED(stagedNames);
     }
-    emit commitParametersFinished(ok);
-    return ok;
+
+    emit commitParametersFinished(failed);
+    return ok && failed.isEmpty();
 }
 
 // ——— Private Slots ———
@@ -599,7 +623,6 @@ void AppController::onDriverCaptureStopped(const QString &cameraId)
     setState(CameraState::Connected);
     emit captureStopped();
 }
-
 void AppController::onDriverConnectionChanged(bool connected, const QString &cameraId)
 {
     Q_UNUSED(cameraId);
@@ -627,5 +650,11 @@ void AppController::onDriverConnectionChanged(bool connected, const QString &cam
 
 void AppController::onDriverError(const CameraError &error)
 {
-    enterErrorState(error);
+    if (error.severity == CameraError::Severity::Error ||
+        error.severity == CameraError::Severity::Fatal) {
+        enterErrorState(error);
+    }
+    // Warning / Info: stash and re-emit so MainWindow/tabs can surface without flipping state.
+    m_lastError = error;
+    emit errorOccurred(error);
 }

@@ -34,9 +34,8 @@ public slots:
     void on_buttonBox_rejected();
     void on_buttonBox_clicked(QAbstractButton *button);
     void on_restoreButton_clicked();
-    void onSetParametersFinished(bool success);
-    void onCommitParametersFinished(bool success);
-
+    void onSetParametersFinished(const QStringList &failedParameters);
+    void onCommitParametersFinished(const QStringList &failedParameters);
 private:
     CameraConfigDialogUi *ui;
     QVariantMap m_pendingConfig;
