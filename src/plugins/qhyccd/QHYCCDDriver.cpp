@@ -1173,6 +1173,36 @@ void QHYCCDDriver::initializeParameterDefinitions()
         m_parameters.insert("binning", 1);
     }
 
+    // DDR cache enable
+    ret = IsQHYCCDControlAvailable(m_cameraHandle, CONTROL_DDR);
+    if (ret == QHYCCD_SUCCESS) {
+        param = ParameterDefinition();
+        param.name = "ddr_cache_enabled";
+        param.displayName = "DDR Cache Enabled";
+        param.description = "Enable DDR cache";
+        param.category = ParameterCategory::Advanced;
+        param.type = ParameterType::Boolean;
+        param.defaultValue = false;
+        param.order = 1.0f;
+        m_parameterDefinitions.insert("ddr_cache_enabled", param);
+        m_parameters.insert("ddr_cache_enabled", false);
+    }
+    
+    // line denoise function
+    ret = IsQHYCCDControlAvailable(m_cameraHandle, CONTROL_ROWNOISERE);
+    if (ret == QHYCCD_SUCCESS) {
+        param = ParameterDefinition();
+        param.name = "line_denoise_enabled";
+        param.displayName = "Line Denoise Enabled";
+        param.description = "Enable line denoise function. The calculation is based on the average value of the overswept area to reduce the horizontal random stripes";
+        param.category = ParameterCategory::Advanced;
+        param.type = ParameterType::Boolean;
+        param.defaultValue = true;
+        param.order = 2.0f;
+        m_parameterDefinitions.insert("line_denoise_enabled", param);
+        m_parameters.insert("line_denoise_enabled", true);
+    }
+
     // USB Traffic - check availability and query constraints from camera
     ret = IsQHYCCDControlAvailable(m_cameraHandle, CONTROL_USBTRAFFIC);
     if (ret == QHYCCD_SUCCESS) {
@@ -1199,7 +1229,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
         }
         
         param.defaultValue = minTraffic;
-        param.order = 1.0f;
+        param.order = 11.0f;
         m_parameterDefinitions.insert("usb_traffic", param);
         m_parameters.insert("usb_traffic", param.defaultValue.toInt());
     }
@@ -1238,7 +1268,7 @@ void QHYCCDDriver::initializeParameterDefinitions()
             defaultBits = param.constraint.validValues.last().toInt();
         }
         param.defaultValue = defaultBits;
-        param.order = 2.0f;
+        param.order = 12.0f;
         m_parameterDefinitions.insert("transfer_bit", param);
         m_parameters.insert("transfer_bit", defaultBits);
     }
