@@ -559,7 +559,7 @@ bool AppController::validateParameters()
 bool AppController::commitParameters()
 {
     if (!m_driver || !m_driver->isConnected()) {
-        emit commitParametersFinished(QStringList{ QStringLiteral("<not-connected>") });
+        emit commitParametersFinished(m_pendingParameters.keys());
         return false;
     }
 
