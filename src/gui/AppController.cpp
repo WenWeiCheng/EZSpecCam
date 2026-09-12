@@ -529,12 +529,21 @@ bool AppController::setParameters(const QVariantMap &params)
         emit setParametersFinished(params.keys());
         return false;
     }
+    
+    QVariantMap filteredParams = params;
+    for (auto it = params.constBegin(); it != params.constEnd(); ++it) {
+        QVariant oldValue = m_parameters.value(it.key());
+        if (!m_fisrtSetParameter && oldValue == it.value() && !m_pendingParameters.contains(it.key())) {
+            filteredParams.remove(it.key());
+            PARAM_DEBUG << it.key() << ":" << oldValue << "->" << it.value();
+        }
+    }
 
     QStringList failed;
-    bool ok = m_driver->setParameters(params, &failed);
+    bool ok = m_driver->setParameters(filteredParams, &failed);
 
     if (failed.isEmpty()) {
-        for (auto it = params.constBegin(); it != params.constEnd(); ++it) {
+        for (auto it = filteredParams.constBegin(); it != filteredParams.constEnd(); ++it) {
             m_pendingParameters[it.key()] = it.value();
         }
     } else {
@@ -582,6 +591,15 @@ bool AppController::commitParameters()
         }
         m_pendingParameters.clear();
         Q_UNUSED(stagedNames);
+    }
+    
+    // update dynamic parameters
+    QStringList paramNames = parameterNames();
+    for (const QString &paramName : paramNames) {
+        ParameterDefinition def = parameter(paramName);
+        if (def.isDynamic && !def.isReadOnly) {
+            m_parameters[paramName] = parameterValue(paramName);
+        }
     }
 
     emit commitParametersFinished(failed);
