@@ -43,7 +43,7 @@ void installWheelBlocker(QWidget *widget)
 
 double correctStep(double value, double min, double step)
 {
-    return min + qRound((value - min) / step) * step;
+    return min + (qRound((value - min) / step)) * step;
 }
 }
 
@@ -314,17 +314,22 @@ QWidget *ParameterWidgetFactory::createFloatRangeWidget(const ParameterDefinitio
                             double step = def.constraint.step > 0 ? def.constraint.step : 1.0;
                             double clamped = qBound(minVal, spinBox->value(), maxVal);
                             double corrected = correctStep(clamped, minVal, step);
-                            if (qAbs(corrected - spinBox->value()) > 1e-9) {
-                                spinBox->setValue(corrected);
-                            }
+                            spinBox->blockSignals(true);
+                            spinBox->setValue(corrected);
+                            spinBox->blockSignals(false);
+                            slider->blockSignals(true);
                             slider->setValue(static_cast<int>(corrected));
+                            slider->blockSignals(false);
                         });
         QObject::connect(slider, &QSlider::valueChanged,
                         [=](int value) {
                             double minVal = def.constraint.minValue;
                             double step = def.constraint.step > 0 ? def.constraint.step : 1.0;
-                            double corrected = correctStep(value, minVal, step);
+                            double clamped = qBound(minVal, static_cast<double>(value), def.constraint.maxValue);
+                            double corrected = correctStep(clamped, minVal, step);
+                            spinBox->blockSignals(true);
                             spinBox->setValue(corrected);
+                            spinBox->blockSignals(false);
                         });
         if (def.defaultValue.isValid()) {
             slider->setValue(static_cast<int>(def.defaultValue.toDouble()));
@@ -335,11 +340,11 @@ QWidget *ParameterWidgetFactory::createFloatRangeWidget(const ParameterDefinitio
                             double minVal = def.constraint.minValue;
                             double maxVal = def.constraint.maxValue;
                             double step = def.constraint.step > 0 ? def.constraint.step : 1.0;
-                            double corrected = correctStep(qBound(minVal, spinBox->value(), maxVal),
-                                                            minVal, step);
-                            if (qAbs(corrected - spinBox->value()) > 1e-9) {
-                                spinBox->setValue(corrected);
-                            }
+                            double clamped = qBound(minVal, spinBox->value(), maxVal);
+                            double corrected = correctStep(clamped, minVal, step);
+                            spinBox->blockSignals(true);
+                            spinBox->setValue(corrected);
+                            spinBox->blockSignals(false);
                         });
     }
 
@@ -440,10 +445,10 @@ QWidget *ParameterWidgetFactory::createFloatRangeWidgetWithUnit(const ParameterD
                                               ? def.constraint.maxValue / def.constraint.unitRange[unitIndex - 1]
                                               : def.constraint.maxValue;
                         double clamped = qBound(rangeMin, spinBox->value(), rangeMax);
-                        double corrected = rangeMin + qRound((clamped - rangeMin) / displayStep) * displayStep;
-                        if (qAbs(corrected - spinBox->value()) > 1e-9) {
-                            spinBox->setValue(corrected);
-                        }
+                        double corrected = correctStep(clamped, rangeMin, displayStep);
+                        spinBox->blockSignals(true);
+                        spinBox->setValue(corrected);
+                        spinBox->blockSignals(false);
                         // int rawValue = static_cast<int>(def.constraint.toRawValue(corrected, unitIndex));
                         slider->blockSignals(true);
                         slider->setValue(corrected);
@@ -461,8 +466,10 @@ QWidget *ParameterWidgetFactory::createFloatRangeWidgetWithUnit(const ParameterD
                                               && unitIndex <= def.constraint.unitRange.size())
                                               ? def.constraint.minValue / def.constraint.unitRange[unitIndex - 1]
                                               : def.constraint.minValue;
-                        double corrected = rangeMin + qRound((displayValue - rangeMin) / displayStep) * displayStep;
+                        double corrected = correctStep(displayValue, rangeMin, displayStep);
+                        spinBox->blockSignals(true);
                         spinBox->setValue(corrected);
+                        spinBox->blockSignals(false);
                                             });
 
     if (def.defaultValue.isValid()) {
@@ -528,10 +535,12 @@ QWidget *ParameterWidgetFactory::createIntRangeWidget(const ParameterDefinition 
                 double clamped = qBound(static_cast<double>(minVal), static_cast<double>(spinBox->value()), static_cast<double>(maxVal));
                 double corrected_d = correctStep(clamped, def.constraint.minValue, step_d);
                 int corrected = static_cast<int>(corrected_d);
-                if (corrected != spinBox->value()) {
-                    spinBox->setValue(corrected);
-                }
+                spinBox->blockSignals(true);
+                spinBox->setValue(corrected);
+                spinBox->blockSignals(false);
+                slider->blockSignals(true);
                 slider->setValue(corrected);
+                slider->blockSignals(false);
             });
 
         return container;
@@ -551,11 +560,12 @@ QWidget *ParameterWidgetFactory::createIntRangeWidget(const ParameterDefinition 
             double minVal = def.constraint.minValue;
             double maxVal = def.constraint.maxValue;
             double step = def.constraint.step > 0 ? def.constraint.step : 1.0;
+            int clamped = qBound(static_cast<int>(minVal), spinBox->value(), static_cast<int>(maxVal));
             int corrected = static_cast<int>(
-                correctStep(qBound(minVal, static_cast<double>(spinBox->value()), maxVal), minVal, step));
-            if (corrected != spinBox->value()) {
-                spinBox->setValue(corrected);
-            }
+                correctStep(clamped, minVal, step));
+            spinBox->blockSignals(true);
+            spinBox->setValue(corrected);
+            spinBox->blockSignals(false);
         });
     return spinBox;
 }
@@ -645,11 +655,11 @@ QWidget *ParameterWidgetFactory::createIntRangeWidgetWithUnit(const ParameterDef
                                               ? def.constraint.maxValue / def.constraint.unitRange[unitIndex - 1]
                                               : def.constraint.maxValue;
                         double clamped = qBound(rangeMin, static_cast<double>(spinBox->value()), rangeMax);
-                        double corrected_d = rangeMin + qRound((clamped - rangeMin) / displayStep) * displayStep;
+                        double corrected_d = correctStep(clamped, rangeMin, displayStep);
                         int corrected = static_cast<int>(corrected_d);
-                        if (corrected != spinBox->value()) {
-                            spinBox->setValue(corrected);
-                        }
+                        spinBox->blockSignals(true);
+                        spinBox->setValue(corrected);
+                        spinBox->blockSignals(false);
                         // double rawValue = def.constraint.toRawValue(corrected, unitIndex);
                         slider->blockSignals(true);
                         slider->setValue(corrected);
