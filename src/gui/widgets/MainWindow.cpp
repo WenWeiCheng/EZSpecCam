@@ -11,6 +11,8 @@
 #include "dialogs/ScaleControlDialog.h"
 #include "dialogs/DisplayStyleDialog.h"
 #include "config/CameraConfigDialog.h"
+#include "config/DataTab.h"
+#include "../ui/CameraConfigDialogUi.h"
 #include "PostProcess.h"
 #include "../workers/FileSaverWorker.h"
 #include "../workers/FileLoaderWorker.h"
@@ -424,6 +426,10 @@ void MainWindow::on_actionAutoSaveToggle_triggered(bool checked)
 {
     QSettings settings;
     settings.setValue("data/autoSaveEnabled", checked);
+    if (m_configDialog && m_configDialog->getUi() && m_configDialog->getUi()->dataTab
+        && m_configDialog->getUi()->dataTab->isAutoSaveEnabled() != checked) {
+        m_configDialog->getUi()->dataTab->setAutoSaveEnabled(checked);
+    }
     showStatusMessage(checked ? tr("Auto-save enabled") : tr("Auto-save disabled"), 2000);
 }
 
@@ -443,6 +449,10 @@ void MainWindow::on_actionChangeAutoSaveDir_triggered()
     }
 
     settings.setValue("data/autoSaveDirectory", dir);
+    if (m_configDialog && m_configDialog->getUi() && m_configDialog->getUi()->dataTab
+        && m_configDialog->getUi()->dataTab->autoSaveDirectory() != dir) {
+        m_configDialog->getUi()->dataTab->setAutoSaveDirectory(dir);
+    }
     showStatusMessage(tr("Auto-save directory set to: %1").arg(dir), 3000);
 }
 
@@ -557,7 +567,7 @@ void MainWindow::onFrameLoadFailed(const QString &error, const QString &filePath
 void MainWindow::on_actionConfig_triggered()
 {
     if (m_configDialog) {
-        m_configDialog->setModal(false); 
+        m_configDialog->setModal(false);
         m_configDialog->show();
         m_configDialog->raise();
         m_configDialog->activateWindow();
@@ -565,7 +575,11 @@ void MainWindow::on_actionConfig_triggered()
     }
     m_configDialog = new CameraConfigDialog(this);
     m_configDialog->setAppController(m_appController);
-    m_configDialog->setModal(false); 
+    m_configDialog->setModal(false);
+    if (auto *dataTab = m_configDialog->getUi()->dataTab) {
+        connect(dataTab, &DataTab::autoSaveToggled,
+                ui->menuActionAutoSaveToggle, &QAction::setChecked);
+    }
     m_configDialog->show();
 }
 

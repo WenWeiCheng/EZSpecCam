@@ -41,6 +41,34 @@ QString DataTab::suffix() const
     return m_suffix;
 }
 
+QString DataTab::autoSaveDirectory() const
+{
+    return ui->autoSaveDirectoryLineEdit ? ui->autoSaveDirectoryLineEdit->text() : QString();
+}
+
+void DataTab::setAutoSaveDirectory(const QString &dir)
+{
+    if (!ui->autoSaveDirectoryLineEdit || ui->autoSaveDirectoryLineEdit->text() == dir) {
+        return;
+    }
+    const QSignalBlocker blocker(ui->autoSaveDirectoryLineEdit);
+    ui->autoSaveDirectoryLineEdit->setText(dir);
+}
+
+bool DataTab::isAutoSaveEnabled() const
+{
+    return ui->autoSaveEnabledCheckBox && ui->autoSaveEnabledCheckBox->isChecked();
+}
+
+void DataTab::setAutoSaveEnabled(bool enabled)
+{
+    if (!ui->autoSaveEnabledCheckBox || ui->autoSaveEnabledCheckBox->isChecked() == enabled) {
+        return;
+    }
+    const QSignalBlocker blocker(ui->autoSaveEnabledCheckBox);
+    ui->autoSaveEnabledCheckBox->setChecked(enabled);
+}
+
 void DataTab::onBrowseClicked()
 {
     QString dir = QFileDialog::getExistingDirectory(this, "Select Auto-Save Directory",
@@ -49,6 +77,7 @@ void DataTab::onBrowseClicked()
         ui->autoSaveDirectoryLineEdit->setText(dir);
         QSettings settings;
         settings.setValue(QStringLiteral("data/autoSaveDirectory"), dir);
+        emit autoSaveDirectoryChanged(dir);
     }
 }
 
@@ -56,6 +85,7 @@ void DataTab::onAutoSaveToggled(bool checked)
 {
     QSettings settings;
     settings.setValue(QStringLiteral("data/autoSaveEnabled"), checked);
+    emit autoSaveToggled(checked);
 }
 
 void DataTab::onImageFormatChanged(const QString &format)

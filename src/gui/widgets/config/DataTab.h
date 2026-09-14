@@ -15,6 +15,16 @@ public:
     QString prefix() const;
     QString suffix() const;
 
+    QString autoSaveDirectory() const;
+    void setAutoSaveDirectory(const QString &dir);
+
+    bool isAutoSaveEnabled() const;
+    void setAutoSaveEnabled(bool enabled);
+
+signals:
+    void autoSaveToggled(bool enabled);
+    void autoSaveDirectoryChanged(const QString &dir);
+
 protected slots:
     void onBrowseClicked();
     void onAutoSaveToggled(bool checked);
