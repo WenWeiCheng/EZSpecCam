@@ -535,8 +535,9 @@ bool AppController::setParameters(const QVariantMap &params)
         QVariant oldValue = m_parameters.value(it.key());
         if (!m_fisrtSetParameter && oldValue == it.value() && !m_pendingParameters.contains(it.key())) {
             filteredParams.remove(it.key());
-            PARAM_DEBUG << it.key() << ":" << oldValue << "->" << it.value();
+            continue;
         }
+        PARAM_DEBUG << it.key() << ":" << oldValue << "->" << it.value();
     }
 
     QStringList failed;
