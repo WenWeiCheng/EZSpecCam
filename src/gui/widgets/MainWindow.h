@@ -20,6 +20,8 @@ class SpectrumViewWidget;
 class ProfileWindow;
 class ScaleControlDialog;
 class DisplayStyleDialog;
+class CalibrationDialog;
+class AcquireDarkFrameDialog;
 class FileSaverWorker;
 struct ImageData;
 
@@ -77,6 +79,11 @@ private slots:
     void onSingleModeTriggered();
     void onBurstModeTriggered();
 
+    void on_actionAcquireDarkFrame_triggered();
+    void on_actionCalibration_triggered();
+    void onCalibrationApplied(bool enabled, const QString &path, int bias);
+    void onAcquireDarkFrameStartRequested(int frameCount);
+
 private:
     void updateToolbarState();
     void updateDisplay(const ImageData &frame);
@@ -85,6 +92,7 @@ private:
     void onFpsTimerTimeout();
     void showStatusMessage(const QString &message, int timeoutMs = 3000);
     void saveFrameToFile(const QString &filePath);
+    void cancelDarkAcquisition(const QString &reason);
 
     QElapsedTimer m_frameTimer;
     static constexpr int MIN_FRAME_INTERVAL_MS = 33;
@@ -102,13 +110,12 @@ private:
     QThread *m_fileLoaderThread = nullptr;
     FileSaverWorker *m_fileSaverWorker = nullptr;
     FileLoaderWorker *m_fileLoaderWorker = nullptr;
-    CameraTab *m_cameraTab;
-    ImageViewWidget *m_imageViewWidget;
-    SpectrumViewWidget *m_spectrumViewWidget;
     CameraConfigDialog *m_configDialog = nullptr;
     ProfileWindow *m_profileWindow = nullptr;
     ScaleControlDialog *m_scaleDialog = nullptr;
     DisplayStyleDialog *m_displayStyleDialog = nullptr;
+    CalibrationDialog *m_calibrationDialog = nullptr;
+    AcquireDarkFrameDialog *m_acquireDarkDialog = nullptr;
 
     int m_frameCount = 0;
     int m_autoSaveFrameCounter = 0;
@@ -119,11 +126,35 @@ private:
     bool m_vBinEnabled = false;
     int m_vBinStartRow = 0;
     int m_vBinEndRow = -1;
-    
-    QShortcut *shortcutConfig = nullptr;
+
+    // Dark-frame calibration state
+    bool    m_darkEnabled  = false;
+    QString m_darkPath;
+    int     m_darkBias     = 0;
+    QImage  m_darkFrame;
+    bool    m_darkFrameValid = false;
+
+    // Dark-frame acquisition state machine
+    bool    m_acquiringDark  = false;
+    int     m_darkBurstTotal     = 10;
+    int     m_darkBurstRemaining = 0;
+    QImage  m_darkAccum;
+    bool    m_darkAccumInit     = false;
+    quint64 m_darkAccumFrames   = 0;
+    quint64 m_lastDarkSizeWarnMs = 0;
+    QImage::Format m_darkAccumFormat = QImage::Format_Invalid;
+    QVector<quint32> m_darkAccumSum; // per-element 32-bit shadow
+
+    // Discriminator: when true, onFrameLoaded stores result as m_darkFrame
+    bool    m_loadingFrameIsDark = false;
+
     QShortcut *shortcutLive = nullptr;
     QShortcut *shortcutSingle = nullptr;
     QShortcut *shortcutBurst = nullptr;
+    CameraTab *m_cameraTab;
+    ImageViewWidget *m_imageViewWidget;
+    SpectrumViewWidget *m_spectrumViewWidget;
 };
+
 
 #endif // MAINWINDOW_H

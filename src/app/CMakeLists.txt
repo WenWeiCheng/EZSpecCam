@@ -82,6 +82,8 @@ target_sources(${EZSPECCAM_TARGET} PRIVATE
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/StatisticsDialog.h ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/StatisticsDialog.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/ProfileWindow.h ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/ProfileWindow.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/dialogs/RowRangeDialog.h ${CMAKE_SOURCE_DIR}/src/gui/widgets/dialogs/RowRangeDialog.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/widgets/dialogs/CalibrationDialog.h ${CMAKE_SOURCE_DIR}/src/gui/widgets/dialogs/CalibrationDialog.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/widgets/dialogs/AcquireDarkFrameDialog.h ${CMAKE_SOURCE_DIR}/src/gui/widgets/dialogs/AcquireDarkFrameDialog.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/dialogs/ScaleControlDialog.h ${CMAKE_SOURCE_DIR}/src/gui/widgets/dialogs/ScaleControlDialog.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/dialogs/DisplayStyleDialog.h ${CMAKE_SOURCE_DIR}/src/gui/widgets/dialogs/DisplayStyleDialog.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/workers/FileSaverWorker.h ${CMAKE_SOURCE_DIR}/src/gui/workers/FileSaverWorker.cpp

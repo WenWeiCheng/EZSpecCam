@@ -35,6 +35,8 @@ MainWindowUi::MainWindowUi(QObject *parent)
     , menuActionPostProcess(nullptr)
     , menuActionVerticalBinning(nullptr)
     , menuActionRowRange(nullptr)
+    , menuActionAcquireDarkFrame(nullptr)
+    , menuActionCalibration(nullptr)
     , menuActionSaveFrameAs(nullptr)
     , menuActionAutoSaveToggle(nullptr)
     , menuActionChangeAutoSaveDir(nullptr)
@@ -97,10 +99,13 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
 
     QMenu *menuCamera = menuBar->addMenu("&Camera");
     menuActionConfig = new QAction("&Config", mainWindow);
-    menuActionConfig->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_O));
-    menuActionConfig->setShortcutContext(Qt::ApplicationShortcut);
+    menuActionConfig->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_C));
     menuCamera->addAction(menuActionConfig);
     actionConfig = menuActionConfig;
+
+    menuCamera->addSeparator();
+    menuActionAcquireDarkFrame = new QAction("Acquire Dark Frame", mainWindow);
+    menuCamera->addAction(menuActionAcquireDarkFrame);
 
     QMenu *menuAnalyse = menuBar->addMenu("&Analyse");
     menuActionStatistics = new QAction("&Statistics", mainWindow);
@@ -138,8 +143,10 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
 
     menuActionRowRange = new QAction("Row Range...", mainWindow);
     menuPostProcess->addAction(menuActionRowRange);
-    menuActionPostProcess = menuPostProcess->menuAction();
 
+    menuPostProcess->addSeparator();
+    menuActionCalibration = new QAction("Calibration...", mainWindow);
+    menuPostProcess->addAction(menuActionCalibration);
     QMenu *menuHelp = menuBar->addMenu("&Help");
     menuActionAbout = new QAction("&About", mainWindow);
     menuHelp->addAction(menuActionAbout);

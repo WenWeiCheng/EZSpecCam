@@ -49,6 +49,8 @@ public:
     QAction *menuActionPostProcess;
     QAction *menuActionVerticalBinning;
     QAction *menuActionRowRange;
+    QAction *menuActionAcquireDarkFrame;
+    QAction *menuActionCalibration;
 
     QLabel *stateLabel;
     QLabel *frameCountLabel;

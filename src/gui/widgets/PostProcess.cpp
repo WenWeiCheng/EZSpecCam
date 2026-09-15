@@ -130,4 +130,61 @@ void verticalBinning(ImageData &frame, int startRow, int endRow)
     frame.image = binnedImage;
 }
 
+void applyDarkCalibration(ImageData &frame, const QImage *darkFrame, int customBias)
+{
+    if (darkFrame == nullptr || darkFrame->isNull()) {
+        return;
+    }
+    if (darkFrame->size() != frame.image.size()) {
+        return;
+    }
+    if (frame.image.isNull()) {
+        return;
+    }
+
+    const int width = frame.image.width();
+    const int height = frame.image.height();
+    if (frame.image.format() == QImage::Format_Grayscale16) {
+        const QImage darkRef = *darkFrame;
+        for (int y = 0; y < height; ++y) {
+            const ushort *srcRow = reinterpret_cast<const ushort *>(frame.image.constScanLine(y));
+            const ushort *darkRow = reinterpret_cast<const ushort *>(darkRef.constScanLine(y));
+            ushort *dstRow = reinterpret_cast<ushort *>(frame.image.scanLine(y));
+            for (int x = 0; x < width; ++x) {
+                int v = static_cast<int>(srcRow[x]) - static_cast<int>(darkRow[x]) + customBias;
+                if (v < 0) v = 0;
+                if (v > 65535) v = 65535;
+                dstRow[x] = static_cast<ushort>(v);
+            }
+        }
+    } else if (frame.image.format() == QImage::Format_Grayscale8) {
+        const QImage darkRef = *darkFrame;
+        for (int y = 0; y < height; ++y) {
+            const uchar *srcRow = frame.image.constScanLine(y);
+            const uchar *darkRow = darkRef.constScanLine(y);
+            uchar *dstRow = frame.image.scanLine(y);
+            for (int x = 0; x < width; ++x) {
+                int v = static_cast<int>(srcRow[x]) - static_cast<int>(darkRow[x]) + customBias;
+                if (v < 0) v = 0;
+                if (v > 255) v = 255;
+                dstRow[x] = static_cast<uchar>(v);
+            }
+        }
+    } else if (frame.image.format() == QImage::Format_RGB888) {
+        const QImage darkRef = *darkFrame;
+        const int rowStride = width * 3;
+        for (int y = 0; y < height; ++y) {
+            const uchar *srcRow = frame.image.constScanLine(y);
+            const uchar *darkRow = darkRef.constScanLine(y);
+            uchar *dstRow = frame.image.scanLine(y);
+            for (int x = 0; x < rowStride; ++x) {
+                int v = static_cast<int>(srcRow[x]) - static_cast<int>(darkRow[x]) + customBias;
+                if (v < 0) v = 0;
+                if (v > 255) v = 255;
+                dstRow[x] = static_cast<uchar>(v);
+            }
+        }
+    }
+}
+
 } // namespace PostProcess

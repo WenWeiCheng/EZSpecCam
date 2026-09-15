@@ -8,6 +8,8 @@
 #include "display/StatisticsDialog.h"
 #include "display/ProfileWindow.h"
 #include "dialogs/RowRangeDialog.h"
+#include "dialogs/CalibrationDialog.h"
+#include "dialogs/AcquireDarkFrameDialog.h"
 #include "dialogs/ScaleControlDialog.h"
 #include "dialogs/DisplayStyleDialog.h"
 #include "config/CameraConfigDialog.h"
@@ -55,10 +57,6 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
 
     ui->centralStackedWidget->hide();
-
-    shortcutConfig = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_C), this);
-    connect(shortcutConfig, &QShortcut::activated, this, &MainWindow::on_actionConfig_triggered);
-
     shortcutLive = new QShortcut(QKeySequence(Qt::Key_L), this);
     connect(shortcutLive, &QShortcut::activated, this, &MainWindow::onLiveModeTriggered);
 
@@ -67,6 +65,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     shortcutBurst = new QShortcut(QKeySequence(Qt::Key_B), this);
     connect(shortcutBurst, &QShortcut::activated, this, &MainWindow::onBurstModeTriggered);
+
 
     m_appController = new AppController(nullptr);
 
@@ -264,6 +263,11 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::on_verticalBinning_triggered);
     connect(ui->menuActionRowRange, &QAction::triggered,
             this, &MainWindow::on_rowRange_triggered);
+
+    connect(ui->menuActionAcquireDarkFrame, &QAction::triggered,
+            this, &MainWindow::on_actionAcquireDarkFrame_triggered);
+    connect(ui->menuActionCalibration, &QAction::triggered,
+            this, &MainWindow::on_actionCalibration_triggered);
 
     connect(ui->menuActionProfile, &QAction::triggered,
             this, &MainWindow::on_profile_triggered);
@@ -495,6 +499,18 @@ void MainWindow::onFrameLoaded(const LoadResult &result, const QString &filePath
             tr("Failed to load frame: %1").arg(result.errorMessage));
         return;
     }
+    if (m_loadingFrameIsDark) {
+        m_loadingFrameIsDark = false;
+        m_darkFrame = result.frame.hasOriginal()
+            ? result.frame.originalImage
+            : result.frame.image;
+        m_darkFrameValid = !m_darkFrame.isNull();
+        showStatusMessage(m_darkFrameValid
+            ? tr("Dark frame loaded.")
+            : tr("Failed to load dark frame: empty image."), 5000);
+        return;
+    }
+
 
     // 旧格式检测：主文件若为 1 行 spectrum，且无 _original 边车，
     // 则视为已废弃的旧格式（旧格式允许保存 1 行 spectrum 作为主文件），
@@ -581,6 +597,85 @@ void MainWindow::on_actionConfig_triggered()
                 ui->menuActionAutoSaveToggle, &QAction::setChecked);
     }
     m_configDialog->show();
+}
+void MainWindow::on_actionAcquireDarkFrame_triggered()
+{
+    if (!m_appController || !m_appController->isConnected()) {
+        showStatusMessage(tr("Connect a camera before acquiring a dark frame."), 3000);
+        return;
+    }
+
+    if (!m_acquireDarkDialog) {
+        m_acquireDarkDialog = new AcquireDarkFrameDialog(this);
+        connect(m_acquireDarkDialog, &AcquireDarkFrameDialog::startRequested,
+                this, &MainWindow::onAcquireDarkFrameStartRequested);
+    }
+
+    m_acquireDarkDialog->setFrameCount(m_darkBurstTotal);
+    m_acquireDarkDialog->setAcquireInProgress(m_acquiringDark);
+    m_acquireDarkDialog->show();
+    m_acquireDarkDialog->raise();
+    m_acquireDarkDialog->activateWindow();
+}
+
+void MainWindow::on_actionCalibration_triggered()
+{
+    if (!m_calibrationDialog) {
+        m_calibrationDialog = new CalibrationDialog(this);
+        connect(m_calibrationDialog, &CalibrationDialog::applied,
+                this, &MainWindow::onCalibrationApplied);
+    }
+
+    m_calibrationDialog->setDarkFrameEnabled(m_darkEnabled);
+    m_calibrationDialog->setDarkFramePath(m_darkPath);
+    m_calibrationDialog->setCustomBias(m_darkBias);
+    m_calibrationDialog->show();
+    m_calibrationDialog->raise();
+    m_calibrationDialog->activateWindow();
+}
+
+void MainWindow::onCalibrationApplied(bool enabled, const QString &path, int bias)
+{
+    m_darkEnabled = enabled;
+    m_darkPath = path;
+    m_darkBias = bias;
+
+    if (enabled && !m_darkFrameValid && !path.isEmpty()) {
+        m_loadingFrameIsDark = true;
+        QMetaObject::invokeMethod(m_fileLoaderWorker, "loadFrame",
+            Qt::QueuedConnection, Q_ARG(QString, path));
+    }
+
+    showStatusMessage(enabled
+        ? tr("Dark-frame calibration enabled.")
+        : tr("Dark-frame calibration disabled."), 3000);
+}
+
+void MainWindow::onAcquireDarkFrameStartRequested(int frameCount)
+{
+    if (m_acquiringDark) {
+        showStatusMessage(tr("Dark-frame acquisition already in progress."), 2000);
+        return;
+    }
+    int n = frameCount;
+    if (n < 1) n = 1;
+    if (n > 1000) n = 1000;
+
+    m_darkBurstTotal = n;
+    m_darkBurstRemaining = n;
+    m_darkAccumInit = false;
+    m_darkAccumFrames = 0;
+    m_darkAccumSum.clear();
+
+    QMetaObject::invokeMethod(m_appController, "startCapture",
+        Qt::QueuedConnection, Q_ARG(int, n));
+
+    m_acquiringDark = true;
+    if (m_acquireDarkDialog) {
+        m_acquireDarkDialog->setAcquireInProgress(true);
+    }
+
+    showStatusMessage(tr("Acquiring dark frame (%1/%2)...").arg(0).arg(n), 3000);
 }
 
 void MainWindow::on_actionAbout_triggered()
@@ -747,19 +842,14 @@ void MainWindow::onCameraStateChanged(CameraState newState)
         updateFpsDisplay();
         
         // disable capture related shortcut
-        shortcutConfig->setEnabled(false);
         shortcutLive->setEnabled(false);
         shortcutSingle->setEnabled(false);
         shortcutBurst->setEnabled(false);
-        break;
-    case CameraState::Connecting:
-        stateText = tr("Connecting...");
         break;
     case CameraState::Connected:
         stateText = tr("Connected");
 
         // enable capture related shortcut
-        shortcutConfig->setEnabled(true);
         shortcutLive->setEnabled(true);
         shortcutSingle->setEnabled(true);
         shortcutBurst->setEnabled(true);
@@ -772,17 +862,18 @@ void MainWindow::onCameraStateChanged(CameraState newState)
         updateFpsDisplay();
         
         // disable capture related shortcut
-        shortcutConfig->setEnabled(false);
         shortcutLive->setEnabled(false);
         shortcutSingle->setEnabled(false);
         shortcutBurst->setEnabled(false);
         break;
     case CameraState::Error:
         stateText = tr("Error");
+        if (m_acquiringDark) {
+            cancelDarkAcquisition(tr("Camera entered error state."));
+        }
         m_fpsTimer->stop();
-        
+
         // disable capture related shortcut
-        shortcutConfig->setEnabled(false);
         shortcutLive->setEnabled(false);
         shortcutSingle->setEnabled(false);
         shortcutBurst->setEnabled(false);
@@ -800,19 +891,153 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
     ui->frameCountLabel->setText(tr("Frames: %1").arg(++m_frameCount));
     m_fpsFrameCount++;
 
+    // 1. Dark-frame acquisition: build the running average across N frames.
+    //    During a burst, calibration is suppressed (we are building the dark,
+    //    not subtracting it).
+    if (m_acquiringDark) {
+        const QImage &img = m_currentFrame.image;
+        if (!img.isNull()) {
+            const int width = img.width();
+            const int height = img.height();
+            const QImage::Format fmt = img.format();
+
+            if (!m_darkAccumInit) {
+                m_darkAccumFormat = fmt;
+                m_darkAccum = QImage(width, height, fmt);
+                m_darkAccum.fill(0);
+                int elementCount = width * height;
+                if (fmt == QImage::Format_RGB888) {
+                    elementCount *= 3;
+                }
+                m_darkAccumSum.assign(static_cast<qsizetype>(elementCount), 0u);
+                m_darkAccumInit = true;
+            }
+
+            if (m_darkAccumSum.size() > 0 && width > 0 && height > 0
+                && fmt == m_darkAccumFormat
+                && m_darkAccum.size() == img.size()) {
+                if (fmt == QImage::Format_Grayscale16) {
+                    const ushort *srcData = reinterpret_cast<const ushort *>(img.constBits());
+                    #pragma omp parallel for schedule(static)
+                    for (int y = 0; y < height; ++y) {
+                        const int rowBase = y * width;
+                        for (int x = 0; x < width; ++x) {
+                            m_darkAccumSum[rowBase + x] += srcData[rowBase + x];
+                        }
+                    }
+                } else if (fmt == QImage::Format_Grayscale8) {
+                    const uchar *srcData = img.constBits();
+                    #pragma omp parallel for schedule(static)
+                    for (int y = 0; y < height; ++y) {
+                        const int rowBase = y * width;
+                        for (int x = 0; x < width; ++x) {
+                            m_darkAccumSum[rowBase + x] += srcData[rowBase + x];
+                        }
+                    }
+                } else if (fmt == QImage::Format_RGB888) {
+                    const uchar *srcData = img.constBits();
+                    const int rowStride = width * 3;
+                    #pragma omp parallel for schedule(static)
+                    for (int y = 0; y < height; ++y) {
+                        const int rowBase = y * rowStride;
+                        for (int x = 0; x < rowStride; ++x) {
+                            m_darkAccumSum[rowBase + x] += srcData[rowBase + x];
+                        }
+                    }
+                }
+            }
+
+            ++m_darkAccumFrames;
+            --m_darkBurstRemaining;
+
+            // Compute running average so far (rounded half-up)
+            const quint64 divisor = m_darkAccumFrames;
+            const quint64 halfDiv = divisor / 2;
+            QImage result(width, height, fmt);
+            if (fmt == QImage::Format_Grayscale16) {
+                ushort *dstData = reinterpret_cast<ushort *>(result.bits());
+                for (int i = 0; i < width * height; ++i) {
+                    quint64 v = (m_darkAccumSum[i] + halfDiv) / divisor;
+                    if (v > 65535) v = 65535;
+                    dstData[i] = static_cast<ushort>(v);
+                }
+            } else if (fmt == QImage::Format_Grayscale8) {
+                uchar *dstData = result.bits();
+                for (int i = 0; i < width * height; ++i) {
+                    quint64 v = (m_darkAccumSum[i] + halfDiv) / divisor;
+                    if (v > 255) v = 255;
+                    dstData[i] = static_cast<uchar>(v);
+                }
+            } else if (fmt == QImage::Format_RGB888) {
+                uchar *dstData = result.bits();
+                const int n = width * height * 3;
+                for (int i = 0; i < n; ++i) {
+                    quint64 v = (m_darkAccumSum[i] + halfDiv) / divisor;
+                    if (v > 255) v = 255;
+                    dstData[i] = static_cast<uchar>(v);
+                }
+            }
+
+            m_currentFrame.image = result;
+
+            showStatusMessage(tr("Acquiring dark frame (%1/%2)...")
+                .arg(m_darkBurstTotal - m_darkBurstRemaining)
+                .arg(m_darkBurstTotal), 2000);
+
+            if (m_darkBurstRemaining <= 0) {
+                m_darkFrame = result;
+                m_darkFrameValid = true;
+                m_acquiringDark = false;
+                if (m_acquireDarkDialog) {
+                    m_acquireDarkDialog->setAcquireInProgress(false);
+                }
+                showStatusMessage(
+                    tr("Dark frame acquired (%1-frame average). Use Save Frame to keep it.")
+                    .arg(m_darkBurstTotal), 10000);
+            }
+        }
+
+        updateDisplay(m_currentFrame);
+        updateToolbarState();
+
+        QSettings settings;
+        if (settings.value("data/autoSaveEnabled", false).toBool()) {
+            on_actionSaveFrame_triggered();
+        }
+        return;
+    }
+
+    // 2. Calibration branch (only after the burst has completed)
+    if (m_darkEnabled && m_darkFrameValid) {
+        if (m_darkFrame.size() != m_currentFrame.image.size()) {
+            const quint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+            if (nowMs - m_lastDarkSizeWarnMs >= 1000) {
+                m_lastDarkSizeWarnMs = nowMs;
+                showStatusMessage(
+                    tr("Dark-frame calibration skipped: size mismatch "
+                       "(dark %1x%2 vs frame %3x%4).")
+                        .arg(m_darkFrame.width()).arg(m_darkFrame.height())
+                        .arg(m_currentFrame.image.width())
+                        .arg(m_currentFrame.image.height()),
+                    2000);
+            }
+        } else {
+            PostProcess::applyDarkCalibration(m_currentFrame, &m_darkFrame, m_darkBias);
+        }
+    }
+
+    // 3. vbin (pre-calibration processing, applies to display only)
     if (m_vBinEnabled) {
-        ImageData processed = frame;
+        ImageData processed = m_currentFrame;
         PostProcess::verticalBinning(processed, m_vBinStartRow, m_vBinEndRow);
         m_currentFrame = processed;
-        updateDisplay(processed);
-    } else {
-        m_currentFrame = frame;
-        updateDisplay(frame);
     }
+
+    updateDisplay(m_currentFrame);
     updateToolbarState();
 
-    QSettings settings;
-    if (settings.value("data/autoSaveEnabled", false).toBool()) {
+    QSettings settings2;
+    if (settings2.value("data/autoSaveEnabled", false).toBool()) {
         on_actionSaveFrame_triggered();
     }
 }
@@ -834,9 +1059,32 @@ void MainWindow::onErrorOccurred(const CameraError &error)
 void MainWindow::onCaptureStarted()
 {
 }
-
 void MainWindow::onCaptureStopped()
 {
+    // If a dark-frame burst was in flight, the user aborted via Stop (or
+    // the driver stopped early). Discard the partial accumulation; the
+    // existing m_darkFrame is left untouched so a previously-acquired dark
+    // frame stays valid.
+    if (m_acquiringDark) {
+        cancelDarkAcquisition(tr("Capture stopped before burst completed."));
+    }
+}
+
+void MainWindow::cancelDarkAcquisition(const QString &reason)
+{
+    if (!m_acquiringDark) {
+        return;
+    }
+    m_acquiringDark = false;
+    m_darkBurstRemaining = 0;
+    m_darkAccumInit = false;
+    m_darkAccumFrames = 0;
+    m_darkAccumSum.clear();
+    m_darkAccum = QImage();
+    if (m_acquireDarkDialog) {
+        m_acquireDarkDialog->setAcquireInProgress(false);
+    }
+    showStatusMessage(QString("Dark-frame acquisition cancelled: %1").arg(reason), 5000);
 }
 
 void MainWindow::onCrosshairCleared()
@@ -924,17 +1172,20 @@ void MainWindow::updateToolbarState()
         ui->toolbarActionConfig->setEnabled(false);
         ui->actionStart->setEnabled(false);
         ui->actionStop->setEnabled(false);
-        return;
+        ui->menuActionAcquireDarkFrame->setEnabled(false);
+        ui->menuActionCalibration->setEnabled(false);
     }
 
     const bool connected = m_appController->isConnected();
     const bool acquiring = m_appController->state() == CameraState::Acquiring;
 
-    ui->actionConfig->setEnabled(!acquiring);
-    ui->toolbarActionConfig->setEnabled(!acquiring);
     ui->actionStart->setEnabled(connected && !acquiring);
     ui->actionStop->setEnabled(acquiring);
+    ui->menuActionAcquireDarkFrame->setEnabled(connected && !acquiring);
+    ui->menuActionCalibration->setEnabled(connected);
 }
+
+
 
 void MainWindow::updateDisplay(const ImageData &frame)
 {

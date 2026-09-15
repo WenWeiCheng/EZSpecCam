@@ -9,5 +9,5 @@ namespace PostProcess
 {
 
 void verticalBinning(ImageData &frame, int startRow, int endRow);
-
+void applyDarkCalibration(ImageData &frame, const QImage *darkFrame, int customBias);
 } // namespace PostProcess
