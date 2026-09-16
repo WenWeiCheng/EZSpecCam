@@ -111,6 +111,26 @@ private slots:
         QVERIFY(r.reason.isEmpty());
     }
 
+    void test_int_collection_rejects_invalid()
+    {
+        ParameterDefinition def = makeIntCollection("binning",
+            QVector<int>{1, 2, 4, 8}, 1);
+        ClampResult r = clampValue(QVariant(3), def);
+        QVERIFY(!r.value.isValid());
+        QVERIFY(!r.changed);
+        QVERIFY(r.reason.contains("must be one of"));
+    }
+
+    void test_int_collection_accepts_valid()
+    {
+        ParameterDefinition def = makeIntCollection("binning",
+            QVector<int>{1, 2, 4, 8}, 1);
+        ClampResult r = clampValue(QVariant(4), def);
+        QCOMPARE(r.value.toInt(), 4);
+        QVERIFY(!r.changed);
+        QVERIFY(r.reason.isEmpty());
+    }
+
     // ---- applyClampedSet integration tests (need driver) ----
 
     void test_apply_exposure_above_max_is_clamped()
@@ -122,6 +142,16 @@ private slots:
         QCOMPARE(rep.skipped, 0);
         QCOMPARE(rep.setFailed, 0);
         QCOMPARE(m_driver->parameterValue("exposure").toDouble(), 10000.0);
+    }
+
+    void test_apply_collection_rejected_is_skipped()
+    {
+        QVariantMap params;
+        params.insert("binning", 3);
+        cli::ApplyReport rep = cli::applyClampedSet(m_driver, params, QString());
+        QCOMPARE(rep.clamped, 0);
+        QCOMPARE(rep.skipped, 1);
+        QCOMPARE(m_driver->parameterValue("binning").toInt(), 1);
     }
 
 private:

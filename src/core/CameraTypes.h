@@ -389,7 +389,46 @@ inline ClampResult clampValue(const QVariant &raw,
         }
         return {QVariant(static_cast<int>(stepped)), changed, reason};
     }
-    // Remaining cases handled in Task 3.
+    case ParameterType::FloatCollection: {
+        double val = raw.toDouble();
+        for (const QVariant &v : def.constraint.validValues) {
+            if (qAbs(v.toDouble() - val) < 0.0001)
+                return {raw, false, QString()};
+        }
+        QStringList opts;
+        for (const QVariant &v : def.constraint.validValues)
+            opts << QString::number(v.toDouble());
+        return {QVariant(), false,
+                QString("invalid value %1; must be one of [%2]")
+                    .arg(val).arg(opts.join(", "))};
+    }
+    case ParameterType::IntCollection: {
+        int val = raw.toInt();
+        for (const QVariant &v : def.constraint.validValues) {
+            if (v.toInt() == val)
+                return {raw, false, QString()};
+        }
+        QStringList opts;
+        for (const QVariant &v : def.constraint.validValues)
+            opts << QString::number(v.toInt());
+        return {QVariant(), false,
+                QString("invalid value %1; must be one of [%2]")
+                    .arg(val).arg(opts.join(", "))};
+    }
+    case ParameterType::StringCollection: {
+        QString val = raw.toString();
+        for (const QVariant &v : def.constraint.validValues) {
+            if (v.toString() == val)
+                return {raw, false, QString()};
+        }
+        QStringList opts;
+        for (const QVariant &v : def.constraint.validValues)
+            opts << v.toString();
+        return {QVariant(), false,
+                QString("invalid value '%1'; must be one of [%2]")
+                    .arg(val).arg(opts.join(", "))};
+    }
+    // Boolean and String cases handled in Task 4.
     default:
         return {raw, false, QString()};
     }
