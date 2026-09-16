@@ -351,8 +351,48 @@ inline ClampResult clampValue(const QVariant &raw,
     if (!def.isValid())
         return {QVariant(), false, QStringLiteral("invalid parameter definition")};
 
-    // Stub — full implementation in next task.
-    return {raw, false, QString()};
+    switch (def.type) {
+    case ParameterType::FloatRange: {
+        double min = def.constraint.minValue;
+        double max = def.constraint.maxValue;
+        double step = def.constraint.step;
+        if (qFuzzyCompare(step, 0.0)) step = 1.0;
+        double rawVal = raw.toDouble();
+        double bounded = qBound(min, rawVal, max);
+        double stepped = min + qRound((bounded - min) / step) * step;
+        if (stepped > max) stepped = max;
+        bool changed = !qFuzzyCompare(1.0 + rawVal, 1.0 + stepped);
+        QString reason;
+        if (changed) {
+            if (rawVal < min)      reason = QString("clamped from %1 to %2").arg(rawVal).arg(min);
+            else if (rawVal > max) reason = QString("clamped from %1 to %2").arg(rawVal).arg(max);
+            else                   reason = QString("stepped from %1 to %2 (step=%3)")
+                                              .arg(rawVal).arg(stepped).arg(step);
+        }
+        return {QVariant(stepped), changed, reason};
+    }
+    case ParameterType::IntRange: {
+        double min = def.constraint.minValue;
+        double max = def.constraint.maxValue;
+        double step = def.constraint.step > 0 ? def.constraint.step : 1.0;
+        double rawVal = raw.toDouble();
+        double bounded = qBound(min, rawVal, max);
+        double stepped = min + qRound((bounded - min) / step) * step;
+        if (stepped > max) stepped = max;
+        bool changed = (rawVal != stepped);
+        QString reason;
+        if (changed) {
+            if (rawVal < min)      reason = QString("clamped from %1 to %2").arg(rawVal).arg(min);
+            else if (rawVal > max) reason = QString("clamped from %1 to %2").arg(rawVal).arg(max);
+            else                   reason = QString("stepped from %1 to %2 (step=%3)")
+                                              .arg(rawVal).arg(stepped).arg(step);
+        }
+        return {QVariant(static_cast<int>(stepped)), changed, reason};
+    }
+    // Remaining cases handled in Task 3.
+    default:
+        return {raw, false, QString()};
+    }
 }
 
 //==============================================================================
