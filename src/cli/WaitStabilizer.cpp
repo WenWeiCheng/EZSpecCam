@@ -10,7 +10,7 @@
 
 #include "ICameraDriver.h"
 
-namespace app
+namespace cli
 {
 
 namespace

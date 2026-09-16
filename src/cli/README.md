@@ -206,7 +206,7 @@ Extrinsic parameters (e.g. sensor temperature) are ideal targets for `wait_stabl
 
 The CLI binary is at `build/msvc-debug/bin/Debug/ezspeccam.exe`. The Mock plugin is deployed alongside it automatically so `--list` and a `mock-001` camera are usable out of the box.
 
-The CLI is part of the unified `ezspeccam` application; the build flag is `EZSPECCAM_BUILD_APP` (default `ON`). To build without the GUI dependency, set `EZSPECCAM_HEADLESS_ONLY` to `ON` (not yet implemented — for now, `ezspeccam` always links Qt Widgets).
+The CLI is a standalone `ezspeccam` executable built when `EZSPECCAM_BUILD_APP=ON`. It does **not** link Qt Widgets / OpenGL; only Qt::Core and Qt::Gui are used.
 
 ## Notes for Migrating from Pre-Merge CLI
 

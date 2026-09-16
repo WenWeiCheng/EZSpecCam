@@ -5,7 +5,7 @@
 #include <QFileInfo>
 #include <QTemporaryDir>
 
-#include "app/PluginLoader.h"
+#include "PluginLoader.h"
 
 class TestPluginLoader : public QObject
 {

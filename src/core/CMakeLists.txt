@@ -1,5 +1,5 @@
 # EZSpecCam Core Module
-# Static library for camera interfaces, data, and config
+# Static library for camera interfaces, data, config, and plugin loader.
 
 add_library(ezspeccam_core STATIC)
 
@@ -12,6 +12,8 @@ target_include_directories(ezspeccam_core
 target_sources(ezspeccam_core PRIVATE
     ICameraDriver.h
     CameraTypes.h
+    PluginLoader.h
+    PluginLoader.cpp
 )
 
 target_link_libraries(ezspeccam_core PUBLIC Qt6::Core Qt6::Gui)

@@ -13,7 +13,7 @@
 #include "WaitStabilizer.h"
 #include "formats/FrameWriter.h"
 
-namespace app
+namespace cli
 {
 
 namespace

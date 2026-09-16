@@ -1,6 +1,6 @@
 #pragma once
 
-namespace app
+namespace cli
 {
 
 /// Install qDebug/qInfo → stdout, qCritical/qFatal → stderr.

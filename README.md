@@ -84,15 +84,19 @@ src/
 
 Static library defining the camera driver contract (`ICameraDriver`) and core data types (ROIs, binning, parameters, errors).
 
-### App (`src/app/`)
+### App
 
-Single executable that hosts both CLI and GUI. `main.cpp` dispatches to either based on argv; the rest of `app/` is shared infrastructure:
+Two separate executables are produced:
 
-- **Mode dispatch** (`AppMode`) — pure function returning the requested mode.
-- **Logging** (`MessageHandler`) — installs a `qDebug` handler so messages hit stderr / OutputDebugString / log files consistently across modes.
-- **Plugin discovery** (`PluginLoader`) — scans `<binary>/plugins/drivers/`, loads each `*.so` / `*.dll`, and casts to `ICameraDriver`.
-- **Capture pipeline** (`HeadlessController`, `WaitStabilizer`) — sequence used by CLI to connect, wait for stable temperature, capture N frames, save each, then disconnect.
-- **Frame output** (`formats/FrameWriter` + per-format handlers) — picks the handler by extension and writes a sidecar `_metadata.json` next to every image.
+- `ezspeccam.exe` — CLI (console subsystem; always built; produces stdout correctly so PowerShell/cmd prompts do not double-echo).
+- `ezspeccam-gui.exe` — GUI (`WIN32` subsystem in Release, console subsystem in Debug so `qDebug` reaches the IDE/terminal).
+
+Shared infrastructure used by both:
+
+- **Plugin discovery** (`src/core/PluginLoader.cpp`, namespace `app::plugins`) — scans plugin roots, loads each `*.dll` / `*.so`, and casts to `ICameraDriver`.
+- **Logging** (`src/cli/MessageHandler.cpp`, `src/gui/MessageHandler.cpp`) — installs a `qDebug` handler so messages hit stdout / stderr consistently across modes.
+- **Capture pipeline** (`src/cli/HeadlessController.cpp`, `src/cli/WaitStabilizer.cpp`) — used by CLI to connect, wait for stable temperature, capture N frames, save each, then disconnect.
+- **Frame output** (`src/formats/`) — `FrameWriter` + per-format `TiffFormatHandler` / `CsvFormatHandler` pick the handler by extension and write a sidecar `_metadata.json` next to every image.
 
 ### CLI (`src/cli/`)
 

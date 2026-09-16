@@ -8,8 +8,8 @@ set(CMAKE_AUTOMOC ON)
 find_package(Qt6 COMPONENTS Core Gui Test REQUIRED)
 
 add_executable(test_plugin_loader test_plugin_loader.cpp
-    ${CMAKE_SOURCE_DIR}/src/app/PluginLoader.h
-    ${CMAKE_SOURCE_DIR}/src/app/PluginLoader.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/PluginLoader.h
+    ${CMAKE_SOURCE_DIR}/src/core/PluginLoader.cpp
 )
 
 target_include_directories(test_plugin_loader PRIVATE

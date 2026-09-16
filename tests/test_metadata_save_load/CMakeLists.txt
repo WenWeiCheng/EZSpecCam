@@ -9,18 +9,16 @@ find_package(Qt6 COMPONENTS Core Gui Test REQUIRED)
 
 add_executable(test_metadata_save_load
     test_metadata_save_load.cpp
-    ${CMAKE_SOURCE_DIR}/src/app/formats/TiffFormatHandler.cpp
-    ${CMAKE_SOURCE_DIR}/src/app/formats/CsvFormatHandler.cpp
+    ${CMAKE_SOURCE_DIR}/src/formats/TiffFormatHandler.cpp
+    ${CMAKE_SOURCE_DIR}/src/formats/CsvFormatHandler.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/workers/FileLoaderWorker.cpp
-    ${CMAKE_SOURCE_DIR}/src/app/formats/IImageFormatHandler.h
-    ${CMAKE_SOURCE_DIR}/src/app/formats/SaveTypes.h
+    ${CMAKE_SOURCE_DIR}/src/formats/IImageFormatHandler.h
+    ${CMAKE_SOURCE_DIR}/src/formats/SaveTypes.h
 )
 
 target_include_directories(test_metadata_save_load PRIVATE
     ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/src/app
     ${CMAKE_SOURCE_DIR}/src/gui/workers
-    ${CMAKE_SOURCE_DIR}/src/app/formats
 )
 
 target_link_libraries(test_metadata_save_load PRIVATE

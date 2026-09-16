@@ -6,7 +6,7 @@
 
 #include "SequenceRunner.h"
 
-namespace app
+namespace cli
 {
 
 struct HeadlessOptions

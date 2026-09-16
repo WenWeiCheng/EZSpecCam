@@ -113,7 +113,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_subdirectory(src/core)
 
 if(EZSPECCAM_BUILD_APP)
-    add_subdirectory(src/app)
+    add_subdirectory(src/cli)
+    add_subdirectory(src/gui)
 endif()
 
 if(EZSPECCAM_BUILD_PLUGINS)

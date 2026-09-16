@@ -8,25 +8,30 @@
 EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connection, parameter management, and image capture. Supports both GUI (QApplication) and CLI (QCoreApplication) entry points with a plugin-based driver architecture.
 
 ## STRUCTURE
-```
-./
 ├── src/
 │   ├── core/           # Camera driver interface + types → see src/core/ICameraDriver.md
-│   ├── gui/            # Qt GUI app → see src/gui/AGENTS.md
+│   ├── formats/        # Image format handlers (TIFF, CSV, SaveTypes, FrameWriter) → used by both CLI and GUI
 │   ├── cli/            # CLI app (QCoreApplication) — see src/cli/README.md
+│   ├── gui/            # Qt GUI app → see src/gui/AGENTS.md
 │   └── plugins/        # Camera driver plugins → see src/plugins/AGENTS.md
 ├── tests/              # Qt Test suite → see tests/AGENTS.md
 └── build/              # CMake build outputs (gitignored)
 ```
 
+**Two separate executables are produced:**
+
+- `ezspeccam.exe` — CLI (always console subsystem; see src/cli/CMakeLists.txt)
+- `ezspeccam-gui.exe` — GUI (Debug = console subsystem so qDebug reaches terminal; Release = WIN32 subsystem so no console flashes)
+
 ## WHERE TO LOOK
+
 | Task | Location | Notes |
 |------|----------|-------|
 | Camera driver interface | `src/core/ICameraDriver.h` | ~15 pure virtual methods + 5 signals; Q_DECLARE_INTERFACE → see `src/core/ICameraDriver.md` |
 | Core data types | `src/core/CameraTypes.h` | ROIs, binning, params, errors, enums → see `src/core/CameraTypes.md` |
 | App controller (GUI) | `src/gui/AppController.h` | Merged CameraManager + PluginManager |
 | MainWindow | `src/gui/widgets/MainWindow.h` | QMainWindow with toolbar, menus, signals |
-| CLI entry point | `src/cli/main.cpp` | QCoreApplication + Qt's `QCommandLineParser` (in-place) + `SequenceRunner` for JSON event sequences |
+| CLI entry point | `src/cli/main.cpp` | `QCoreApplication` → `cli::installMessageHandler()` → `cli::attachParentConsoleIfAvailable()` → `cli::run()` from `src/cli/CliMain.cpp` |
 | Build config | `CMakeLists.txt` / `CMakePresets.json` | msvc-debug, msvc-release, msvc-debug-gui presets |
 | Plugin metadata | `src/plugins/*/plugin.json` | JSON descriptors per driver |
 
@@ -42,7 +47,7 @@ EZSpecCam is a Qt 6.8 C++17 application for camera control — discovery, connec
 | `SpectrumViewWidget` | Widget | `src/gui/widgets/display/SpectrumViewWidget.h` | Spectrum plot widget |
 | `MockCameraDriver` | Plugin | `src/plugins/mock/MockCameraDriver.cpp` | Simulated camera for testing |
 | `QHYCCDDriver` | Plugin | `src/plugins/qhyccd/QHYCCDDriver.cpp` | Real QHYCCD hardware driver |
-| `SequenceRunner` | Class | `src/cli/SequenceRunner.h` / `SequenceRunner.cpp` | Parses and runs JSON event-sequence scripts (`--sequence`) |
+| `SequenceRunner` | Class | `src/cli/SequenceRunner.h` / `src/cli/SequenceRunner.cpp` | Parses and runs JSON event-sequence scripts (`--sequence`) |
 
 ## CONVENTIONS
 - **C++17**, no extensions (`CMAKE_CXX_EXTENSIONS OFF`)

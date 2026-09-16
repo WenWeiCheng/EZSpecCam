@@ -4,7 +4,7 @@
 
 class ICameraDriver;
 
-namespace app
+namespace cli
 {
 
 /// Poll a driver parameter until all readings in a sliding window are within

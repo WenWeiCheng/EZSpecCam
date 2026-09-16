@@ -3,9 +3,9 @@
 #include <QCommandLineOption>
 #include <QDebug>
 
-#include "app/HeadlessController.h"
-#include "app/MessageHandler.h"
-#include "app/CliFormat.h"
+#include "HeadlessController.h"
+#include "MessageHandler.h"
+#include "CliFormat.h"
 #include "SequenceRunner.h"
 
 namespace cli
@@ -57,13 +57,13 @@ int run(int argc, char *argv[], QCoreApplication & /*app*/)
 
     parser.process(QCoreApplication::instance()->arguments());
 
-    app::HeadlessOptions opts;
+    cli::HeadlessOptions opts;
     opts.listCameras = parser.isSet(listOpt);
     opts.listParams = parser.isSet(listParamsOpt);
     opts.cameraId = parser.value(cameraOpt);
     opts.frames = parser.value(framesOpt).toInt();
     opts.outputDir = parser.value(outputOpt);
-    opts.outputExtension = app::cliFormatToExtension(parser.value(formatOpt));
+    opts.outputExtension = cli::cliFormatToExtension(parser.value(formatOpt));
     opts.prefix = parser.value(prefixOpt);
     opts.suffix = parser.value(suffixOpt);
 
@@ -90,7 +90,7 @@ int run(int argc, char *argv[], QCoreApplication & /*app*/)
         if (opts.suffix.isEmpty() && !seq.defaultSuffix.isEmpty())      opts.suffix = seq.defaultSuffix;
     }
 
-    return app::run(opts);
+    return cli::run(opts);
 }
 
 }

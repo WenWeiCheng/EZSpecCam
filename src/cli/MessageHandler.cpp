@@ -21,7 +21,7 @@ void messageHandler(QtMsgType type, const QMessageLogContext &, const QString &m
 
 }
 
-namespace app
+namespace cli
 {
 
 void installMessageHandler()

@@ -2,7 +2,7 @@
 
 #include <QString>
 
-namespace app
+namespace cli
 {
 
 /// Translate a CLI / sequence-JSON format string ("tiff", "csv", ...) to a
