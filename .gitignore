@@ -108,6 +108,8 @@ temp/
 # Cache directories
 .cache/
 output/
+emva/
+emva*
 
 material/
 node_modules/
