@@ -834,13 +834,13 @@ void MainWindow::onCameraStateChanged(CameraState newState)
 {
     QString stateText;
     switch (newState) {
-    case CameraState::Disconnected:
-        stateText = tr("Disconnected");
+    case CameraState::Connecting:
+        stateText = tr("Connecting");
         m_fpsTimer->stop();
         m_fpsFrameCount = 0;
         m_fpsValue = 0;
         updateFpsDisplay();
-        
+
         // disable capture related shortcut
         shortcutLive->setEnabled(false);
         shortcutSingle->setEnabled(false);

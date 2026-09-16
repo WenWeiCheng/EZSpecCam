@@ -133,6 +133,7 @@ int runSequence(ICameraDriver *driver, const HeadlessOptions &opts,
                     qWarning() << "  Failed to commit parameters:" << commitFailed.join(", ");
             }
             break;
+        case SequenceStep::Capture:
         {
             QString outDir = step.outputDir.isEmpty()    ? opts.outputDir         : step.outputDir;
             QString ext    = step.outputExtension.isEmpty() ? opts.outputExtension : step.outputExtension;
