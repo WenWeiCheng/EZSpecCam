@@ -26,39 +26,53 @@ rmdir /S /Q "%DEPLOY_DIR%" 2>nul
 mkdir "%DEPLOY_DIR%"
 mkdir "%DEPLOY_DIR%\plugins\drivers"
 
-:: Copy main executable (exe is in bin\Release subdirectory for release, bin\Debug for debug)
-echo Copying executable...
-if exist "%BUILD_DIR%\bin\Release\ezspeccam.exe" (
-    set "APP_EXE=%BUILD_DIR%\bin\Release\ezspeccam.exe"
-) else (
-    set "APP_EXE=%BUILD_DIR%\bin\Debug\ezspeccam.exe"
-)
-if not exist "%APP_EXE%" (
+::: Copy main executables (CLI + GUI). Release build: bin\Release; Debug build: bin\Debug.
+set "SUFFIX=Release"
+if not exist "%BUILD_DIR%\bin\Release\ezspeccam.exe" set "SUFFIX=Debug"
+set "CLI_EXE=%BUILD_DIR%\bin\%SUFFIX%\ezspeccam.exe"
+set "GUI_EXE=%BUILD_DIR%\bin\%SUFFIX%\ezspeccam-gui.exe"
+if not exist "%CLI_EXE%" (
     echo ERROR: ezspeccam.exe not found
     exit /b 1
 )
-copy /Y "%APP_EXE%" "%DEPLOY_DIR%\"
+if not exist "%GUI_EXE%" (
+    echo ERROR: ezspeccam-gui.exe not found
+    exit /b 1
+)
+echo Copying executables...
+copy /Y "%CLI_EXE%" "%DEPLOY_DIR%\"
+copy /Y "%GUI_EXE%" "%DEPLOY_DIR%\"
 
-:: windeployqt - collect Qt runtime DLLs
-echo Running windeployqt...
+::: windeployqt - collect Qt runtime DLLs for both binaries
 set "QT_DIR=C:\Qt\6.8.2\msvc2022_64"
 if not exist "%QT_DIR%\bin\windeployqt.exe" (
     echo ERROR: windeployqt.exe not found at %QT_DIR%\bin\
     exit /b 1
 )
 
+echo Running windeployqt for CLI...
 "%QT_DIR%\bin\windeployqt.exe" ^
     --no-translations ^
     --no-compiler-runtime ^
     --no-opengl-sw ^
     "%DEPLOY_DIR%\ezspeccam.exe"
-
 if errorlevel 1 (
-    echo ERROR: windeployqt failed
+    echo ERROR: windeployqt failed for ezspeccam.exe
     exit /b 1
 )
 
-:: Copy camera driver plugins (auto-discover *.dll from build's deployed location)
+echo Running windeployqt for GUI...
+"%QT_DIR%\bin\windeployqt.exe" ^
+    --no-translations ^
+    --no-compiler-runtime ^
+    --no-opengl-sw ^
+    "%DEPLOY_DIR%\ezspeccam-gui.exe"
+if errorlevel 1 (
+    echo ERROR: windeployqt failed for ezspeccam-gui.exe
+    exit /b 1
+)
+
+::: Copy camera driver plugins (auto-discover *.dll from build's deployed location)
 set "PLUGIN_SRC_DIR="
 if exist "%BUILD_DIR%\bin\Release\plugins\drivers" (
     set "PLUGIN_SRC_DIR=%BUILD_DIR%\bin\Release\plugins\drivers"

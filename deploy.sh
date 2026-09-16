@@ -25,6 +25,7 @@ case "${CONFIG##linux-}" in
         ;;
 esac
 APP_BIN="${APP_BIN_DIR}/ezspeccam"
+GUI_BIN="${APP_BIN_DIR}/ezspeccam-gui"
 
 # Prefer system binaries over broken vendor ones (Xilinx/Vitis).
 if [ -x /usr/bin/cmake ]; then CMAKE=/usr/bin/cmake; else CMAKE=cmake; fi
@@ -38,14 +39,19 @@ if [ ! -x "$APP_BIN" ]; then
     echo "       Run build_preset.sh ${CONFIG##linux-} first." >&2
     exit 1
 fi
+if [ ! -x "$GUI_BIN" ]; then
+    echo "ERROR: $GUI_BIN not found." >&2
+    echo "       Build the GUI (src/gui/CMakeLists.txt target 'ezspeccam-gui') first." >&2
+    exit 1
+fi
 
 # Reset deploy dir.
 rm -rf "$DEPLOY_DIR"
 mkdir -p "${DEPLOY_DIR}/plugins/drivers"
 
-echo "Copying executable..."
-cp "$APP_BIN" "$DEPLOY_DIR/"
-
+echo "Copying executables..."
+cp "$APP_BIN" "$DEPLOY_DIR/ezspeccam"
+cp "$GUI_BIN" "${DEPLOY_DIR}/ezspeccam-gui"
 PLUGIN_SRC="${APP_BIN_DIR}/plugins/drivers"
 if [ -d "$PLUGIN_SRC" ]; then
     echo "Copying camera driver plugins from ${PLUGIN_SRC}..."
@@ -74,9 +80,11 @@ if command -v linuxdeployqt >/dev/null 2>&1; then
         echo "WARNING: qmake6 not found; linuxdeployqt may pick the wrong Qt." >&2
     fi
     # linuxdeployqt scans the binary, follows Qt plugins (platforms/, imageformats/),
-    # and bundles everything into DEPLOY_DIR.
+    # and bundles everything into DEPLOY_DIR. Pass both the CLI and GUI binaries
+    # so widget/QtSvg/etc. plugins needed by the GUI are also collected.
     linuxdeployqt \
         "${DEPLOY_DIR}/ezspeccam" \
+        "${DEPLOY_DIR}/ezspeccam-gui" \
         "${QMAKE_FLAG[@]}" \
         -verbose=1
 else
