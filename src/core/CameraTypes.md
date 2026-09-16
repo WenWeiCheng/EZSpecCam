@@ -155,6 +155,35 @@ Used by drivers (`validateParameters()`, `commitParameters()`) and GUI (pre-subm
 
 Both are `inline` — defined in the header for zero-cost inclusion.
 
+### `clampValue()` — Silent clamp helper
+
+```cpp
+struct ClampResult {
+    QVariant value;
+    bool changed;
+    QString reason;
+};
+
+inline ClampResult clampValue(const QVariant &raw,
+                              const ParameterDefinition &def);
+```
+
+Mirrors the GUI's widget-level silent-clamp behaviour so headless CLI workflows
+(`--set`, `--sequence configure`) can apply the same user-forgiving correction:
+
+- `FloatRange` / `IntRange`: `qBound(min, value, max)` then snap to nearest step.
+- `FloatCollection` / `IntCollection` / `StringCollection`: reject (return
+  `QVariant()`) with `reason` listing the valid values.
+- `Boolean`: coerce via `toBool()`; `changed` reflects whether the input was
+  already a bool.
+- `String`: pass-through.
+- Pre-gates: empty name (unknown parameter), `isReadOnly`, or invalid definition
+  all reject with a descriptive reason.
+
+Used by `cli::applyClampedSet()` (`src/cli/ParameterClamper.{h,cpp}`) which
+emits `qWarning` for `changed==true` rejections and skips rejected entries
+without aborting the batch.
+
 ---
 
 ## ERROR HANDLING

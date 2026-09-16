@@ -32,7 +32,7 @@ ezspeccam --camera mock-001 --set exposure=500 --set gain=5.5 --frames 5
 
 | Option | Description |
 |--------|-------------|
-| `--set <name>=<value>` | Set a camera parameter. Repeatable. Values are auto-parsed as double, integer, or string. |
+| `--set <name>=<value>` | Set a camera parameter. Repeatable. Values are auto-parsed as double, integer, or string. Values outside the parameter's valid range are auto-clamped to the nearest valid value, with a warning printed to stderr. |
 
 ### Capture
 
@@ -149,7 +149,7 @@ For workflows requiring multiple configurations or stabilized conditions, use `-
 
 ### Step Types
 
-**`configure`** — Set camera parameters before the next step.
+**`configure`** — Set camera parameters before the next step. Values outside the parameter's valid range are auto-clamped to the nearest valid value, with a warning printed to stderr.
 
 ```json
 { "configure": { "exposure": 200, "gain": 5.0 } }
