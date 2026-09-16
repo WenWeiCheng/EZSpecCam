@@ -30,8 +30,6 @@ endif()
 
 target_sources(ezspeccam-gui PRIVATE
     main.cpp
-    GuiMain.h
-    GuiMain.cpp
     MessageHandler.h
     MessageHandler.cpp
     DebugMacros.h

@@ -23,11 +23,8 @@ qt_add_executable(ezspeccam)
 
 target_sources(ezspeccam PRIVATE
     main.cpp
-    CliMain.h
-    CliMain.cpp
     MessageHandler.h
     MessageHandler.cpp
-    HeadlessController.h
     HeadlessController.cpp
     WaitStabilizer.h
     WaitStabilizer.cpp
