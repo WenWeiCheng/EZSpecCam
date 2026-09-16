@@ -909,7 +909,7 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
                 if (fmt == QImage::Format_RGB888) {
                     elementCount *= 3;
                 }
-                m_darkAccumSum.assign(static_cast<qsizetype>(elementCount), 0u);
+                m_darkAccumSum.fill(static_cast<qsizetype>(elementCount), 0u);
                 m_darkAccumInit = true;
             }
 
