@@ -54,6 +54,8 @@ void listParameters(ICameraDriver *driver)
     }
 }
 
+}
+
 int captureFrames(ICameraDriver *driver, int frameCount,
                   const QString &outputDir, const QString &outputExtension,
                   const QString &prefix, const QString &suffix)
@@ -64,7 +66,7 @@ int captureFrames(ICameraDriver *driver, int frameCount,
     int captured = 0;
     int errors = 0;
 
-    QObject::connect(driver, &ICameraDriver::frameReady,
+    QObject::connect(driver, &ICameraDriver::frameReady, &loop,
         [&](const QSharedPointer<QImage> &image, quint64 ts, int frameNumber,
             const QString &cameraId, const QVariantMap &parameters)
         {
@@ -83,7 +85,7 @@ int captureFrames(ICameraDriver *driver, int frameCount,
             if (captured >= frameCount) loop.quit();
         });
 
-    QObject::connect(driver, &ICameraDriver::captureStopped,
+    QObject::connect(driver, &ICameraDriver::captureStopped, &loop,
         [&](const QString &) {
             if (captured < frameCount) {
                 qWarning() << "Capture stopped unexpectedly";
@@ -91,7 +93,7 @@ int captureFrames(ICameraDriver *driver, int frameCount,
             }
         });
 
-    QObject::connect(driver, &ICameraDriver::errorOccurred,
+    QObject::connect(driver, &ICameraDriver::errorOccurred, &loop,
         [&](const CameraError &err) {
             qWarning().noquote() << "Camera error:" << err.description;
             errors++;
@@ -108,6 +110,9 @@ int captureFrames(ICameraDriver *driver, int frameCount,
     qInfo() << "Capture complete:" << captured << "frames," << errors << "errors";
     return captured;
 }
+
+namespace
+{
 
 int runSequence(ICameraDriver *driver, const HeadlessOptions &opts,
                 const QVector<SequenceStep> &steps)
