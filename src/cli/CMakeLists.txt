@@ -26,6 +26,8 @@ target_sources(ezspeccam PRIVATE
     MessageHandler.h
     MessageHandler.cpp
     HeadlessController.cpp
+    ParameterClamper.h
+    ParameterClamper.cpp
     WaitStabilizer.h
     WaitStabilizer.cpp
     SequenceRunner.h

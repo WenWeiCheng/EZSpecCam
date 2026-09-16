@@ -311,6 +311,51 @@ inline QString validateReason(const QVariant &value,
 }
 
 //==============================================================================
+// Parameter Clamping (free functions)
+//==============================================================================
+
+/**
+ * @brief Result of a clampValue() call.
+ */
+struct ClampResult
+{
+    QVariant value;       ///< Clamped value; QVariant() if rejected.
+    bool changed = false; ///< True iff the output differs from the input.
+    QString reason;       ///< Human-readable explanation (for qWarning), empty when !changed.
+};
+
+/**
+ * @brief Snap an arbitrary user input into a parameter's valid domain.
+ *
+ * Mirrors the GUI's widget-level silent-clamp behaviour: out-of-range Range
+ * values are qBound() to [min,max] then snapped to the nearest step; Collection
+ * values that are not in validValues are rejected (QVariant() returned);
+ * Boolean and String values are type-coerced.
+ *
+ * Gate order (return {QVariant(), false, reason} on first match):
+ *   1. def.name.isEmpty()        -> "unknown parameter"
+ *   2. def.isReadOnly            -> "parameter is read-only"
+ *   3. !def.isValid()            -> "invalid parameter definition"
+ *
+ * @param raw  User-supplied value (from CLI argv or JSON).
+ * @param def  Parameter metadata from driver->parameter(name).
+ * @return     ClampResult describing the corrected value (or rejection).
+ */
+inline ClampResult clampValue(const QVariant &raw,
+                              const ParameterDefinition &def)
+{
+    if (def.name.isEmpty())
+        return {QVariant(), false, QStringLiteral("unknown parameter")};
+    if (def.isReadOnly)
+        return {QVariant(), false, QStringLiteral("parameter is read-only")};
+    if (!def.isValid())
+        return {QVariant(), false, QStringLiteral("invalid parameter definition")};
+
+    // Stub — full implementation in next task.
+    return {raw, false, QString()};
+}
+
+//==============================================================================
 // Error Handling
 //==============================================================================
 
