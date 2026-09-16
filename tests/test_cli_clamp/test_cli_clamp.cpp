@@ -218,6 +218,36 @@ private slots:
         QCOMPARE(m_driver->parameterValue("binning").toInt(), 1);
     }
 
+    void test_apply_unknown_param_is_skipped()
+    {
+        QVariantMap params;
+        params.insert("nonexistent_param", 1.0);
+        cli::ApplyReport rep = cli::applyClampedSet(m_driver, params, QString());
+        QCOMPARE(rep.clamped, 0);
+        QCOMPARE(rep.skipped, 1);
+        QCOMPARE(rep.setFailed, 0);
+    }
+
+    void test_apply_valid_value_no_change()
+    {
+        QVariantMap params;
+        params.insert("exposure", 100.0);
+        cli::ApplyReport rep = cli::applyClampedSet(m_driver, params, QString());
+        QCOMPARE(rep.clamped, 0);
+        QCOMPARE(rep.skipped, 0);
+        QCOMPARE(rep.setFailed, 0);
+        QCOMPARE(m_driver->parameterValue("exposure").toDouble(), 100.0);
+    }
+
+    void test_apply_indent_prefixes_log_lines()
+    {
+        QVariantMap params;
+        params.insert("exposure", 99999.0);
+        cli::ApplyReport rep = cli::applyClampedSet(m_driver, params, QStringLiteral("  "));
+        QCOMPARE(rep.clamped, 1);
+        QCOMPARE(m_driver->parameterValue("exposure").toDouble(), 10000.0);
+    }
+
 private:
     MockCameraDriver *m_driver = nullptr;
 };

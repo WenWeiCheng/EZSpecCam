@@ -11,6 +11,7 @@
 #include "MessageHandler.h"
 #include "PluginLoader.h"
 #include "WaitStabilizer.h"
+#include "ParameterClamper.h"
 #include "formats/FrameWriter.h"
 
 namespace cli
@@ -120,18 +121,7 @@ int runSequence(ICameraDriver *driver, const HeadlessOptions &opts,
         switch (step.type)
         {
         case SequenceStep::Configure:
-            for (auto it = step.parameters.constBegin(); it != step.parameters.constEnd(); ++it)
-            {
-                qInfo().noquote() << "  set" << it.key() << "=" << it.value().toString();
-                if (!driver->setParameter(it.key(), it.value()))
-                    qWarning().noquote() << "  Failed to set" << it.key();
-            }
-            {
-                QStringList commitFailed;
-                driver->commitParameters(&commitFailed);
-                if (!commitFailed.isEmpty())
-                    qWarning() << "  Failed to commit parameters:" << commitFailed.join(", ");
-            }
+            applyClampedSet(driver, step.parameters, QStringLiteral("  "));
             break;
         case SequenceStep::Capture:
         {
@@ -187,6 +177,12 @@ int run(const HeadlessOptions &opts)
         driver->commitParameters(&commitFailed);
         if (!commitFailed.isEmpty())
             qWarning() << "Warning: commitParameters rejected parameters:" << commitFailed.join(", ");
+    }
+
+    if (!opts.setParameters.isEmpty())
+    {
+        qInfo() << "Applying" << opts.setParameters.size() << "--set parameters";
+        applyClampedSet(driver, opts.setParameters, QString());
     }
 
     int rc = 0;

@@ -432,7 +432,7 @@ inline ClampResult clampValue(const QVariant &raw,
         if (!raw.canConvert<bool>())
             return {QVariant(), false, QStringLiteral("cannot convert to bool")};
         bool boolVal = raw.toBool();
-        bool changed = (raw.type() != QVariant::Bool);
+        bool changed = (raw.typeId() != QMetaType::Bool);
         return {QVariant(boolVal), changed, QString()};
     }
     case ParameterType::String: {
