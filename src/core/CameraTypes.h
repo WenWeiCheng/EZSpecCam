@@ -428,7 +428,16 @@ inline ClampResult clampValue(const QVariant &raw,
                 QString("invalid value '%1'; must be one of [%2]")
                     .arg(val).arg(opts.join(", "))};
     }
-    // Boolean and String cases handled in Task 4.
+    case ParameterType::Boolean: {
+        if (!raw.canConvert<bool>())
+            return {QVariant(), false, QStringLiteral("cannot convert to bool")};
+        bool boolVal = raw.toBool();
+        bool changed = (raw.type() != QVariant::Bool);
+        return {QVariant(boolVal), changed, QString()};
+    }
+    case ParameterType::String: {
+        return {QVariant(raw.toString()), false, QString()};
+    }
     default:
         return {raw, false, QString()};
     }

@@ -131,6 +131,70 @@ private slots:
         QVERIFY(r.reason.isEmpty());
     }
 
+    void test_boolean_coerces_from_string()
+    {
+        ParameterDefinition def = makeBoolean("cooling_enabled", false);
+        ClampResult r = clampValue(QVariant("true"), def);
+        QCOMPARE(r.value.toBool(), true);
+        QVERIFY(r.changed);
+    }
+
+    void test_boolean_unchanged_when_already_bool()
+    {
+        ParameterDefinition def = makeBoolean("cooling_enabled", false);
+        ClampResult r = clampValue(QVariant(true), def);
+        QCOMPARE(r.value.toBool(), true);
+        QVERIFY(!r.changed);
+    }
+
+    void test_string_passthrough()
+    {
+        ParameterDefinition def;
+        def.name = "comment";
+        def.displayName = "Comment";
+        def.description = "Free text";
+        def.category = ParameterCategory::Info;
+        def.type = ParameterType::String;
+        def.defaultValue = QStringLiteral("hello");
+        ClampResult r = clampValue(QVariant("world"), def);
+        QCOMPARE(r.value.toString(), QString("world"));
+        QVERIFY(!r.changed);
+    }
+
+    void test_readonly_rejects()
+    {
+        ParameterDefinition def = makeFloatRange("cooling_sensor_temp",
+            -50.0, 50.0, 0.1, 25.0);
+        def.isReadOnly = true;
+        def.isExtrinsic = true;
+        ClampResult r = clampValue(QVariant(20.0), def);
+        QVERIFY(!r.value.isValid());
+        QVERIFY(r.reason.contains("read-only"));
+    }
+
+    void test_unknown_param_rejects()
+    {
+        ParameterDefinition def;
+        ClampResult r = clampValue(QVariant(1.0), def);
+        QVERIFY(!r.value.isValid());
+        QVERIFY(r.reason.contains("unknown"));
+    }
+
+    void test_invalid_definition_rejects()
+    {
+        ParameterDefinition def;
+        def.name = "broken";
+        def.displayName = "Broken";
+        def.description = "Broken";
+        def.category = ParameterCategory::Core;
+        def.type = ParameterType::FloatRange;
+        def.constraint.minValue = 100.0;
+        def.constraint.maxValue = 50.0;
+        ClampResult r = clampValue(QVariant(75.0), def);
+        QVERIFY(!r.value.isValid());
+        QVERIFY(r.reason.contains("invalid parameter definition"));
+    }
+
     // ---- applyClampedSet integration tests (need driver) ----
 
     void test_apply_exposure_above_max_is_clamped()
