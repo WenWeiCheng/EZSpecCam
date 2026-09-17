@@ -577,7 +577,6 @@ bool QHYCCDDriver::commitParameters(QStringList *failedParameters)
                     ? m_pendingParameters.value("target_temperature").toDouble()
                     : m_parameters.value("target_temperature", -10.0).toDouble();
                 ret = ControlQHYCCDTemp(m_cameraHandle, targetTemp);
-                m_pendingParameters.remove("target_temperature");
             } else {
                 ret = SetQHYCCDParam(m_cameraHandle, CONTROL_MANULPWM, 0.0);
             }
