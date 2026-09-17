@@ -83,6 +83,14 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug)
 endif()
 
+# Strip qDebug()/qCDebug() at compile time for Release builds. Without this,
+# qCDebug() output (e.g. DRIVER_DEBUG) still reaches the message handler because
+# Qt only disables plain qDebug() by default; qCDebug() is gated by the
+# category's runtime enabledDebug flag (default true).
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_compile_definitions(QT_NO_DEBUG_OUTPUT)
+endif()
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/bin/Debug")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/lib/Debug")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/lib/Debug")
