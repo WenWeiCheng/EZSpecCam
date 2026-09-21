@@ -628,6 +628,12 @@ void MainWindow::on_actionCalibration_triggered()
 
     m_calibrationDialog->setDarkFrameEnabled(m_darkEnabled);
     m_calibrationDialog->setDarkFramePath(m_darkPath);
+    // If no file is selected but an acquired dark frame is already in memory,
+    // surface that in the dialog so the user sees what is actually in use.
+    // The path field stays empty (placeholder only), so darkFramePath() keeps
+    // returning "" and we never write the indicator into m_darkPath.
+    m_calibrationDialog->setInMemoryDarkFrameUsed(
+        m_darkPath.isEmpty() && m_darkFrameValid, m_darkBurstTotal);
     m_calibrationDialog->setCustomBias(m_darkBias);
     m_calibrationDialog->show();
     m_calibrationDialog->raise();

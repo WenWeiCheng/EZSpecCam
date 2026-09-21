@@ -78,6 +78,16 @@ void CalibrationDialog::setDarkFramePath(const QString &path)
     }
 }
 
+void CalibrationDialog::setInMemoryDarkFrameUsed(bool used, int frameCount)
+{
+    if (!m_pathLineEdit) {
+        return;
+    }
+    m_pathLineEdit->setPlaceholderText(used
+        ? tr("(in-memory dark frame, %1-frame average)").arg(frameCount)
+        : tr("(no dark frame selected)"));
+}
+
 QString CalibrationDialog::darkFramePath() const
 {
     return m_pathLineEdit ? m_pathLineEdit->text() : QString();

@@ -23,6 +23,12 @@ public:
     void setDarkFramePath(const QString &path);
     QString darkFramePath() const;
 
+    // When true, the path field is left empty but its placeholder advertises
+    // that an in-memory dark frame is the active source. When the user later
+    // picks a file via Browse, darkFramePath() still returns the picked path,
+    // so the in-memory marker never leaks into persisted state.
+    void setInMemoryDarkFrameUsed(bool used, int frameCount = 0);
+
     void setCustomBias(int bias);
     int customBias() const;
 

@@ -130,7 +130,7 @@ private:
     // Dark-frame calibration state
     bool    m_darkEnabled  = false;
     QString m_darkPath;
-    int     m_darkBias     = 0;
+    int     m_darkBias     = 1000;
     QImage  m_darkFrame;
     bool    m_darkFrameValid = false;
 
