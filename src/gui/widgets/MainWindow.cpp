@@ -903,8 +903,6 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
 
             if (!m_darkAccumInit) {
                 m_darkAccumFormat = fmt;
-                m_darkAccum = QImage(width, height, fmt);
-                m_darkAccum.fill(0);
                 int elementCount = width * height;
                 if (fmt == QImage::Format_RGB888) {
                     elementCount *= 3;
@@ -913,9 +911,7 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
                 m_darkAccumInit = true;
             }
 
-            if (m_darkAccumSum.size() > 0 && width > 0 && height > 0
-                && fmt == m_darkAccumFormat
-                && m_darkAccum.size() == img.size()) {
+            if (width > 0 && height > 0 && fmt == m_darkAccumFormat) {
                 if (fmt == QImage::Format_Grayscale16) {
                     const ushort *srcData = reinterpret_cast<const ushort *>(img.constBits());
                     #pragma omp parallel for schedule(static)
@@ -1080,7 +1076,6 @@ void MainWindow::cancelDarkAcquisition(const QString &reason)
     m_darkAccumInit = false;
     m_darkAccumFrames = 0;
     m_darkAccumSum.clear();
-    m_darkAccum = QImage();
     if (m_acquireDarkDialog) {
         m_acquireDarkDialog->setAcquireInProgress(false);
     }

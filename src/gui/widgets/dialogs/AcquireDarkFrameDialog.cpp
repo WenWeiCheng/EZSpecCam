@@ -15,7 +15,7 @@ AcquireDarkFrameDialog::AcquireDarkFrameDialog(QWidget *parent)
 
     m_frameCountSpinBox = new QSpinBox(this);
     m_frameCountSpinBox->setMinimum(1);
-    m_frameCountSpinBox->setMaximum(1000);
+    m_frameCountSpinBox->setMaximum(10000);
     m_frameCountSpinBox->setValue(10);
     m_frameCountSpinBox->setSingleStep(1);
     formLayout->addRow(tr("Number of frames to average:"), m_frameCountSpinBox);

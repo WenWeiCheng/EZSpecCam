@@ -138,12 +138,14 @@ private:
     bool    m_acquiringDark  = false;
     int     m_darkBurstTotal     = 10;
     int     m_darkBurstRemaining = 0;
-    QImage  m_darkAccum;
     bool    m_darkAccumInit     = false;
     quint64 m_darkAccumFrames   = 0;
     quint64 m_lastDarkSizeWarnMs = 0;
     QImage::Format m_darkAccumFormat = QImage::Format_Invalid;
-    QVector<quint32> m_darkAccumSum; // per-element 32-bit shadow
+    // Per-pixel (per-channel for RGB) running sum. quint64 keeps the accumulator
+    // safe from wrap-around across the full range of supported frame counts
+    // (up to AcquireDarkFrameDialog::maxFrameCount) and pixel depths (8/16-bit).
+    QVector<quint64> m_darkAccumSum;
 
     // Discriminator: when true, onFrameLoaded stores result as m_darkFrame
     bool    m_loadingFrameIsDark = false;
