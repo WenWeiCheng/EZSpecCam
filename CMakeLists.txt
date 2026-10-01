@@ -111,6 +111,72 @@ set(EZSPECCAM_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 list(APPEND CMAKE_INCLUDE_PATH "${EZSPECCAM_INCLUDE_DIR}")
 
 # ===========================================
+# GUI Source List
+# ===========================================
+# Shared by the ezspeccam-gui binary and the GUI-level tests, so a test that
+# drives MainWindow never drifts from what the app actually compiles.
+set(EZSPECCAM_GUI_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/MessageHandler.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/MessageHandler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/DebugMacros.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/AppController.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/AppController.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/qcustomplot.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/qcustomplot.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/MainWindow.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/MainWindow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/PostProcess.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/PostProcess.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/MainWindowUi.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/MainWindowUi.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/CameraTab.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/CameraTab.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/CameraTabUi.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/CameraTabUi.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/LoadingIndicator.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/LoadingIndicator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/ParameterWidgetFactory.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/ParameterWidgetFactory.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/DataTab.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/DataTab.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/DataTabUi.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/DataTabUi.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/PluginTab.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/PluginTab.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/CameraConfigDialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/CameraConfigDialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/CameraConfigDialogUi.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/CameraConfigDialogUi.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/StatisticsDialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/StatisticsDialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/ProfileWindow.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/ProfileWindow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/ImageViewWidget.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/ImageViewWidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/SpectrumViewWidget.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/SpectrumViewWidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/workers/FileLoaderWorker.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/formats/IImageFormatHandler.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/formats/SaveTypes.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/formats/TiffFormatHandler.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/formats/TiffFormatHandler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/formats/CsvFormatHandler.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/formats/CsvFormatHandler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/RowRangeDialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/RowRangeDialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/CalibrationDialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/CalibrationDialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/AcquireDarkFrameDialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/AcquireDarkFrameDialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/ScaleControlDialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/ScaleControlDialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/DisplayStyleDialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/DisplayStyleDialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/workers/FileSaverWorker.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/workers/FileSaverWorker.cpp
+)
+
+# ===========================================
 # Export compile commands for tooling
 # ===========================================
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

@@ -125,6 +125,7 @@ private:
     QImage downsampleImage(const QImage &source, int factorX, int factorY);
     void resetZoomToFit();
     void updatePlotGeometry();
+    int computeColorScaleWidth();
 
     QCustomPlot *m_plot;
     QCPColorMap *m_colorMap;
