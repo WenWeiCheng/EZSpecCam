@@ -147,6 +147,18 @@
             "configurePreset": "msvc-release",
             "description": "Run tests with MSVC Release configuration",
             "configuration": "Release"
+        },
+        {
+            "name": "linux-debug",
+            "configurePreset": "linux-debug",
+            "description": "Run tests with Linux Debug configuration",
+            "configuration": "Debug"
+        },
+        {
+            "name": "linux-release",
+            "configurePreset": "linux-release",
+            "description": "Run tests with Linux Release configuration",
+            "configuration": "Release"
         }
     ]
 }
