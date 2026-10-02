@@ -3,9 +3,17 @@
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QDebug>
+#include <QFontMetricsF>
 #include <QTimer>
 #include <qpoint.h>
 #include "../../qcustomplot.h"
+
+namespace {
+// Gradient thickness of the colour strip; kept in sync with setBarWidth() below.
+constexpr int kColorBarWidth = 20;
+// Never narrower than this, so the bar still reads as a bar on tiny fonts.
+constexpr int kMinColorScaleWidth = 60;
+}
 
 ImageViewWidget::ImageViewWidget(QWidget *parent)
     : QWidget(parent)
@@ -70,6 +78,7 @@ void ImageViewWidget::setupColorScalePlot()
     m_colorScale = new QCPColorScale(m_colorScalePlot);
     m_colorScale->setType(QCPAxis::atRight);
     m_colorScale->setMargins(QMargins(2, 2, 2, 2));
+    m_colorScale->setBarWidth(kColorBarWidth);
 
     m_colorScalePlot->plotLayout()->addElement(0, 0, m_colorScale);
     m_colorScalePlot->plotLayout()->setRowSpacing(0);
@@ -550,6 +559,38 @@ void ImageViewWidget::showEvent(QShowEvent *event)
     m_resizeTimer->start(50);
 }
 
+int ImageViewWidget::computeColorScaleWidth()
+{
+    QCPAxis *axis = m_colorScale ? m_colorScale->axis() : nullptr;
+    if (!axis) {
+        return kMinColorScaleWidth;
+    }
+
+    // QCustomPlot gives the tick labels their room before the gradient gets any,
+    // so a fixed strip width collapses to a line as soon as the labels outgrow
+    // it. Size the strip from the widest label the axis can produce over the
+    // current range; erring wide only costs a few pixels of image area.
+    // The ticker labels with round values, so the integer form of the range
+    // bound bounds the label width; below 1 a decimal point can appear.
+    const QFontMetricsF fm(axis->tickLabelFont());
+    const QCPRange range = axis->range();
+    const double magnitude = qMax(qAbs(range.lower), qAbs(range.upper));
+    const int decimals = (magnitude < 10.0) ? 1 : 0;
+    const int widestLabel = qCeil(
+        fm.horizontalAdvance(QString::number(magnitude, 'f', decimals)));
+
+    const QMargins margins = m_colorScale->margins();
+    const int width = margins.left() + margins.right()
+                    + kColorBarWidth
+                    + axis->tickLengthIn()
+                    + axis->tickLabelPadding()
+                    + axis->padding()
+                    + widestLabel
+                    + 4; // tick labels overhang the plot area slightly
+
+    return qMax(width, kMinColorScaleWidth);
+}
+
 void ImageViewWidget::updatePlotGeometry()
 {
     if (!m_plot) {
@@ -563,7 +604,7 @@ void ImageViewWidget::updatePlotGeometry()
 
     int colorScaleW = 0;
     if (m_colorScalePlot && m_colorScaleVisible) {
-        colorScaleW = 60;
+        colorScaleW = computeColorScaleWidth();
     }
 
     int imageW = availableSize.width() - colorScaleW;
