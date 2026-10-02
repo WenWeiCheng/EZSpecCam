@@ -39,6 +39,18 @@
         } \
     } while (false)
 
+/// ParameterConstraint::validValues is a QVector<QVariant>, which has no
+/// join(); render it for assertion messages.
+QString joinValues(const QVector<QVariant> &values)
+{
+    QStringList parts;
+    parts.reserve(values.size());
+    for (const QVariant &value : values) {
+        parts.append(value.toString());
+    }
+    return parts.join(QStringLiteral(", "));
+}
+
 class TestHk16011Driver : public QObject
 {
     Q_OBJECT
@@ -67,6 +79,8 @@ private slots:
     void test_parameterTableShape();
     void test_everyDefinitionIsValid();
     void test_readOnlyParametersAreFlagged();
+    void test_parameterCategories();
+    void test_exposureUnitSelector();
 
     // ——— One test per round-trippable parameter ———
     void test_parameter_exposure_time_us();
@@ -82,6 +96,11 @@ private slots:
     void test_parameter_tec_set_temp();
     void test_parameter_adc_gain_r();
     void test_parameter_adc_offset_b();
+
+    // ——— Enumeration labels vs. wire tokens ———
+    void test_enumValuesAreLabels();
+    void test_enumAcceptsWireToken();
+    void test_enumWriteReachesDevice();
 
     // ——— Read-only / telemetry ———
     void test_readOnly_camera_name();
@@ -311,15 +330,19 @@ void TestHk16011Driver::test_parameterTableShape()
     QVERIFY2(names.size() >= 30,
              qPrintable(QString("expected the full parameter table, got %1").arg(names.size())));
 
-    // Parameters the vendor regression tests prove round-trip on the wire.
+    // Parameters the vendor regression tests prove round-trip on the wire, plus
+    // at least one from every category the driver groups them into.
     const QStringList expected = {
         QStringLiteral("exposure_time_us"), QStringLiteral("read_mode"),
         QStringLiteral("freq_sel"),        QStringLiteral("mock_mode"),
         QStringLiteral("cdsclk_delay"),    QStringLiteral("image_width"),
         QStringLiteral("image_height"),    QStringLiteral("bevel_left"),
         QStringLiteral("blank_right"),     QStringLiteral("tec_kp"),
-        QStringLiteral("tec_set_temp"),    QStringLiteral("adc_gain_r"),
-        QStringLiteral("adc_offset_b"),    QStringLiteral("camera_name"),
+        QStringLiteral("tec_set_temp"),    QStringLiteral("camera_name"),
+        QStringLiteral("frame_num_ready"),
+        QStringLiteral("adc_gain_r"),      QStringLiteral("adc_gain_g"),
+        QStringLiteral("adc_gain_b"),      QStringLiteral("adc_offset_r"),
+        QStringLiteral("adc_offset_g"),    QStringLiteral("adc_offset_b"),
     };
     for (const QString &name : expected) {
         QVERIFY2(names.contains(name),
@@ -379,6 +402,78 @@ void TestHk16011Driver::test_readOnlyParametersAreFlagged()
     }
 }
 
+void TestHk16011Driver::test_parameterCategories()
+{
+    REQUIRE_HK16011();
+    QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
+
+    // The SDK reports no grouping, so every category below comes from the
+    // driver's own table. One representative per group is enough here —
+    // test_parameterTableShape already pins down which parameters exist.
+    const QVector<QPair<QString, ParameterCategory>> expected = {
+        { QStringLiteral("exposure_time_us"), ParameterCategory::Core },
+        { QStringLiteral("read_mode"),        ParameterCategory::Core },
+        { QStringLiteral("freq_sel"),         ParameterCategory::Core },
+        { QStringLiteral("tec_enable"),       ParameterCategory::Cooling },
+        { QStringLiteral("tec_set_temp"),     ParameterCategory::Cooling },
+        { QStringLiteral("camera_name"),      ParameterCategory::Info },
+        { QStringLiteral("tec_kp"),           ParameterCategory::Advanced },
+        { QStringLiteral("tec_ki"),           ParameterCategory::Advanced },
+        { QStringLiteral("tec_kd"),           ParameterCategory::Advanced },
+        { QStringLiteral("mock_mode"),        ParameterCategory::Debug },
+        { QStringLiteral("image_width"),      ParameterCategory::Debug },
+        { QStringLiteral("frame_num_ready"),  ParameterCategory::Debug },
+    };
+    for (const auto &entry : expected) {
+        QCOMPARE(m_driver->parameter(entry.first).category, entry.second);
+    }
+
+    // The six ADC codes are whole-device settings a user actually dials in for
+    // white balance, so they belong with exposure and readout mode.
+    for (const QString &name : { QStringLiteral("adc_gain_r"),
+                                 QStringLiteral("adc_gain_g"),
+                                 QStringLiteral("adc_gain_b"),
+                                 QStringLiteral("adc_offset_r"),
+                                 QStringLiteral("adc_offset_g"),
+                                 QStringLiteral("adc_offset_b") }) {
+        QCOMPARE(m_driver->parameter(name).category, ParameterCategory::Core);
+    }
+}
+
+void TestHk16011Driver::test_exposureUnitSelector()
+{
+    REQUIRE_HK16011();
+    QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
+
+    // A bare unit string is invisible in the GUI: ParameterWidgetFactory only
+    // builds a unit combo when unitRange is present as well. Without the scale
+    // the exposure spin box would span 1..2147483647 us, which no one can type.
+    const ParameterConstraint &c = m_driver->parameter(QStringLiteral("exposure_time_us")).constraint;
+    const QStringList expectedUnits = { QStringLiteral("us"), QStringLiteral("ms"), QStringLiteral("s") };
+    QVERIFY2(c.unit == expectedUnits,
+             qPrintable(QString("unit list is %1, expected us/ms/s").arg(c.unit.join(','))));
+    const QVector<double> expectedScale = { 1000.0, 1000000.0 };
+    QVERIFY2(c.unitRange == expectedScale,
+             qPrintable(QString("unit scale has %1 entries, expected %2")
+                            .arg(c.unitRange.size()).arg(expectedScale.size())));
+    QVERIFY2(c.hasUnitRange(), "the exposure should render a unit selector");
+
+    // The scale is cumulative from the base unit: getUnitIndex() compares the raw
+    // value against these entries while toDisplayValue() divides by them, so
+    // {1000, 1000} would have shown 2000 us as "2 s". Exercise the conversions the
+    // widget itself performs rather than trusting the numbers above.
+    QCOMPARE(c.getUnitIndex(2000.0), 1);
+    QCOMPARE(c.getUnitIndex(500.0), 0);
+    QCOMPARE(c.getUnitIndex(5000000.0), 2);
+    QCOMPARE(c.toDisplayValue(2000.0, 1), 2.0);
+    QCOMPARE(c.toRawValue(2.0, 1), 2000.0);
+    QCOMPARE(c.toDisplayValue(5000000.0, 2), 5.0);
+
+    // The raw value stays in microseconds, which is what the device stores and
+    // what parameterValue() reports.
+    QCOMPARE(c.toRawValue(2.0, 2), 2000000.0);
+}
+
 //==============================================================================
 // Parameter round-trips
 //==============================================================================
@@ -436,7 +531,11 @@ void TestHk16011Driver::test_parameter_read_mode()
     QVERIFY2(def.constraint.validValues.size() >= 2,
              "read_mode should offer both a line_binning and an image mode");
 
-    roundTripParameter(QStringLiteral("read_mode"), QStringLiteral("image"));
+    // The label, not the wire token: validValues is what the combo box holds and
+    // what the value is validated against.
+    QVERIFY2(def.constraint.validValues.contains(QStringLiteral("Image")),
+             "read_mode should offer the 'Image' label");
+    roundTripParameter(QStringLiteral("read_mode"), QStringLiteral("Image"));
 }
 
 void TestHk16011Driver::test_parameter_freq_sel()
@@ -549,6 +648,114 @@ void TestHk16011Driver::test_parameter_adc_offset_b()
     roundTripParameter(QStringLiteral("adc_offset_b"), QVariant::fromValue(qlonglong(511)));
 }
 
+void TestHk16011Driver::test_enumValuesAreLabels()
+{
+    REQUIRE_HK16011();
+    QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
+
+    const ParameterDefinition readMode = m_driver->parameter(QStringLiteral("read_mode"));
+    QCOMPARE(readMode.type, ParameterType::StringCollection);
+    QVERIFY2(readMode.constraint.validValues.contains(QStringLiteral("Image")),
+             qPrintable(QString("read_mode should offer the 'Image' label, got %1")
+                            .arg(joinValues(readMode.constraint.validValues))));
+    QVERIFY2(!readMode.constraint.validValues.contains(QStringLiteral("image")),
+             "the wire token must not be what the GUI stores and shows");
+
+    // The value read back from the device is normalized to the label. Without
+    // that, ParameterWidgetFactory::setWidgetValue() cannot find it in the combo
+    // and silently leaves the selection on the first entry.
+    const QVariant live = m_driver->parameterValue(QStringLiteral("read_mode"));
+    QVERIFY2(readMode.constraint.validValues.contains(live.toString()),
+             qPrintable(QString("current read_mode '%1' is not one of the offered labels %2")
+                            .arg(live.toString(),
+                                 joinValues(readMode.constraint.validValues))));
+
+    // freq_sel carries no labels at all, so it has to display as its tokens
+    // rather than fall back to something blank.
+    const ParameterDefinition freq = m_driver->parameter(QStringLiteral("freq_sel"));
+    QVERIFY2(freq.constraint.validValues.contains(QStringLiteral("500k")),
+             qPrintable(QString("freq_sel should offer '500k', got %1")
+                            .arg(joinValues(freq.constraint.validValues))));
+    QVERIFY2(freq.constraint.validValues.contains(
+                 m_driver->parameterValue(QStringLiteral("freq_sel")).toString()),
+             "the current readout clock should be one of the offered tokens");
+}
+
+void TestHk16011Driver::test_enumAcceptsWireToken()
+{
+    REQUIRE_HK16011();
+    QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
+
+    // Configs saved before the labels became the display form, and CLI scripts
+    // written against the wire names, both carry tokens. They stay accepted, and
+    // are normalized before staging — a token must never reach the device as-is.
+    const QString name = QStringLiteral("read_mode");
+    const QVariant original = m_driver->parameterValue(name);
+    QVERIFY2(original.isValid(), "read_mode should have a current value");
+
+    QStringList failed;
+    QVERIFY2(m_driver->setParameter(name, QStringLiteral("image"), &failed),
+             qPrintable(QString("the wire token should be accepted: %1")
+                            .arg(failed.join(QStringLiteral(", ")))));
+    QCOMPARE(m_driver->parameterValue(name), QVariant(QStringLiteral("Image")));
+    QVERIFY2(m_driver->validateParameters(),
+             "validateParameters() should accept the normalized value");
+
+    QVERIFY2(m_driver->commitParameters(&failed),
+             qPrintable(QString("commitParameters() rejected the token: %1")
+                            .arg(failed.join(QStringLiteral(", ")))));
+    QCOMPARE(m_driver->parameterValue(name), QVariant(QStringLiteral("Image")));
+
+    // A token that is not one of this parameter's items is still rejected.
+    QVERIFY2(!m_driver->setParameter(name, QStringLiteral("nonsense")),
+             "an unknown enumeration value should be rejected");
+
+    m_driver->setParameter(name, original);
+    m_driver->commitParameters();
+}
+
+void TestHk16011Driver::test_enumWriteReachesDevice()
+{
+    REQUIRE_HK16011();
+    QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
+
+    // Regression test. A String/Enumeration value used to be pointed at a
+    // QByteArray local to the encoder, so the SDK serialised freed memory and
+    // sent whatever the heap happened to hold — read_mode arrived as the literal
+    // "SETPARAM read_mode read_mode" and the firmware answered ERR 3. The other
+    // enum tests did not catch it: the freed block often still contained the
+    // right bytes, and asserting through the driver's own value cache cannot see
+    // what the wire carried either way.
+    //
+    // So write the *other* mode and then re-read it from a fresh connection,
+    // which is the only path that reflects what the device actually holds.
+    const QString name = QStringLiteral("read_mode");
+    const QString original = m_driver->parameterValue(name).toString();
+    QVERIFY2(original.isEmpty() == false, "read_mode should have a current value");
+    const QString target = (original == QStringLiteral("Image")) ? QStringLiteral("Line binning")
+                                                                 : QStringLiteral("Image");
+
+    QStringList failed;
+    QVERIFY2(m_driver->setParameter(name, target, &failed),
+             qPrintable(QString("setParameter('%1', %2) was rejected: %3")
+                            .arg(name, target, failed.join(QStringLiteral(", ")))));
+    QVERIFY2(m_driver->commitParameters(&failed),
+             qPrintable(QString("commitParameters() rejected '%1': %2")
+                            .arg(name, failed.join(QStringLiteral(", ")))));
+
+    // Reconnecting re-reads every value from the device.
+    m_driver->disconnectCamera();
+    QVERIFY2(!connectAndGetId().isEmpty(), "reconnect should succeed");
+    QCOMPARE(m_driver->parameterValue(name).toString(), target);
+
+    // Put it back and confirm that too, rather than trusting the restore.
+    QVERIFY2(m_driver->setParameter(name, original), "restoring read_mode should be accepted");
+    QVERIFY2(m_driver->commitParameters(&failed), "restoring read_mode should commit");
+    m_driver->disconnectCamera();
+    QVERIFY2(!connectAndGetId().isEmpty(), "reconnect should succeed");
+    QCOMPARE(m_driver->parameterValue(name).toString(), original);
+}
+
 //==============================================================================
 // Read-only / telemetry
 //==============================================================================
@@ -577,14 +784,15 @@ void TestHk16011Driver::test_readOnly_acq_state()
 
     const QVariant state = m_driver->parameterValue(QStringLiteral("acq_state"));
     QVERIFY2(state.isValid(), "acq_state should have a value");
-    QVERIFY2(state.toString() == QStringLiteral("idle")
-                 || state.toString() == QStringLiteral("exposing")
-                 || state.toString() == QStringLiteral("reading"),
+    // Labels, like every enumeration: the wire tokens are idle/exposing/reading.
+    QVERIFY2(state.toString() == QStringLiteral("Idle")
+                 || state.toString() == QStringLiteral("Exposing")
+                 || state.toString() == QStringLiteral("Reading"),
              qPrintable(QString("unexpected acq_state '%1'").arg(state.toString())));
 
     // The firmware rejects SETPARAM on read-only parameters, and the driver
     // must not even put one on the wire.
-    QVERIFY2(m_driver->setParameter(QStringLiteral("acq_state"), QStringLiteral("reading")),
+    QVERIFY2(m_driver->setParameter(QStringLiteral("acq_state"), QStringLiteral("Reading")),
              "a read-only parameter should be accepted and ignored");
     m_driver->commitParameters();
     QCOMPARE(m_driver->parameterValue(QStringLiteral("acq_state")).toString(), state.toString());
@@ -597,8 +805,10 @@ void TestHk16011Driver::test_unimplemented_telemetry()
 
     // The TEC loop is not wired to real sensors, so the firmware returns
     // placeholders that fall outside the range the device itself declares.
-    // These must be reported as read-only info and must never be presented to
-    // the user as measurements.
+    // These must be reported as read-only and must never be presented to the
+    // user as measurements. They sit next to tec_set_temp in the Cooling group
+    // rather than in Info: grouping follows what a parameter is for, and being
+    // read-only no longer implies Info.
     const QStringList placeholders = { QStringLiteral("sensor_temp"),
                                        QStringLiteral("environment_temp"),
                                        QStringLiteral("tec_voltage"),
@@ -608,7 +818,7 @@ void TestHk16011Driver::test_unimplemented_telemetry()
         const ParameterDefinition def = m_driver->parameter(name);
         QVERIFY2(def.isReadOnly,
                  qPrintable(QString("'%1' should be read-only").arg(name)));
-        QCOMPARE(def.category, ParameterCategory::Info);
+        QCOMPARE(def.category, ParameterCategory::Cooling);
         QVERIFY2(def.description.contains(QStringLiteral("not implemented")),
                  qPrintable(QString("'%1' should be flagged as not implemented, "
                                     "description was: %2")

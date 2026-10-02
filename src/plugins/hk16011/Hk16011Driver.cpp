@@ -57,27 +57,161 @@ const int kCapturePollMs = 20;
 /// driver gives up. A 20-frame burst at 1024x64 needs several seconds.
 const qint64 kCaptureTimeoutMs = 20000;
 
-ParameterCategory mapCategory(HK16011_CategoryEnum category, bool readOnly)
+/**
+ * Per-parameter presentation metadata that EZSpecCam owns.
+ *
+ * The device reports no grouping and no help text of its own. Both would be a
+ * second source of truth that drifts as soon as the firmware is touched, which
+ * is why the SDK dropped its copies rather than let the two disagree. This table
+ * is therefore the only place an hk16011 parameter is described and assigned to
+ * a GUI group, and it doubles as the whitelist: a parameter the firmware offers
+ * but this table does not list is not exposed at all, so a firmware-side
+ * addition surfaces in the log instead of silently appearing in the GUI.
+ *
+ * Within a group the GUI sorts by ParameterDefinition::order, which the driver
+ * leaves at the LISTPARAMS index, so each category keeps the firmware's own
+ * ordering without anything being spelled out here.
+ *
+ * `unitScale` is cumulative from the base unit, not the step between neighbours:
+ * ParameterConstraint::getUnitIndex() compares the raw value against these
+ * entries while toDisplayValue() divides by them, and the two only agree under
+ * the cumulative reading. {"us","ms","s"} therefore needs {1000, 1000000} —
+ * {1000, 1000} would render 2000 us as "2 s".
+ */
+struct ParameterMetadata
 {
-    // EZSpecCam defines Info as "read-only informational parameters", so every
-    // read-only device parameter belongs there regardless of how the firmware
-    // grouped it. The vendor grouping is only used for writable parameters.
-    if (readOnly) {
-        return ParameterCategory::Info;
-    }
-    switch (category) {
-    case HK16011_Category_Cooling:
-        return ParameterCategory::Cooling;
-    case HK16011_Category_Info:
-        return ParameterCategory::Info;
-    case HK16011_Category_Advanced:
-        return ParameterCategory::Advanced;
-    case HK16011_Category_Debug:
-        return ParameterCategory::Debug;
-    case HK16011_Category_Core:
-    default:
-        return ParameterCategory::Core;
-    }
+    ParameterCategory category;
+    QString description;          ///< shown as the GUI tooltip; empty falls back to the SDK's
+    QStringList units{};          ///< empty: keep whatever unit the SDK reported
+    QVector<double> unitScale{};  ///< empty: no unit selector
+};
+
+const QMap<QString, ParameterMetadata> &hk16011ParameterMetadata()
+{
+    static const QMap<QString, ParameterMetadata> table = {
+        // —— Core ——
+        { QStringLiteral("exposure_time_us"),
+          { ParameterCategory::Core,
+            QStringLiteral("Integration time per frame, in microseconds."),
+            { QStringLiteral("us"), QStringLiteral("ms"), QStringLiteral("s") },
+            { 1000.0, 1000000.0 } } },
+        { QStringLiteral("read_mode"),
+          { ParameterCategory::Core,
+            QStringLiteral("Line binning combines the 64 sensor rows into a single 1024x1 "
+                           "line; image reads the full 1024x64 frame.") } },
+        { QStringLiteral("freq_sel"),
+          { ParameterCategory::Core,
+            QStringLiteral("Pixel clock used to shift accumulated charge out of the CCD. "
+                           "It bounds the shortest exposure the sensor can use.") } },
+        { QStringLiteral("adc_gain_r"),
+          { ParameterCategory::Core,
+            QStringLiteral("Gain code applied to the red channel by the on-chip ADC (0-63).") } },
+        { QStringLiteral("adc_gain_g"),
+          { ParameterCategory::Core,
+            QStringLiteral("Gain code applied to the green channel by the on-chip ADC (0-63).") } },
+        { QStringLiteral("adc_gain_b"),
+          { ParameterCategory::Core,
+            QStringLiteral("Gain code applied to the blue channel by the on-chip ADC (0-63).") } },
+        { QStringLiteral("adc_offset_r"),
+          { ParameterCategory::Core,
+            QStringLiteral("Offset code subtracted on the red channel before conversion (0-511).") } },
+        { QStringLiteral("adc_offset_g"),
+          { ParameterCategory::Core,
+            QStringLiteral("Offset code subtracted on the green channel before conversion (0-511).") } },
+        { QStringLiteral("adc_offset_b"),
+          { ParameterCategory::Core,
+            QStringLiteral("Offset code subtracted on the blue channel before conversion (0-511).") } },
+
+        // —— Cooling ——
+        { QStringLiteral("tec_enable"),
+          { ParameterCategory::Cooling,
+            QStringLiteral("Turns the thermoelectric cooler on; it closes the loop around "
+                           "tec_set_temp.") } },
+        { QStringLiteral("tec_set_temp"),
+          { ParameterCategory::Cooling,
+            QStringLiteral("Temperature the cooler loop drives towards, in degrees Celsius.") } },
+        { QStringLiteral("sensor_temp"),
+          { ParameterCategory::Cooling,
+            QStringLiteral("Temperature reported at the sensor package.") } },
+        { QStringLiteral("environment_temp"),
+          { ParameterCategory::Cooling,
+            QStringLiteral("Ambient temperature reported near the camera.") } },
+        { QStringLiteral("tec_voltage"),
+          { ParameterCategory::Cooling,
+            QStringLiteral("Voltage the cooler is being driven at.") } },
+        { QStringLiteral("tec_current"),
+          { ParameterCategory::Cooling,
+            QStringLiteral("Current the cooler is drawing.") } },
+
+        // —— Info ——
+        { QStringLiteral("camera_name"),
+          { ParameterCategory::Info,
+            QStringLiteral("Model name the camera reports for itself.") } },
+
+        // —— Advanced ——
+        { QStringLiteral("tec_kp"),
+          { ParameterCategory::Advanced,
+            QStringLiteral("Proportional term of the cooler PID loop.") } },
+        { QStringLiteral("tec_ki"),
+          { ParameterCategory::Advanced,
+            QStringLiteral("Integral term of the cooler PID loop.") } },
+        { QStringLiteral("tec_kd"),
+          { ParameterCategory::Advanced,
+            QStringLiteral("Derivative term of the cooler PID loop.") } },
+
+        // —— Debug ——
+        { QStringLiteral("mock_mode"),
+          { ParameterCategory::Debug,
+            QStringLiteral("Replaces the sensor with a synthetic test pattern. For bench "
+                           "bring-up, not for measurements.") } },
+        { QStringLiteral("cdsclk_delay"),
+          { ParameterCategory::Debug,
+            QStringLiteral("Extra clock cycles inserted between correlated double sampling "
+                           "samples, in CCD clocks.") } },
+        { QStringLiteral("image_width"),
+          { ParameterCategory::Debug,
+            QStringLiteral("Number of valid pixels per line the camera programs.") } },
+        { QStringLiteral("image_height"),
+          { ParameterCategory::Debug,
+            QStringLiteral("Number of sensor lines the camera programs.") } },
+        { QStringLiteral("bevel_left"),
+          { ParameterCategory::Debug,
+            QStringLiteral("Pixels discarded at the left edge of each line.") } },
+        { QStringLiteral("bevel_top"),
+          { ParameterCategory::Debug,
+            QStringLiteral("Pixels discarded along the top edge.") } },
+        { QStringLiteral("bevel_right"),
+          { ParameterCategory::Debug,
+            QStringLiteral("Pixels discarded at the right edge of each line.") } },
+        { QStringLiteral("bevel_bottom"),
+          { ParameterCategory::Debug,
+            QStringLiteral("Pixels discarded along the bottom edge.") } },
+        { QStringLiteral("blank_left"),
+          { ParameterCategory::Debug,
+            QStringLiteral("Pixels left at zero along the left edge.") } },
+        { QStringLiteral("blank_right"),
+          { ParameterCategory::Debug,
+            QStringLiteral("Pixels left at zero along the right edge.") } },
+        { QStringLiteral("acq_state"),
+          { ParameterCategory::Debug,
+            QStringLiteral("What the acquisition engine is doing right now: idle, exposing "
+                           "or reading.") } },
+        { QStringLiteral("frame_num_ready"),
+          { ParameterCategory::Debug,
+            QStringLiteral("Frames already buffered in the camera that have not been fetched. "
+                           "A bounded fetch is only accepted once this reaches the count.") } },
+        { QStringLiteral("frame_capacity"),
+          { ParameterCategory::Debug,
+            QStringLiteral("How many frames the camera's buffer can hold.") } },
+        { QStringLiteral("exception_flag"),
+          { ParameterCategory::Debug,
+            QStringLiteral("Set when the firmware has raised an exception; read exception_cnt "
+                           "alongside it.") } },
+        { QStringLiteral("exception_cnt"),
+          { ParameterCategory::Debug,
+            QStringLiteral("Exception code or count recorded by the firmware.") } },
+    };
+    return table;
 }
 
 } // namespace
@@ -309,6 +443,50 @@ void Hk16011Driver::clearParameterTable()
     m_parameterDefinitions.clear();
     m_parameters.clear();
     m_pendingParameters.clear();
+    m_enumLabelByToken.clear();
+    m_enumTokenByLabel.clear();
+}
+
+void Hk16011Driver::applyParameterMetadata()
+{
+    const QMap<QString, ParameterMetadata> &table = hk16011ParameterMetadata();
+
+    // Query before defining, in both directions: a firmware parameter nobody
+    // here describes is not exposed, and a listed parameter the firmware has
+    // dropped is simply skipped. Either way the table stays the single source of
+    // truth without having to be edited in lockstep with the firmware.
+    for (auto it = m_parameterDefinitions.begin(); it != m_parameterDefinitions.end();) {
+        if (!table.contains(it.key())) {
+            qInfo().noquote() << "hk16011: not exposing unlisted parameter" << it.key();
+            m_parameters.remove(it.key());
+            it = m_parameterDefinitions.erase(it);
+            continue;
+        }
+        ++it;
+    }
+
+    for (auto it = table.constBegin(); it != table.constEnd(); ++it) {
+        auto def = m_parameterDefinitions.find(it.key());
+        if (def == m_parameterDefinitions.end()) {
+            qInfo().noquote() << "hk16011: firmware no longer offers" << it.key()
+                              << "- drop it from hk16011ParameterMetadata()";
+            continue;
+        }
+        def->category = it.value().category;
+        if (!it.value().description.isEmpty()) {
+            def->description = it.value().description;
+        } else {
+            // ParameterDefinition::isValid() rejects an empty description, so a
+            // table entry that forgot one would make the parameter disappear.
+            qInfo().noquote() << "hk16011:" << it.key()
+                              << "has no description in hk16011ParameterMetadata(); "
+                                 "falling back to the SDK's";
+        }
+        if (!it.value().units.isEmpty()) {
+            def->constraint.unit = it.value().units;
+            def->constraint.unitRange = it.value().unitScale;
+        }
+    }
 }
 
 void Hk16011Driver::buildParameterTable()
@@ -345,7 +523,6 @@ void Hk16011Driver::buildParameterTable()
         if (def.description.isEmpty()) {
             def.description = def.displayName;
         }
-        def.category = mapCategory(src.category, readOnly);
         def.isReadOnly = readOnly;
         def.order = static_cast<float>(i);
 
@@ -372,25 +549,32 @@ void Hk16011Driver::buildParameterTable()
             break;
         case HK16011_ValueType_Enumeration: {
             def.type = ParameterType::StringCollection;
-            // The wire token is the canonical identifier and is what SETPARAM
-            // expects, so it is what goes into validValues. The friendlier
-            // firmware label is folded into the description instead.
-            QStringList labels;
+            // validValues is what the GUI puts in a combo box, so it holds the
+            // label. The device still speaks tokens, hence the two maps that
+            // translate in both directions — validValues is also the validation
+            // set and the value stored for the parameter, so a bare token would
+            // never match the combo's currentData(). Items without a label (the
+            // readout clock, "100k"/"500k") display as the token itself.
+            QHash<QString, QString> labelByToken;
+            QHash<QString, QString> tokenByLabel;
             const size_t itemCount =
                 qMin(src.valid_item_count, static_cast<size_t>(HK16011_PARAM_ITEMS_MAX));
             for (size_t j = 0; j < itemCount; ++j) {
                 const char *token = src.valid_items[j].data.s.set;
-                const char *label = src.valid_items[j].data.s.label;
                 if (!token) {
                     continue;
                 }
-                def.constraint.validValues.append(QString::fromLatin1(token));
-                if (label) {
-                    labels.append(QString::fromLatin1(label));
-                }
+                const QString wireToken = QString::fromLatin1(token);
+                const char *label = src.valid_items[j].data.s.label;
+                const QString shown =
+                    (label && label[0] != '\0') ? QString::fromLatin1(label) : wireToken;
+                def.constraint.validValues.append(shown);
+                labelByToken.insert(wireToken, shown);
+                tokenByLabel.insert(shown, wireToken);
             }
-            if (!labels.isEmpty()) {
-                def.description += QStringLiteral(" (%1)").arg(labels.join(QStringLiteral(", ")));
+            if (!labelByToken.isEmpty()) {
+                m_enumLabelByToken.insert(name, labelByToken);
+                m_enumTokenByLabel.insert(name, tokenByLabel);
             }
             break;
         }
@@ -416,6 +600,10 @@ void Hk16011Driver::buildParameterTable()
             m_parameters.insert(it.key(), value);
         }
     }
+
+    // From here on the table holds only parameters EZSpecCam exposes, so the
+    // passes below describe exactly what the GUI will render.
+    applyParameterMetadata();
 
     // The firmware's GETINFO reply carries only "<min>:<max>:<step>" — it never
     // reports a default, so the SDK hands us an Invalid value for every
@@ -498,8 +686,17 @@ QVariant Hk16011Driver::toVariant(const HK16011_ValueStruct &value)
     }
 }
 
+QVariant Hk16011Driver::toShownValue(const ParameterDefinition &def, const QVariant &value) const
+{
+    if (def.type != ParameterType::StringCollection || !value.isValid()) {
+        return value;
+    }
+    const QString shown = m_enumLabelByToken.value(def.name).value(value.toString());
+    return shown.isEmpty() ? value : QVariant(shown);
+}
+
 bool Hk16011Driver::fromVariant(const ParameterDefinition &def, const QVariant &value,
-                                HK16011_ValueStruct *out)
+                                QByteArray *storage, HK16011_ValueStruct *out) const
 {
     std::memset(out, 0, sizeof(*out));
     switch (def.type) {
@@ -515,16 +712,23 @@ bool Hk16011Driver::fromVariant(const ParameterDefinition &def, const QVariant &
         out->type = HK16011_ValueType_Bool;
         out->data.b = value.toBool() ? 1 : 0;
         return true;
-    case ParameterType::String:
     case ParameterType::StringCollection: {
-        // SETPARAM wants the bare wire token with no label attached.
-        const QByteArray token = value.toString().toLatin1();
-        out->type = def.type == ParameterType::String ? HK16011_ValueType_String
-                                                       : HK16011_ValueType_Enumeration;
-        out->data.s.set = token.constData();
+        // SETPARAM wants the bare wire token with no label attached. An
+        // unrecognised string is passed through as-is so a value that never
+        // went through toShownValue() still reaches the device as typed.
+        const QString shown = value.toString();
+        *storage = m_enumTokenByLabel.value(def.name).value(shown, shown).toLatin1();
+        out->type = HK16011_ValueType_Enumeration;
+        out->data.s.set = storage->constData();
         out->data.s.label = nullptr;
         return true;
     }
+    case ParameterType::String:
+        *storage = value.toString().toLatin1();
+        out->type = HK16011_ValueType_String;
+        out->data.s.set = storage->constData();
+        out->data.s.label = nullptr;
+        return true;
     default:
         return false;
     }
@@ -578,7 +782,7 @@ QVariant Hk16011Driver::readValue(const QString &name, bool *ok) const
         return QVariant();
     }
 
-    const QVariant result = toVariant(value);
+    const QVariant result = toShownValue(m_parameterDefinitions.value(name), toVariant(value));
     // Only String / Enumeration results own heap memory.
     if (value.type == HK16011_ValueType_String
         || value.type == HK16011_ValueType_Enumeration) {
@@ -596,13 +800,25 @@ bool Hk16011Driver::writeValue(const QString &name, const QVariant &value)
         return false;
     }
     const ParameterDefinition def = m_parameterDefinitions.value(name);
+    // Must outlive the SDK call: the struct points its String/Enumeration
+    // payload at these bytes. A QByteArray local to fromVariant() would leave
+    // the SDK formatting freed memory.
+    QByteArray storage;
     HK16011_ValueStruct sdkValue;
-    if (!fromVariant(def, value, &sdkValue)) {
+    if (!fromVariant(def, value, &storage, &sdkValue)) {
+        qWarning().noquote() << "hk16011: no wire encoding for" << name
+                             << "of ParameterType" << static_cast<int>(def.type);
         return false;
     }
     const QByteArray utf8Name = name.toLatin1();
     const HK16011_ErrorCodeEnum rc =
         HK16011_SetParamValue(m_device, utf8Name.constData(), &sdkValue);
+    if (rc != HK16011_OK) {
+        // Without this the caller only learns which parameter failed, never why,
+        // which makes a device-side rejection indistinguishable from a bad value.
+        qWarning().noquote() << "hk16011: SETPARAM" << name << "=" << value.toString()
+                             << "rejected:" << rc << HK16011_ErrorCodeToString(rc);
+    }
     return rc == HK16011_OK;
 }
 
@@ -628,7 +844,13 @@ bool Hk16011Driver::setParameter(const QString &name, const QVariant &value,
         return true;
     }
 
-    if (!validateValue(value, def)) {
+    // A wire token is a legitimate spelling of an enumeration value — configs
+    // saved before the labels became the display form, and CLI scripts written
+    // against the wire names, both carry them. Normalize first so everything
+    // downstream sees one spelling.
+    const QVariant shown = toShownValue(def, value);
+
+    if (!validateValue(shown, def)) {
         if (failedParameters) {
             failedParameters->append(name);
         }
@@ -638,7 +860,7 @@ bool Hk16011Driver::setParameter(const QString &name, const QVariant &value,
         return false;
     }
 
-    m_pendingParameters.insert(name, value);
+    m_pendingParameters.insert(name, shown);
     return true;
 }
 
@@ -664,7 +886,7 @@ bool Hk16011Driver::setParameters(const QVariantMap &parameters,
         if (def.isReadOnly) {
             continue;
         }
-        if (!validateValue(it.value(), def)) {
+        if (!validateValue(toShownValue(def, it.value()), def)) {
             localFailed.append(name);
             if (hk16011CriticalParameters().contains(name)) {
                 criticalFailure.append(name);
@@ -698,7 +920,8 @@ bool Hk16011Driver::setParameters(const QVariantMap &parameters,
 
     for (auto it = parameters.constBegin(); it != parameters.constEnd(); ++it) {
         if (!localFailed.contains(it.key())) {
-            m_pendingParameters.insert(it.key(), it.value());
+            m_pendingParameters.insert(it.key(),
+                                       toShownValue(m_parameterDefinitions.value(it.key()), it.value()));
         }
     }
 
@@ -762,6 +985,7 @@ bool Hk16011Driver::commitParameters(QStringList *failedParameters)
     }
 
     QStringList localFailed;
+    const int staged = m_pendingParameters.size();
     const bool ok = flushPendingParameters(&localFailed);
 
     if (!ok) {
@@ -773,7 +997,7 @@ bool Hk16011Driver::commitParameters(QStringList *failedParameters)
         reportError(CameraError::Code::CommitFailed, description,
                     CameraError::Severity::Warning, localFailed);
     } else {
-        DRIVER_DEBUG << "committed" << m_parameters.size() << "parameters";
+        DRIVER_DEBUG << "committed" << staged << "parameters";
     }
 
     return ok;
@@ -838,7 +1062,6 @@ bool Hk16011Driver::startCapture(int captureCount)
 
     m_captureCount = captureCount;
     m_framesDelivered.store(0);
-    m_fetchStarted = false;
     m_capturing.store(true);
     m_state.store(CameraState::Acquiring);
 
@@ -856,12 +1079,12 @@ bool Hk16011Driver::startCapture(int captureCount)
     DRIVER_DEBUG << "capture started, count:" << captureCount;
     emit captureStarted(m_connectedCameraId);
 
-    // A bounded `ACQ fetch <n>` is only accepted once all n frames are already
-    // cached in the device's DDR3; asked for earlier the firmware answers
-    // ERR 5 (device busy). Waiting for that takes as long as the exposure
-    // does — seconds for a long burst — so it is polled from a timer rather
-    // than blocking this thread. `ACQ fetch 0` has no such precondition and
-    // starts straight away.
+    // Live streams, so fetch continuously right away. A bounded count cannot:
+    // `ACQ fetch <n>` is only accepted once all n frames are cached, and issuing
+    // a continuous fetch while the acquisition is still running drops exactly
+    // the last frame of every burst (measured on the bench at n = 2/5/8). Waiting
+    // for the burst to finish and then asking for it whole is the only path that
+    // returns every frame. See AGENTS.md.
     if (captureCount == 0) {
         if (!startFetchLocked(0)) {
             return false;
@@ -883,7 +1106,6 @@ bool Hk16011Driver::startFetchLocked(int fetchCount)
         finishCaptureLocked();
         return false;
     }
-    m_fetchStarted = true;
     return true;
 }
 
@@ -891,35 +1113,38 @@ void Hk16011Driver::pollCapture()
 {
     QMutexLocker locker(&m_mutex);
 
-    if (!m_capturing.load() || m_fetchStarted) {
+    if (!m_capturing.load()) {
         m_captureTimer->stop();
         return;
     }
 
-    // Negative means the SDK returned an error code, not a frame count.
-    const int ready = HK16011_GetFrameNumReady(m_device);
-    if (ready < 0) {
-        reportSdkError(QStringLiteral("HK16011_GetFrameNumReady"), ready);
-        finishCaptureLocked();
-        return;
-    }
-
-    if (ready >= m_captureCount) {
-        if (!startFetchLocked(m_captureCount)) {
+    if (m_captureCount > 0) {
+        // Wait until the device reports the whole count cached, then ask for it
+        // in one bounded fetch.
+        const int ready = HK16011_GetFrameNumReady(m_device);
+        if (ready < 0) {
+            reportSdkError(QStringLiteral("HK16011_GetFrameNumReady"), ready);
+            finishCaptureLocked();
             return;
         }
-        m_captureTimer->stop();
-        return;
-    }
 
-    if (QDateTime::currentMSecsSinceEpoch() > m_captureDeadline) {
-        reportError(CameraError::Code::Timeout,
-                    QStringLiteral("The camera cached only %1 of the %2 requested frames "
-                                   "within %3 s")
-                        .arg(ready)
-                        .arg(m_captureCount)
-                        .arg(kCaptureTimeoutMs / 1000));
-        finishCaptureLocked();
+        if (ready >= m_captureCount) {
+            if (!startFetchLocked(m_captureCount)) {
+                return;
+            }
+            m_captureTimer->stop();
+            return;
+        }
+
+        if (QDateTime::currentMSecsSinceEpoch() > m_captureDeadline) {
+            reportError(CameraError::Code::Timeout,
+                        QStringLiteral("The camera cached only %1 of the %2 requested frames "
+                                       "within %3 s")
+                            .arg(ready)
+                            .arg(m_captureCount)
+                            .arg(kCaptureTimeoutMs / 1000));
+            finishCaptureLocked();
+        }
     }
 }
 

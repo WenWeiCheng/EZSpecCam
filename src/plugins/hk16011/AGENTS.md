@@ -91,8 +91,80 @@
 | `Int` | `IntRange` | 读 `min/max/step` 的 `data.i` |
 | `Float` | `FloatRange` | 读 `data.d` |
 | `Bool` | `Boolean` | |
-| `Enumeration` | `StringCollection` | **`validValues` 放线上 token**（如 `line_binning`），因为那才是 `SETPARAM` 认的东西；友好的 label 写进 `description` |
+| `Enumeration` | `StringCollection` | `validValues` 放 **label**，设备只认 token —— 见下 |
 | `String` | `String` | |
+
+### 枚举：label 是对外的值，token 是对上设备的值
+
+`validValues` 填的是 `data.s.label`（`Image`、`Idle`…），不是 `data.s.set`
+（`image`、`idle`…）。原因不是好看：`validValues` 同时是**下拉框的数据源**、
+**校验集合**和**参数当前值**的取值域，三者必须是同一个东西。
+
+这一点如果只改 `validValues` 会立刻出问题：`def.defaultValue` 在固件不报默认值时
+回退到「设备当前值」，而设备返回的是 token；`ParameterWidgetFactory::createEnumWidget()`
+用 `findData(defaultValue)` 选中项，token 在 label 列表里查不到，
+`setWidgetValue()` 里的 `if (index >= 0)` 于是**静默不生效** —— 下拉框停在第 0 项，
+用户点确定后 `getWidgetValue()` 把错误值写回去，相机自己换了工作模式。
+
+所以驱动维护两张映射（`m_enumLabelByToken` / `m_enumTokenByLabel`），把值统一到 label：
+
+| 方向 | 位置 |
+|------|------|
+| 读设备 → 对外 | `readValue()` 经 `toShownValue()` 把 token 换成 label |
+| 写入 → 暂存 | `setParameter()` / `setParameters()` 先 `toShownValue()` 再校验、暂存 |
+| 暂存 → 上设备 | `fromVariant()` 把 label 换回 token；认不出来的字符串按原样下发 |
+
+**token 仍然可以传进来。** 改之前存下的 `.ini` 里是 `string:image`，照着线上名字写的
+CLI 脚本同理；这些都要继续能用，所以 `setParameter` 收 token、只是归一化后再暂存。
+`fromVariant` 对认不出的字符串按原样当 token 处理，保证 token 绝不会原样进 GUI、
+也绝不会以 label 的形态进设备。
+
+没有 label 的枚举项（`freq_sel` 的 `100k` / `500k`）直接显示 token 本身。
+
+### 描述与分类由插件持有（SDK 不再上报）
+
+SDK 曾经在 `HK16011_ParamDefStruct` 里带 `category`，其 `description` 也一直是固件自己
+写的文案，两处现均改由插件提供。原因是它们都是**第二份事实来源**：固件一改就会和
+EZSpecCam 漂移，与其让两份对不上，不如只留一份。`displayName` 仍取自 SDK。
+
+现在唯一给 hk16011 参数写描述和归组的地方是静态表 `hk16011ParameterMetadata()`，
+这张表同时是**白名单**，由 `applyParameterMetadata()` 按「先查后定」的方式套用：
+
+| 方向 | 行为 |
+|------|------|
+| 固件有、静态表没有 | `qInfo` 点名后**不暴露**，从参数表和值表一并删除 |
+| 静态表有、固件没有 | `qInfo` 点名后跳过，不报错 |
+| 静态表没写描述 | `qInfo` 告警并回退到 SDK 的文案（`isValid()` 不接受空描述） |
+
+前两条是为了固件增删参数时能立刻看见，而不是让 GUI 里悄悄多出或少掉一个控件；
+第三条是因为 `ParameterDefinition::isValid()` 会把空描述判为非法，那样参数就直接消失了。
+
+分组内部的顺序不用写：`order` 保持 LISTPARAMS 下标，GUI 按它排，
+于是每组自然沿用固件自己的顺序。
+
+| 类别 | 参数 |
+|------|------|
+| Core | `exposure_time_us` `read_mode` `freq_sel` `adc_gain_r` `adc_gain_g` `adc_gain_b` `adc_offset_r` `adc_offset_g` `adc_offset_b` |
+| Cooling | `tec_enable` `tec_set_temp` `sensor_temp` `environment_temp` `tec_voltage` `tec_current` |
+| Info | `camera_name` |
+| Advanced | `tec_kp` `tec_ki` `tec_kd` |
+| Debug | `mock_mode` `cdsclk_delay` `image_width` `image_height` `bevel_left` `bevel_top` `bevel_right` `bevel_bottom` `blank_left` `blank_right` `acq_state` `frame_num_ready` `frame_capacity` `exception_flag` `exception_cnt` |
+
+**只读 ≠ Info。** `sensor_temp` 等四个遥测虽然只读，但归 `Cooling` —— 它们和
+`tec_set_temp` 是同一件事的设定端与读数端。归组看的是参数**拿来干什么**。
+
+### `exposure_time_us` 的单位下拉
+
+量程是 `[1, 2147483647] µs`，一个光秃秃的 `QSpinBox` 谁也没法手动输入，所以静态表
+给它带上 `units = {us, ms, s}` 和 `unitScale = {1000, 1000000}`。
+
+注意 `unitScale` 是**相对基准单位的累计倍率**，不是相邻档位之间的倍率。
+`ParameterConstraint::getUnitIndex()` 拿它当阈值比较，`toDisplayValue()` 拿它当除数，
+只有按累计理解两者才自洽：写 `{1000, 1000}` 会把 2000 µs 显示成 `2 s`。
+
+另外，**单独一个 `unit` 字符串在 GUI 上是看不见的** ——
+`ParameterWidgetFactory` 只有在 `unitRange` 同时非空（`hasUnitRange()`）时才渲染单位
+下拉。raw 值始终是 µs，设备侧和 CLI 输出都不受影响。
 
 ### 两个固件侧的坑
 
@@ -192,16 +264,44 @@ cmake --preset linux-debug
   紧超时会让测试变脆。
 - 参数往返用例会改动设备状态，务必在结束时把原值写回。
 
+测试的 `CMakeLists.txt` 会**复用** `src/plugins/hk16011` 已经解析好的
+`HK16011_SDK_ROOT`（那个子目录先被 `add_subdirectory`），而不是自己从
+`$ENV{HK16011_ROOT}` 重新推导一遍。早期版本只认自己的 `HK16011_TEST_SDK_ROOT`
+和环境变量，于是只要 SDK 是靠 `-D` 或上一轮 configure 遗留在 cache 里的值定位的，
+测试 target 就会静默地 `return()` 掉 —— 插件照常编译，测试压根不存在，
+`ctest` 里也看不到，只剩一个过期的旧二进制躺在 `bin/Debug/` 里。
+
 覆盖范围：`enumerate` / 连接与重连 / 非法 id / 断开、参数表形状与逐个定义合法性、
+逐类别归属（Core/Cooling/Info/Advanced/Debug 各取代表，外加六个 `adc_*`）、
+枚举的 label 与 token 双向换算、枚举写入是否真的到达设备（靠重连后复读）、
+`exposure_time_us` 单位换算、
 13 个已验证可回读参数各一个用例、只读参数与未实测遥测、越界与未知参数拒绝、
-批量语义与关键参数整批拒绝、单帧 / 定量 / 实时采集。
+批量语义与关键参数整批拒绝、单帧 / 定量 / 实时采集。共 48 项。
 
 ---
 
 ## 反模式
 
 - **不要**在 `frame_num_ready` 达到目标帧数之前就发有界的 `ACQ fetch` —— 固件回 ERR 5。
+- **不要**为了「有帧即读」而在采集进行中改用连续 `ACQ fetch 0` —— **每个 burst 会恰好丢掉最后一帧**。
+  实测（1024×64，曝光 2 ms）：采集中途发起连续 fetch，burst 2/5/8 分别只回来 1/4/7 帧；
+  同一个 session 里紧接着「等 `frame_num_ready` 攒满再 `ACQ fetch <n>`」则 2/5/8 全满。
+  更精确的规律是「发起 fetch 时采集是否已结束」，而不是 FIFO 里有没有残留：
+  burst 8 **等攒满再 `fetch 0`** 同样是 8/8，只等 4 帧就取就变 7/8。
+  驱动在 StartFetch 前也确实**没有**清理 FX2 FIFO —— 但清理解决不了这个，它不是残留问题。
+  代价是首帧要等满整个 burst；要真正做到有帧即读，得让固件侧放开 `fetch <n>` 的容量校验
+  （允许 n 大于当前缓存数，语义变成「最多 n 帧、边到边发」）。
 - **不要**在帧回调里 emit Qt 信号或访问 QObject。
 - **不要**读取联合体里与 `type` 不匹配的成员。
+- **不要**让 `HK16011_ValueStruct` 指向一个活不过本次调用的缓冲区。
+  `data.s.set` 是 `const char *`，如果它指向 `fromVariant()` 内部的局部 `QByteArray`，
+  函数一返回就悬垂，SDK 随后会把**已释放的内存**格式化进命令里。真实踩过的表现是
+  下发 `SETPARAM read_mode read_mode`，固件回 ERR 3 —— 而同样的值用探针程序（传的是
+  静态字符串）永远成功，因为静态存储期不会失效。缓冲区由调用方持有
+  （见 `writeValue()` 里的 `QByteArray storage`）。
+- **不要**只把 `validValues` 换成 label 而不同时归一化读回来的值 ——
+  下拉框会静默停在第 0 项，并把错误值写回去。
 - **不要**在 CMakeLists 里写死 SDK 的绝对路径。
 - **不要**为那四个占位遥测断言具体数值。
+- **不要**指望设备替 EZSpecCam 决定分类 —— 那份分类已经从 SDK 里删掉了，
+  新增参数要自己往 `hk16011ParameterMetadata()` 里加，否则它不会出现在界面上。

@@ -20,11 +20,12 @@
  * Acquisition
  * -----------
  * The device's own modes are used: 0 = live, 1 = single, >= 2 = burst of that
- * count. The catch is that a bounded `ACQ fetch <n>` is only accepted once all
- * n frames are already cached in the device's DDR3 — asked for earlier the
- * firmware answers ERR 5 (device busy). That wait lasts as long as the
- * exposures do, so it is polled from a timer instead of blocking the thread
- * this object lives on.
+ * count. Live fetches continuously. A bounded count cannot: `ACQ fetch <n>` is
+ * only accepted once all n frames are cached in the device's DDR3, and issuing a
+ * continuous fetch while the acquisition is still running drops exactly the last
+ * frame of every burst. So the driver polls frame_num_ready and then asks for
+ * the whole count in one bounded fetch, which is the only path that returns
+ * every frame. The cost is that the first frame waits out the whole burst.
  */
 
 #include "core/ICameraDriver.h"
@@ -33,6 +34,7 @@
 #include "hk16011.h"
 
 #include <QObject>
+#include <QHash>
 #include <QRecursiveMutex>
 #include <QSharedPointer>
 #include <QTimer>
@@ -79,7 +81,7 @@ private slots:
     /// Drains the frame queue on the Qt thread and emits frameReady().
     void deliverQueuedFrames();
 
-    /// Polls frame_num_ready until a bounded capture can be fetched.
+    /// Polls frame_num_ready until a bounded capture can be fetched whole.
     void pollCapture();
 
 private:
@@ -95,12 +97,22 @@ private:
     /// Reads LISTPARAMS + every current value and fills the definition/value maps.
     void buildParameterTable();
     void clearParameterTable();
+    /// Drops parameters hk16011ParameterMetadata() does not list, then applies its
+    /// category and unit to the ones that survive.
+    void applyParameterMetadata();
 
     // ——— Value conversion ———
     static QVariant toVariant(const HK16011_ValueStruct &value);
-    static bool fromVariant(const ParameterDefinition &def, const QVariant &value,
-                            HK16011_ValueStruct *out);
+    /// Encodes `value` into `out`. A String or Enumeration value is pointed at
+    /// by `out->data.s.set`, so the bytes must live in `storage`, which the
+    /// caller owns and keeps alive until the SDK call returns.
+    bool fromVariant(const ParameterDefinition &def, const QVariant &value,
+                     QByteArray *storage, HK16011_ValueStruct *out) const;
     static bool validateValue(const QVariant &value, const ParameterDefinition &def);
+    /// Maps a wire token onto the label the GUI shows. Anything that is not a
+    /// token of this parameter — a label, or a value of another type — passes
+    /// through untouched.
+    QVariant toShownValue(const ParameterDefinition &def, const QVariant &value) const;
 
     // ——— Hardware ———
     QVariant readValue(const QString &name, bool *ok = nullptr) const;
@@ -134,10 +146,15 @@ private:
     QVariantMap m_parameters;        ///< last known values read from the device
     QVariantMap m_pendingParameters; ///< staged by setParameter(), applied on commit
 
+    /// Enumeration parameters carry labels, but the device only speaks tokens.
+    /// Both directions are kept so a value can be shown and still be sent:
+    /// setParameter() normalizes token -> label, fromVariant() maps back.
+    QMap<QString, QHash<QString, QString>> m_enumLabelByToken; ///< parameter -> token -> label
+    QMap<QString, QHash<QString, QString>> m_enumTokenByLabel; ///< parameter -> label -> token
+
     // ——— Capture ———
     std::atomic<bool> m_capturing{false};
     int m_captureCount = 0;                  ///< Qt thread only
-    bool m_fetchStarted = false;             ///< Qt thread only
     qint64 m_captureDeadline = 0;            ///< epoch ms, Qt thread only
     QTimer *m_captureTimer = nullptr;
     std::atomic<int> m_framesDelivered{0};
