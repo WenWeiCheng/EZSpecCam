@@ -95,7 +95,10 @@ void SpectrumViewWidget::applyTheme()
 
     m_graph->setPen(QPen(c.curve, 1.0));
 
-    // 悬浮读数是一个不透明的色块，深色下不跟着换会变成一块白斑
+    // 悬浮读数是一个不透明的色块，深色下不跟着换会变成一块白斑。
+    // 注意 QCPItemText 的三处颜色是分开的：文字用 setColor()，setPen() 只管
+    // 方框的边线，setBrush() 管方框的填充——只设 pen 的话字还是黑的
+    m_cursorLabel->setColor(c.overlayText);
     m_cursorLabel->setPen(QPen(c.overlayText));
     m_cursorLabel->setBrush(QBrush(c.overlayBackground));
 

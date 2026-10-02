@@ -236,6 +236,10 @@ private slots:
         QVERIFY(label);
         QCOMPARE(label->brush().color(), dark.overlayBackground);
         QCOMPARE(label->pen().color(), dark.overlayText);
+        // 文字颜色走的是 setColor()，和方框边线的 pen 是两回事。
+        // 只断言 pen 的话这里会一路绿灯，而深色下字其实还是黑的。
+        QCOMPARE(label->color(), dark.overlayText);
+        QVERIFY(label->color() != QColor(Qt::black));
     }
 
     void test_image_colorbar_axis_is_themed()
