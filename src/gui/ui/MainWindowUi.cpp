@@ -78,11 +78,11 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     menuFile->addSeparator();
 
     menuActionSaveFrameAs = new QAction("Save Frame As...", mainWindow);
-    menuActionSaveFrameAs->setShortcut(QKeySequence(Qt::ALT | Qt::Key_S));
+    menuActionSaveFrameAs->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_S));
     menuFile->addAction(menuActionSaveFrameAs);
 
     menuActionSaveFrame = new QAction("Save Frame", mainWindow);
-    menuActionSaveFrame->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_S));
+    menuActionSaveFrame->setShortcut(QKeySequence(Qt::ALT | Qt::Key_S));
     menuFile->addAction(menuActionSaveFrame);
 
     menuFile->addSeparator();
