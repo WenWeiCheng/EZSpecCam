@@ -119,6 +119,8 @@ set(EZSPECCAM_GUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/MessageHandler.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/MessageHandler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/DebugMacros.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/Theme.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/Theme.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/AppController.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/AppController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/qcustomplot.h

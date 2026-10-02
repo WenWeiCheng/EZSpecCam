@@ -3,6 +3,7 @@ add_executable(test_image_colorbar)
 target_sources(test_image_colorbar PRIVATE
     test_image_colorbar.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/qcustomplot.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/Theme.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/ImageViewWidget.cpp
 )
 target_include_directories(test_image_colorbar PRIVATE

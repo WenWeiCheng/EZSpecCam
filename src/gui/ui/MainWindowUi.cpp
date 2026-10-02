@@ -6,6 +6,7 @@
 #include <QMenu>
 #include <QMainWindow>
 #include <QIcon>
+#include <QActionGroup>
 #include <QApplication>
 
 MainWindowUi::MainWindowUi(QObject *parent)
@@ -133,6 +134,23 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     menuActionProfile->setShortcut(QKeySequence(Qt::Key_P));
     menuActionProfile->setShortcutContext(Qt::ApplicationShortcut);
     menuView->addAction(menuActionProfile);
+
+    menuView->addSeparator();
+    QMenu *menuTheme = menuView->addMenu("&Theme");
+    // 用 QActionGroup 做互斥，选中哪一项就是当前的配色来源
+    QActionGroup *themeGroup = new QActionGroup(mainWindow);
+    menuActionThemeSystem = new QAction("&Follow System", themeGroup);
+    menuActionThemeSystem->setCheckable(true);
+    menuActionThemeLight = new QAction("&Light", themeGroup);
+    menuActionThemeLight->setCheckable(true);
+    menuActionThemeDark = new QAction("&Dark", themeGroup);
+    menuActionThemeDark->setCheckable(true);
+    themeGroup->addAction(menuActionThemeSystem);
+    themeGroup->addAction(menuActionThemeLight);
+    themeGroup->addAction(menuActionThemeDark);
+    menuTheme->addActions(themeGroup->actions());
+    // 默认跟着系统，设置在 MainWindow 里同步过来
+    menuActionThemeSystem->setChecked(true);
 
     QMenu *menuPostProcess = menuBar->addMenu("&Post-Process");
     menuActionVerticalBinning = new QAction("Software Vertical Binning", mainWindow);

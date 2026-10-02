@@ -3,12 +3,19 @@
 #include <QPainter>
 #include <QHideEvent>
 
+#include "../../Theme.h"
+
 LoadingIndicator::LoadingIndicator(QWidget *parent)
     : QWidget(parent)
 {
     setFixedSize(24, 24);
     m_timer = new QTimer(this);
     connect(m_timer, &QTimer::timeout, this, &LoadingIndicator::updateAnimation);
+
+    setColor(Theme::instance()->plotColors().spinner);
+    connect(Theme::instance(), &Theme::themeChanged, this, [this] {
+        setColor(Theme::instance()->plotColors().spinner);
+    });
 }
 
 void LoadingIndicator::startAnimation()

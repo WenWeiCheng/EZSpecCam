@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include "../ui/MainWindowUi.h"
 #include "../DebugMacros.h"
+#include "../Theme.h"
 #include "config/CameraTab.h"
 #include "display/ImageViewWidget.h"
 #include "display/SpectrumViewWidget.h"
@@ -54,6 +55,9 @@ MainWindow::MainWindow(QWidget *parent)
     , m_fpsTimer(new QTimer(this))
     , m_launchTimestamp(QDateTime::currentDateTime())
 {
+    // 必须在 setupUi 之前：绘图控件是在那里创建的，创建时就会按当前主题取色
+    restoreTheme();
+
     ui->setupUi(this);
 
     ui->centralStackedWidget->hide();
@@ -252,6 +256,14 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->menuActionShowAxes, &QAction::toggled,
             this, &MainWindow::on_showAxes_triggered);
+
+    connect(ui->menuActionThemeSystem, &QAction::triggered,
+            this, [this] { setThemeMode(Theme::Mode::System); });
+    connect(ui->menuActionThemeLight, &QAction::triggered,
+            this, [this] { setThemeMode(Theme::Mode::Light); });
+    connect(ui->menuActionThemeDark, &QAction::triggered,
+            this, [this] { setThemeMode(Theme::Mode::Dark); });
+    syncThemeMenu();
 
     connect(ui->menuActionFillWindow, &QAction::toggled,
             this, &MainWindow::on_fillWindow_triggered);
@@ -743,6 +755,49 @@ void MainWindow::on_showAxes_triggered(bool checked)
 {
     if (m_imageViewWidget) {
         m_imageViewWidget->setAxesVisible(checked);
+    }
+}
+
+void MainWindow::restoreTheme()
+{
+    QSettings settings;
+    const QString value = settings.value("ui/themeMode").toString();
+    if (value == QStringLiteral("dark")) {
+        Theme::instance()->setMode(Theme::Mode::Dark);
+    } else if (value == QStringLiteral("light")) {
+        Theme::instance()->setMode(Theme::Mode::Light);
+    }
+    // 没有记录就是「跟随系统」，main() 里已经按系统设过了，这里不用动
+}
+
+void MainWindow::setThemeMode(Theme::Mode mode)
+{
+    // 用户选了 Light/Dark 就存下来，下次启动直接用；选 System 时把这个键删掉，
+    // 好让「跟随系统」恢复成默认值而不是记住上一次的强制选择
+    QSettings settings;
+    if (mode == Theme::Mode::System) {
+        settings.remove("ui/themeMode");
+    } else {
+        settings.setValue("ui/themeMode", mode == Theme::Mode::Dark ? "dark" : "light");
+    }
+
+    Theme::instance()->setMode(mode);
+    syncThemeMenu();
+}
+
+void MainWindow::syncThemeMenu()
+{
+    // Theme 可能被 --theme 改过（比如命令行指定了 dark），菜单要跟着显示实际选项
+    switch (Theme::instance()->mode()) {
+        case Theme::Mode::Light:
+            ui->menuActionThemeLight->setChecked(true);
+            break;
+        case Theme::Mode::Dark:
+            ui->menuActionThemeDark->setChecked(true);
+            break;
+        case Theme::Mode::System:
+            ui->menuActionThemeSystem->setChecked(true);
+            break;
     }
 }
 

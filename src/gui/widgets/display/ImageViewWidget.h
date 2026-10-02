@@ -119,6 +119,8 @@ private:
     void applyColorMap();
     void applyColorScaleMode();
     void setupColorScalePlot();
+    void applyTheme();
+    QPen crosshairPen() const;
     QPointF widgetToImageCoords(int widgetX, int widgetY) const;
     void updateDisplayData();
     void calculateDownsampleFactors();

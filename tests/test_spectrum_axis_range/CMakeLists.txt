@@ -3,6 +3,7 @@ add_executable(test_spectrum_axis_range)
 target_sources(test_spectrum_axis_range PRIVATE
     test_spectrum_axis_range.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/qcustomplot.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/Theme.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/SpectrumViewWidget.cpp
 )
 target_link_libraries(test_spectrum_axis_range PRIVATE

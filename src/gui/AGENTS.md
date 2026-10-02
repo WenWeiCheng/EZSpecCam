@@ -11,6 +11,7 @@ gui/
 ├── main.cpp                    # QApplication entry
 ├── AppController.cpp/h         # State machine + plugin manager (merged)
 ├── DebugMacros.h               # QDEBUG_* macros
+├── Theme.cpp/h                 # Light/dark palette + QCustomPlot colours
 ├── qcustomplot.cpp/h           # EXTERNAL — DO NOT MODIFY
 ├── ui/
 │   └── MainWindowUi.cpp/h      # Separated UI construction
@@ -42,11 +43,16 @@ gui/
 | Frame rendering | `widgets/display/ImageViewWidget.cpp` |
 | Spectrum display | `widgets/display/SpectrumViewWidget.cpp` |
 | Dynamic parameter widgets | `widgets/config/ParameterWidgetFactory.cpp` |
+| Colours (GUI chrome + plots) | `Theme.cpp` |
 
 ## CONVENTIONS
 - `Q_OBJECT` macro always present in QObject subclasses
 - `signals:` / `slots:` sections follow Qt naming (not `Q_SIGNALS`/`Q_SLOTS`)
 - UI construction separated into `ui/MainWindowUi` (not in MainWindow itself)
+- Never hardcode a colour in a widget. Take it from `Theme::plotColors()`
+- QCustomPlot ignores `QWidget` palettes entirely, so plot colours must be set
+  explicitly. New plots go through `Theme::applyToPlot()` rather than being
+  styled in place, or they will stay light in dark mode
 - Camera state machine: Disconnected → Connecting → Connected → Acquiring → Error
 - Frame delivery via `frameReady(const ImageData &)` signal (not polling)
 - Functions defined with slots in `AppController` must be invoked via `QMetaObject::invokeMethod()`.

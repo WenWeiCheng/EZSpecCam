@@ -100,6 +100,7 @@ protected:
 
 private:
     void setupPlot();
+    void applyTheme();
     void updateCursor(double x, double y);
     double widgetToDataX(int widgetX) const;
     QVector<double> extractRowData(const QImage &image) const;

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <limits>
 #include <cmath>
+#include "../../Theme.h"
 #include "../../qcustomplot.h"
 
 SpectrumViewWidget::SpectrumViewWidget(QWidget *parent)
@@ -40,7 +41,6 @@ void SpectrumViewWidget::setupPlot()
     m_plot->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     m_graph = m_plot->addGraph(m_plot->xAxis, m_plot->yAxis);
-    m_graph->setPen(QPen(Qt::blue, 1.0));
 
     m_graph->setAdaptiveSampling(true);
 
@@ -56,10 +56,6 @@ void SpectrumViewWidget::setupPlot()
     // 补出上、右两条轴，凑成四边封闭的图框。上、右只画轴线和刻度线，
     // 刻度标签仍留在左、下（setupFullAxesBox 已关掉），range 通过信号跟着左、下走
     m_plot->axisRect()->setupFullAxesBox(true);
-    m_plot->xAxis2->setBasePen(m_plot->xAxis->basePen());
-    m_plot->xAxis2->setTickPen(m_plot->xAxis->tickPen());
-    m_plot->yAxis2->setBasePen(m_plot->yAxis->basePen());
-    m_plot->yAxis2->setTickPen(m_plot->yAxis->tickPen());
 
     m_plot->setInteractions(QCP::iSelectPlottables);
     m_plot->setMouseTracking(true);
@@ -70,14 +66,11 @@ void SpectrumViewWidget::setupPlot()
     m_plot->setNoAntialiasingOnDrag(true);
 
     m_cursorLine = new QCPItemLine(m_plot);
-    m_cursorLine->setPen(QPen(Qt::red, 1, Qt::DashLine));
     m_cursorLine->setVisible(false);
     m_cursorLine->start->setCoords(0, 0);
     m_cursorLine->end->setCoords(0, 1);
 
     m_cursorLabel = new QCPItemText(m_plot);
-    m_cursorLabel->setPen(QPen(Qt::black));
-    m_cursorLabel->setBrush(QBrush(Qt::white));
     m_cursorLabel->setFont(QFont("sans", 9));
     m_cursorLabel->setText("");
     m_cursorLabel->setVisible(false);
@@ -86,6 +79,29 @@ void SpectrumViewWidget::setupPlot()
 
     m_cursorLine->setLayer(QLatin1String("overlay"));
     m_cursorLabel->setLayer(QLatin1String("overlay"));
+
+    // 建完轴再上色：applyToPlot 要遍历 axisRect 里的四条轴
+    applyTheme();
+    connect(Theme::instance(), &Theme::themeChanged, this, &SpectrumViewWidget::applyTheme);
+
+    m_plot->replot(QCustomPlot::rpQueuedReplot);
+}
+
+void SpectrumViewWidget::applyTheme()
+{
+    const Theme::PlotColors &c = Theme::instance()->plotColors();
+
+    Theme::instance()->applyToPlot(m_plot);
+
+    m_graph->setPen(QPen(c.curve, 1.0));
+
+    // 悬浮读数是一个不透明的色块，深色下不跟着换会变成一块白斑
+    m_cursorLabel->setPen(QPen(c.overlayText));
+    m_cursorLabel->setBrush(QBrush(c.overlayBackground));
+
+    QColor cursorColor = c.crosshair;
+    cursorColor.setAlpha(255);
+    m_cursorLine->setPen(QPen(cursorColor, 1, Qt::DashLine));
 
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }

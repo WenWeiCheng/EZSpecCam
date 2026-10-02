@@ -10,6 +10,7 @@
 #include <QThread>
 
 #include "../AppController.h"
+#include "../Theme.h"
 #include "../workers/FileLoaderWorker.h"
 
 class MainWindowUi;
@@ -85,6 +86,9 @@ private slots:
     void onAcquireDarkFrameStartRequested(int frameCount);
 
 private:
+    void restoreTheme();
+    void setThemeMode(Theme::Mode mode);
+    void syncThemeMenu();
     void updateToolbarState();
     void updateDisplay(const ImageData &frame);
     void switchView(int height);

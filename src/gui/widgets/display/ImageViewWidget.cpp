@@ -6,6 +6,7 @@
 #include <QFontMetricsF>
 #include <QTimer>
 #include <qpoint.h>
+#include "../../Theme.h"
 #include "../../qcustomplot.h"
 
 namespace {
@@ -38,6 +39,8 @@ ImageViewWidget::ImageViewWidget(QWidget *parent)
 
     setupPlot();
     setupColorScalePlot();
+
+    connect(Theme::instance(), &Theme::themeChanged, this, &ImageViewWidget::applyTheme);
 }
 
 ImageViewWidget::~ImageViewWidget() = default;
@@ -85,11 +88,46 @@ void ImageViewWidget::setupColorScalePlot()
     m_colorScalePlot->plotLayout()->setColumnSpacing(0);
     m_colorScalePlot->plotLayout()->setMargins(QMargins(0, 0, 0, 0));
 
-    m_colorScalePlot->setBackground(Qt::white);
-
     m_colorScale->setGradient(m_colorMap->gradient());
     m_colorScale->setDataRange(m_colorMap->dataRange());
     m_colorScale->setDataScaleType(m_colorMap->dataScaleType());
+
+    applyTheme();
+}
+
+void ImageViewWidget::applyTheme()
+{
+    const Theme::PlotColors &c = Theme::instance()->plotColors();
+
+    Theme::instance()->applyToPlot(m_plot);
+    Theme::instance()->applyToPlot(m_colorScalePlot);
+
+    // 色标有自己的内部轴，挂在 QCPColorScale 上而不是 plot->axisRect() 里，
+    // applyToPlot 遍历不到，得单独上色，否则深色下刻度数字是黑底黑字
+    if (m_colorScale) {
+        QCPAxis *colorAxis = m_colorScale->axis();
+        if (colorAxis) {
+            colorAxis->setBasePen(QPen(c.axis));
+            colorAxis->setTickPen(QPen(c.axis));
+            colorAxis->setTickLabelColor(c.text);
+        }
+    }
+
+    // 十字线是取色时现建的，主题变了得回头给已经画上的那些补一遍
+    for (const auto &pair : m_crosshairs) {
+        pair.first->setPen(crosshairPen());
+        pair.second->setPen(crosshairPen());
+    }
+
+    m_plot->replot(QCustomPlot::rpQueuedReplot);
+}
+
+QPen ImageViewWidget::crosshairPen() const
+{
+    QPen pen(Theme::instance()->plotColors().crosshair);
+    pen.setWidth(1);
+    pen.setStyle(Qt::DashLine);
+    return pen;
 }
 
 void ImageViewWidget::setImage(const QImage &image)
@@ -409,18 +447,16 @@ void ImageViewWidget::addCrosshair(int x, int y)
 
     clearCrosshairs();
 
-    QPen crosshairPen(QColor(255, 0, 0, 180));
-    crosshairPen.setWidth(1);
-    crosshairPen.setStyle(Qt::DashLine);
+    const QPen pen = crosshairPen();
 
     QCPItemLine *verticalLine = new QCPItemLine(m_plot);
-    verticalLine->setPen(crosshairPen);
+    verticalLine->setPen(pen);
     verticalLine->setSelectable(false);
     verticalLine->start->setCoords(x + 0.5, 0);
     verticalLine->end->setCoords(x + 0.5, m_originalImage.height());
 
     QCPItemLine *horizontalLine = new QCPItemLine(m_plot);
-    horizontalLine->setPen(crosshairPen);
+    horizontalLine->setPen(pen);
     horizontalLine->setSelectable(false);
     horizontalLine->start->setCoords(0, y + 0.5);
     horizontalLine->end->setCoords(m_originalImage.width(), y + 0.5);

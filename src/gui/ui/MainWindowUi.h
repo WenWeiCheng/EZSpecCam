@@ -45,6 +45,10 @@ public:
     QAction *menuActionDisplayStyle;
     QAction *menuActionProfile;
 
+    QAction *menuActionThemeSystem;
+    QAction *menuActionThemeLight;
+    QAction *menuActionThemeDark;
+
     QAction *menuActionStatistics;
     QAction *menuActionPostProcess;
     QAction *menuActionVerticalBinning;
