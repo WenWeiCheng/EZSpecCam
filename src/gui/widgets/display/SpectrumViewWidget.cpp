@@ -9,6 +9,11 @@
 #include "../../Theme.h"
 #include "../../qcustomplot.h"
 
+namespace {
+// 读数框字号。原来 9 磅在放大后的绘图区里显得偏小，看着像一坨看不清的小字
+constexpr int kCursorFontPointSize = 12;
+} // namespace
+
 SpectrumViewWidget::SpectrumViewWidget(QWidget *parent)
     : QWidget(parent)
     , m_plot(nullptr)
@@ -71,7 +76,7 @@ void SpectrumViewWidget::setupPlot()
     m_cursorLine->end->setCoords(0, 1);
 
     m_cursorLabel = new QCPItemText(m_plot);
-    m_cursorLabel->setFont(QFont("sans", 9));
+    m_cursorLabel->setFont(QFont("sans", kCursorFontPointSize));
     m_cursorLabel->setText("");
     m_cursorLabel->setVisible(false);
     m_cursorLabel->setPositionAlignment(Qt::AlignTop | Qt::AlignLeft);
