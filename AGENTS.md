@@ -48,6 +48,7 @@ EZSpecCam 是一个基于 Qt 6.8、C++17 的相机控制应用程序，负责相
 | `SpectrumViewWidget` | 控件 | `src/gui/widgets/display/SpectrumViewWidget.h` | 光谱图控件 |
 | `MockCameraDriver` | 插件 | `src/plugins/mock/MockCameraDriver.cpp` | 用于测试的模拟相机 |
 | `QHYCCDDriver` | 插件 | `src/plugins/qhyccd/QHYCCDDriver.cpp` | QHYCCD 真实硬件驱动 |
+| `Hk16011Driver` | 插件 | `src/plugins/hk16011/Hk16011Driver.cpp` | HK16011 CCD 光谱相机驱动（Linux）→ 详见 `src/plugins/hk16011/AGENTS.md` |
 | `SequenceRunner` | 类 | `src/cli/SequenceRunner.h` / `src/cli/SequenceRunner.cpp` | 解析并执行 JSON 事件序列脚本（`--sequence`） |
 
 ## 编码约定
@@ -142,7 +143,8 @@ ctest --preset linux-release
 ## 构建约定
 - 根 CMakeLists.txt：设置输出目录后仍调用 `file(MAKE_DIRECTORY ...)` —— 略显冗余但无害
 - Windows 用 `build_preset.bat`，Linux 用 `build_preset.sh`，两者都只是对 `cmake --preset <platform>-<config>` 的封装。
-- Linux 预设只构建 mock 驱动；`qhyccd` / `hamamatsu` 依赖厂商 Windows SDK，在 Linux 上不可用。
+- Linux 预设默认只构建 mock 驱动；`qhyccd` / `hamamatsu` 依赖厂商 Windows SDK，在 Linux 上不可用。
+- Linux 上若设置了 `HK16011_ROOT`，则会额外构建 `hk16011` 插件及其测试（`test_hk16011_driver_HK16011`）。该测试在**没有接硬件时全部 `QSKIP`**，因此可以安全地留在 ctest 里。
 
 ## 构建可移植性
 
@@ -159,7 +161,11 @@ ctest --preset linux-release
 
 ### Linux：依赖系统包，无需环境变量
 
-Linux 侧不读任何环境变量，Qt 与工具链全部来自系统包（`qt6-base-dev`、`cmake`、`ninja-build`、`g++`）。`build_preset.sh` 会优先选用 `/usr/bin/cmake`，以避开某些环境（如 Xilinx/Vitis）PATH 中更靠前、依赖 `libidn.so.11` 的旧版 cmake。
+Linux 侧除厂商 SDK 外不读任何环境变量，Qt 与工具链全部来自系统包（`qt6-base-dev`、`cmake`、`ninja-build`、`g++`）。`build_preset.sh` 会优先选用 `/usr/bin/cmake`，以避开某些环境（如 Xilinx/Vitis）PATH 中更靠前、依赖 `libidn.so.11` 的旧版 cmake。
+
+| 环境变量 | 示例 | 用途 |
+|---------|---------|---------|
+| `HK16011_ROOT` | `/opt/hk16011` | HK16011 C SDK 源码树，需含 `include/hk16011.h` 与 `lib/libHK16011.so`；未设置时插件带警告跳过。还需要 `libusb-1.0-dev` 与 `libserialport-dev` |
 
 `linux-debug` / `linux-release` 预设中写死了 `"CMAKE_PREFIX_PATH": "/usr"`。这在多数发行版上成立，但如果 Qt 装在别处（`/opt`、自定义 prefix），请用 `CMakeUserPresets.json` 覆盖，**不要**直接改动被跟踪的 `CMakePresets.json`。
 

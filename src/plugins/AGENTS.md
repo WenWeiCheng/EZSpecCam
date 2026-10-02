@@ -24,6 +24,12 @@ plugins/
     ├── hamamatsu.json
     ├── HamamatsuDriver.cpp
     └── HamamatsuDriver.h
+└── hk16011/                    # Real HK16011 CCD spectrometer driver (Linux only)
+    ├── AGENTS.md               # Device quirks + SDK integration notes — read before touching capture
+    ├── CMakeLists.txt
+    ├── hk16011.json
+    ├── Hk16011Driver.cpp
+    └── Hk16011Driver.h
 ```
 
 ## WHERE TO LOOK
@@ -35,6 +41,7 @@ plugins/
 | Mock camera for testing | `mock/MockCameraDriver.cpp` — generates synthetic frames |
 | QHYCCD hardware driver | `qhyccd/QHYCCDDriver.cpp` — QHYCCD SDK integration |
 | Hamamatsu hardware driver | `hamamatsu/HamamatsuDriver.cpp` — DCAMSDK4 integration |
+| HK16011 hardware driver | `hk16011/Hk16011Driver.cpp` — libHK16011 integration; read `hk16011/AGENTS.md` first, the device has several frame-delivery traps |
 
 ## CONVENTIONS
 - Each driver is a Qt plugin: inherits `QObject` + `ICameraDriver`, uses `Q_PLUGIN_METADATA`

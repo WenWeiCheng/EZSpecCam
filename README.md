@@ -19,12 +19,18 @@
 - **Qt 6.2** 或更高版本（Windows 上使用 Qt 6.8）
 - **C++17** 编译器（Windows 上为 MSVC 2022；Linux 上为 GCC 11+）
 - **CMake 3.20+**
+- `hk16011` 驱动另需：Linux、厂商 SDK（用 `HK16011_ROOT` 指定）、`libusb-1.0` 与 `libserialport`
 
 ## 快速开始
 
 ### Linux
 
-`qhyccd` 与 `hamamatsu` 仅支持 Windows，会被自动跳过。未安装 PICam SDK 时，`picam` 插件会带警告自行跳过。需要 Qt 6.2+、CMake 3.20+、GCC 11+ 以及 Ninja。
+`qhyccd` 与 `hamamatsu` 仅支持 Windows，会被自动跳过。未安装 PICam SDK 时，`picam` 插件会带警告自行跳过；未设置 `HK16011_ROOT` 时，`hk16011` 插件同样带警告跳过。需要 Qt 6.2+、CMake 3.20+、GCC 11+ 以及 Ninja。
+
+```bash
+# 可选：启用 hk16011 驱动
+export HK16011_ROOT=/path/to/hk16011/sdk/tree
+```
 
 ```bash
 git clone https://github.com/your-repo/EZSpecCam.git
@@ -127,6 +133,11 @@ Qt GUI 应用程序：相机发现、连接管理、参数配置、实时图像�
 | QHYCCD | 硬件 | 支持真实的 QHY 相机 | QHY268M | [下载](https://www.qhyccd.cn/download/) |
 | Hamamatsu | 硬件 | 支持滨松相机 | C16091-10 | [下载](https://www.hamamatsu.com/jp/en/product/cameras/software/driver-software.html) |
 | PI | 硬件 | 支持 Princeton 相机 | PIXIS100B,PIXIS400B | [下载](https://www.princetoninstruments.com.cn/products_driver.html) |
+| HK16011 | 硬件 | CCD 光谱相机（Linux，仅厂商 SDK） | HK16011 | 随设备提供，见 `HK16011_ROOT` |
+
+> **HK16011 说明**：温控环尚未接入真实传感器，`sensor_temp` / `environment_temp` /
+> `tec_voltage` / `tec_current` 返回的是固件占位值，驱动会在参数描述中标注「未实现」。
+> 详见 [`src/plugins/hk16011/AGENTS.md`](src/plugins/hk16011/AGENTS.md)。
 
 ## 构建
 
@@ -139,6 +150,14 @@ Qt GUI 应用程序：相机发现、连接管理、参数配置、实时图像�
 | `EZSPECCAM_BUILD_TESTS` | ON | 构建测试可执行文件 |
 | `EZSPECCAM_BUILD_APP` | ON | 构建应用程序（产出 `ezspeccam` 与 `ezspeccam-gui` 两个可执行文件） |
 | `EZSPECCAM_BUILD_PLUGINS` | ON | 构建相机驱动插件 |
+
+缺失的可选 SDK 只会让对应插件带 `WARNING` 跳过，不会中断构建。需要把缺失升级为硬错误时，
+传对应的 `EZSPECCAM_REQUIRE_<SDK>` 开关：
+
+| 开关 | 对应插件 |
+|--------|---------|
+| `EZSPECCAM_REQUIRE_PICAM` | `picam` |
+| `EZSPECCAM_REQUIRE_HK16011` | `hk16011` |
 
 ## 许可证
 

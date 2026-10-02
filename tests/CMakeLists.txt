@@ -12,6 +12,12 @@ if(WIN32)
     add_subdirectory(test_hamamatsu_driver)
 endif()
 
+# hk16011 depends on a Linux-only SDK that is not installed by the vendor; it
+# self-skips with WARNING + return() when HK16011_ROOT is unset.
+if(NOT WIN32)
+    add_subdirectory(test_hk16011_driver)
+endif()
+
 add_subdirectory(test_metadata_save_load)
 add_subdirectory(test_row_range_dialog)
 add_subdirectory(test_spectrum_axis_range)
