@@ -78,7 +78,8 @@ int captureFrames(ICameraDriver *driver, int frameCount,
             frame.frameNumber = frameNumber;
             frame.cameraId = cameraId;
             frame.parameters = parameters;
-            const QString filePath = app::formats::generateFilename(outputDir, prefix, suffix, outputExtension);
+            const QString filePath = app::formats::generateFilename(outputDir, prefix, suffix,
+                                                                      outputExtension, ts, frameNumber);
             if (!app::formats::saveFrame(frame, filePath)) errors++;
             captured++;
             qInfo() << "Frame" << captured << "/" << frameCount;

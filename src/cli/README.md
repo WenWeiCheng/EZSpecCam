@@ -62,15 +62,20 @@ ezspeccam --camera mock-001 --set exposure=500 --set gain=5.5 --frames 5
 Filenames follow the convention (underscores auto-inserted):
 
 ```
-[{prefix}_]img_{yyyyMMdd_hhmmss_zzz}[_{suffix}].{ext}
+[{prefix}_]img_{yyyyMMdd_hhmmss_zzz}_{tag}[_{suffix}].{ext}
 ```
+
+`{tag}` is a four-symbol hash of the frame's timestamp and frame number. It is
+there because a driver can deliver frames faster than one per millisecond — at
+1024×1 a frame is 2 KB and a cached burst arrives back-to-back — and two frames
+sharing a millisecond stamp would otherwise overwrite each other with no error.
 
 | `--prefix` | `--suffix` | Result |
 |------------|------------|--------|
-| (none) | (none) | `img_20260602_143021_550.tiff` |
-| `test` | (none) | `test_img_20260602_143021_550.tiff` |
-| (none) | `cooled` | `img_20260602_143021_550_cooled.tiff` |
-| `test` | `cooled` | `test_img_20260602_143021_550_cooled.tiff`
+| (none) | (none) | `img_20260602_143021_550_9f2a.tiff` |
+| `test` | (none) | `test_img_20260602_143021_550_9f2a.tiff` |
+| (none) | `cooled` | `img_20260602_143021_550_9f2a_cooled.tiff` |
+| `test` | `cooled` | `test_img_20260602_143021_550_9f2a_cooled.tiff`
 
 ### Metadata JSON
 
