@@ -122,6 +122,7 @@ private:
     void applyTheme();
     QPen crosshairPen() const;
     QPointF widgetToImageCoords(int widgetX, int widgetY) const;
+    void updateCursorReadout(const QPoint &widgetPos);
     void updateDisplayData();
     void calculateDownsampleFactors();
     QImage downsampleImage(const QImage &source, int factorX, int factorY);
@@ -160,6 +161,11 @@ private:
     QRubberBand *m_rubberBand = nullptr;
     QPoint m_rubberBandOrigin;
     bool m_userHasZoomed = false;
+
+    // 悬浮读数依赖的鼠标位置。数据刷新时要用它把读数重算一遍，
+    // 所以不能只留在 mouseMoveEvent 的栈上
+    QPoint m_lastMousePos = QPoint(-1, -1);
+    bool m_cursorActive = false;
 };
 
 #endif // IMAGEVIEWWIDGET_H

@@ -5,6 +5,7 @@
 #include <QDebug>
 #include <QFontMetricsF>
 #include <QTimer>
+#include <QToolTip>
 #include <qpoint.h>
 #include "../../Theme.h"
 #include "../../qcustomplot.h"
@@ -151,6 +152,12 @@ void ImageViewWidget::setImage(const QImage &image)
         int y = static_cast<int>(m_currentCrosshairPos.y());
         int value = pixelValue(x, y);
         emit crosshairMoved(QPointF(x, y), value);
+    }
+
+    // 放在 updatePlotGeometry() 之后：widgetToImageCoords() 依赖坐标轴，
+    // 而坐标轴范围要先随新图定下来
+    if (m_cursorActive) {
+        updateCursorReadout(m_lastMousePos);
     }
 }
 
@@ -481,27 +488,48 @@ void ImageViewWidget::mouseMoveEvent(QMouseEvent *event)
         return;
     }
 
-    QPointF imageCoords = widgetToImageCoords(event->pos().x(), event->pos().y());
+    m_lastMousePos = event->pos();
+    updateCursorReadout(event->pos());
+
+    QWidget::mouseMoveEvent(event);
+}
+
+// 读数只由两样东西决定：鼠标停在哪、当前这一帧该点的像素值。
+// 抽出来是因为 setImage() 每来一帧也要走一遍——鼠标不动时，
+// 挂在屏幕上的 tooltip 得跟着新数据换数字，否则 live 模式下读到的是上一帧的值
+void ImageViewWidget::updateCursorReadout(const QPoint &widgetPos)
+{
+    QPointF imageCoords = widgetToImageCoords(widgetPos.x(), widgetPos.y());
     int x = static_cast<int>(imageCoords.x());
     int y = static_cast<int>(imageCoords.y());
 
-    if (x >= 0 && x < m_originalImage.width() &&
-        y >= 0 && y < m_originalImage.height()) {
-
-        int value = pixelValue(x, y);
-
-        QString tooltip = QString("X: %1, Y: %2, Value: %3")
-                          .arg(x)
-                          .arg(y)
-                          .arg(value);
-
-        setToolTip(tooltip);
-        emit pixelInfo(x, y, value);
-    } else {
+    if (x < 0 || x >= m_originalImage.width() ||
+        y < 0 || y >= m_originalImage.height()) {
+        m_cursorActive = false;
         setToolTip(QString());
+        return;
     }
 
-    QWidget::mouseMoveEvent(event);
+    m_cursorActive = true;
+
+    int value = pixelValue(x, y);
+
+    QString tooltip = QString("X: %1, Y: %2, Value: %3")
+                      .arg(x)
+                      .arg(y)
+                      .arg(value);
+
+    setToolTip(tooltip);
+
+    // 关键点：setToolTip() 只改属性，屏幕上已经弹出来的那条不会重画，
+    // 数字会一直停在旧值上。重新 showText() 一次才会换字；
+    // 实测不需要先 hideText()，所以不会出现消失再出现的闪烁。
+    // 只有真显示着的时候才重弹，否则会把用户还没等出来的那条提前按出来
+    if (QToolTip::isVisible()) {
+        QToolTip::showText(mapToGlobal(widgetPos), tooltip, this);
+    }
+
+    emit pixelInfo(x, y, value);
 }
 
 void ImageViewWidget::keyPressEvent(QKeyEvent *event)
@@ -559,6 +587,8 @@ void ImageViewWidget::keyPressEvent(QKeyEvent *event)
 
 void ImageViewWidget::leaveEvent(QEvent *event)
 {
+    m_cursorActive = false;
+    m_lastMousePos = QPoint(-1, -1);
     setToolTip(QString());
     QWidget::leaveEvent(event);
 }
