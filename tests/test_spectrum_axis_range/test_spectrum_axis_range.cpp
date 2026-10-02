@@ -248,6 +248,92 @@ private slots:
         widget.setXAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Auto);
         QCOMPARE(widget.yAxisRangeMode(), SpectrumViewWidget::AxisRangeMode::Manual);
     }
+
+    void test_top_and_right_axes_complete_the_box()
+    {
+        SpectrumViewWidget widget;
+        widget.resize(800, 600);
+
+        QVector<double> x(100), y(100);
+        for (int i = 0; i < 100; ++i) {
+            x[i] = i;
+            y[i] = i * 10.0;
+        }
+        widget.setData(x, y);
+
+        auto *plot = widget.findChild<QCustomPlot *>();
+        QVERIFY(plot);
+        QCPAxisRect *rect = plot->axisRect();
+
+        QCOMPARE(rect->axisCount(QCPAxis::atTop), 1);
+        QCOMPARE(rect->axisCount(QCPAxis::atRight), 1);
+
+        QCPAxis *top = rect->axis(QCPAxis::atTop);
+        QCPAxis *right = rect->axis(QCPAxis::atRight);
+        QVERIFY(top->visible());
+        QVERIFY(right->visible());
+
+        // 刻度标签只在左、下，上、右重复一遍会挤掉绘图区
+        QVERIFY(!top->tickLabels());
+        QVERIFY(!right->tickLabels());
+
+        // 范围跟着左、下走，否则对角刻度线会和轴标签对不齐
+        QCOMPARE(top->range().lower, widget.currentXMin());
+        QCOMPARE(top->range().upper, widget.currentXMax());
+        QCOMPARE(right->range().lower, widget.currentYMin());
+        QCOMPARE(right->range().upper, widget.currentYMax());
+    }
+
+    void test_right_axis_follows_manual_and_zoom_ranges()
+    {
+        SpectrumViewWidget widget;
+        widget.resize(800, 600);
+
+        QVector<double> x(100), y(100);
+        for (int i = 0; i < 100; ++i) {
+            x[i] = i;
+            y[i] = i;
+        }
+        widget.setData(x, y);
+
+        auto *plot = widget.findChild<QCustomPlot *>();
+        QVERIFY(plot);
+        QCPAxis *top = plot->axisRect()->axis(QCPAxis::atTop);
+        QCPAxis *right = plot->axisRect()->axis(QCPAxis::atRight);
+
+        widget.setXAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
+        widget.setManualXRange(10.0, 90.0);
+        widget.setYAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
+        widget.setManualYRange(-5.0, 50.0);
+
+        QCOMPARE(top->range().lower, 10.0);
+        QCOMPARE(top->range().upper, 90.0);
+        QCOMPARE(right->range().lower, -5.0);
+        QCOMPARE(right->range().upper, 50.0);
+    }
+
+    void test_right_axis_follows_log_scale()
+    {
+        SpectrumViewWidget widget;
+        widget.resize(800, 600);
+
+        QVector<double> x(100), y(100);
+        for (int i = 0; i < 100; ++i) {
+            x[i] = i;
+            y[i] = (i + 1) * 10.0;
+        }
+        widget.setData(x, y);
+
+        widget.setIntensityScaleType(SpectrumViewWidget::IntensityScaleType::Log);
+
+        auto *plot = widget.findChild<QCustomPlot *>();
+        QVERIFY(plot);
+        QCPAxis *right = plot->axisRect()->axis(QCPAxis::atRight);
+
+        // 右侧刻度线的位置由自己的刻度算法决定，必须和左侧一样切到对数
+        QCOMPARE(right->scaleType(), QCPAxis::stLogarithmic);
+        QVERIFY(dynamic_cast<QCPAxisTickerLog *>(right->ticker().data()) != nullptr);
+    }
 };
 
 QTEST_MAIN(TestSpectrumAxisRange)

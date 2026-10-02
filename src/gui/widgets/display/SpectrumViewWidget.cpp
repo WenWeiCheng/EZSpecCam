@@ -53,6 +53,14 @@ void SpectrumViewWidget::setupPlot()
     m_plot->xAxis->setRange(0, 100);
     m_plot->yAxis->setRange(0, 100);
 
+    // 补出上、右两条轴，凑成四边封闭的图框。上、右只画轴线和刻度线，
+    // 刻度标签仍留在左、下（setupFullAxesBox 已关掉），range 通过信号跟着左、下走
+    m_plot->axisRect()->setupFullAxesBox(true);
+    m_plot->xAxis2->setBasePen(m_plot->xAxis->basePen());
+    m_plot->xAxis2->setTickPen(m_plot->xAxis->tickPen());
+    m_plot->yAxis2->setBasePen(m_plot->yAxis->basePen());
+    m_plot->yAxis2->setTickPen(m_plot->yAxis->tickPen());
+
     m_plot->setInteractions(QCP::iSelectPlottables);
     m_plot->setMouseTracking(true);
     m_plot->installEventFilter(this);
@@ -326,6 +334,10 @@ void SpectrumViewWidget::setIntensityScaleType(IntensityScaleType type)
             break;
         }
     }
+
+    // 右侧轴共用左侧的刻度算法，否则对数刻度下它的刻度线会和左侧标签对不齐
+    m_plot->yAxis2->setScaleType(m_plot->yAxis->scaleType());
+    m_plot->yAxis2->setTicker(m_plot->yAxis->ticker());
 
     if (m_dataValid && !m_xData.isEmpty()) {
         applyAxisRange();
