@@ -129,7 +129,20 @@ void SpectrumViewWidget::setData(const QVector<double> &x, const QVector<double>
         applyAxisRange();
     }
 
+    // 鼠标不动时读数会一直停在上一帧的数值上，live 模式下等于挂着一个假读数。
+    // 只在光标确实还悬着的时候刷新，否则鼠标从没进过画面也会凭空冒出读数
+    double readoutY = 0.0;
+    const bool refreshReadout = m_cursorActive;
+    if (refreshReadout) {
+        readoutY = intensityAt(m_lastCursorX);
+        applyCursor(m_lastCursorX, readoutY);
+    }
+
     m_plot->replot(QCustomPlot::rpQueuedReplot);
+
+    if (refreshReadout) {
+        emit cursorPosition(m_lastCursorX, readoutY);
+    }
 }
 
 void SpectrumViewWidget::setFromImage(const QImage &image)
@@ -194,6 +207,8 @@ void SpectrumViewWidget::clearData()
     m_xData.clear();
     m_yData.clear();
     m_dataValid = false;
+    // 数据都清了，光标也就没有可读的值了，别让新数据进来时又冒出来
+    m_cursorActive = false;
 
     m_graph->data()->clear();
     m_plot->xAxis->setRange(0, 100);
@@ -420,6 +435,7 @@ void SpectrumViewWidget::mouseMoveEvent(QMouseEvent *event)
 
 void SpectrumViewWidget::leaveEvent(QEvent *event)
 {
+    m_cursorActive = false;
     m_cursorLine->setVisible(false);
     m_cursorLabel->setVisible(false);
     m_plot->layer(QLatin1String("overlay"))->replot();
@@ -504,6 +520,20 @@ void SpectrumViewWidget::updateCursor(double x, double y)
         return;
     }
 
+    // 记下光标位置：新一帧到达时数据变了但鼠标没动，靠它重新取当前值
+    m_lastCursorX = x;
+    m_cursorActive = true;
+
+    applyCursor(x, y);
+    m_plot->layer(QLatin1String("overlay"))->replot();
+
+    emit cursorPosition(x, y);
+}
+
+// 只改 overlay 上的图元和文字。数据刷新那条路也要用它，但那边已经把
+// 整幅图排进重绘队列了，不能再单独让 overlay 同步重绘一遍
+void SpectrumViewWidget::applyCursor(double x, double y)
+{
     double minY = m_plot->yAxis->range().lower;
     double maxY = m_plot->yAxis->range().upper;
 
@@ -521,8 +551,6 @@ void SpectrumViewWidget::updateCursor(double x, double y)
 
     m_cursorLabel->position->setCoords(labelX, maxY - (maxY - minY) * 0.05);
     m_cursorLabel->setVisible(true);
-
-    m_plot->layer(QLatin1String("overlay"))->replot();
 }
 
 double SpectrumViewWidget::widgetToDataX(int widgetX) const

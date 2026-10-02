@@ -102,6 +102,7 @@ private:
     void setupPlot();
     void applyTheme();
     void updateCursor(double x, double y);
+    void applyCursor(double x, double y);
     double widgetToDataX(int widgetX) const;
     QVector<double> extractRowData(const QImage &image) const;
     void applyAxisRange();
@@ -127,6 +128,10 @@ private:
     QRubberBand *m_rubberBand = nullptr;
     QPoint m_rubberBandOrigin;
     bool m_userHasZoomed = false;
+    //! 鼠标最后一次悬停的 x。数据刷新而鼠标未动时靠它重新取当前值
+    double m_lastCursorX = 0.0;
+    //! 光标当前是否还「在场」——鼠标进过画面且尚未离开
+    bool m_cursorActive = false;
 };
 
 #endif // SPECTRUMVIEWWIDGET_H
