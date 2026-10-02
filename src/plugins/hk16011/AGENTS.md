@@ -137,17 +137,24 @@
 
 ## enumerate() 为什么不用 HK16011_Open
 
-`HK16011_Open()` 当然可以用来枚举，实测也**没有**独占 UART 的问题
-（用 pyserial 同时占着 `/dev/ttyACM0` 时，SDK 依然能正常打开）。
-选 libusb 直接探测的理由只有两条，都是成本与健壮性，不是正确性：
+`HK16011_Open()` 用来枚举完全可行，实测也**不会**独占 UART
+（pyserial 同时占着 `/dev/ttyACM0` 时 SDK 依然能打开）。唯一站得住的理由是成本：
 
-- `PluginLoader::scan()` 每次扫描（启动时一次，用户每点一次「Scan Plugins」
-  再一次）都会调用 `enumerate()`。实测 `HK16011_Open` 约 **365 ms**，
-  全部走 Open 会让 GUI 线程每次都卡住，而且 `connect` 还要再开一次。
-  libusb 探测约 1 ms。
-- 经由 `HK16011_Open()` 的扫描一旦打开失败，相机就会从列表里**整个消失**，
-  用户既选不中也看不到原因。列出设备、让 `connectToCamera()` 报出具体错误码，
-  相机仍在列表里，诊断信息也才有意义。
+实测分段 —— USB 打开 ~10 ms、串口打开 ~40 ms、**`fetch_list()` ~310 ms**。
+`Open` 会预热参数缓存，即 `LISTPARAMS` + 每个参数一次 `GETINFO`，
+共 35 次 UART 往返；115200 波特率下每次往返约 8–10 ms，合计就是那 310 ms。
+libusb 直接探测约 1 ms。
+
+`enumerate()` 每次扫描都会执行（启动一次，用户每点一次「Scan Plugins」再一次），
+而 `AppController` 跑在 `m_controllerThread` 上，**同时还负责把驱动的
+`frameReady()` 转发出去**。阻塞它 365 ms/插件会在实时采集时卡住帧转发，
+而 SDK 帧队列只有 4 帧深，扫描一次就会丢帧。
+
+> 注：`PluginLoader::scan()` 完全不处理 `enumerate()` 的失败
+> （`src/core/PluginLoader.cpp:106` 直接 `e.cameraIds = driver->enumerate();`，
+> `g_loadFailedCallback` 只用于插件**加载**失败）。所以枚举失败对所有驱动都是静默的。
+> 用 libusb 探测并不能修好这个静默，只是把失败推迟到 `connectToCamera()`，
+> 那里会 `emit errorOccurred` 报出具体错误码。
 
 ---
 

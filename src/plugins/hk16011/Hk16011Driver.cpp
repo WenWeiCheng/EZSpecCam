@@ -173,18 +173,17 @@ void Hk16011Driver::reportSdkError(const QString &context, int code)
 
 QStringList Hk16011Driver::enumerate()
 {
-    // HK16011_Open() is the SDK's only discovery entry point, and it works —
-    // but it costs ~365 ms and the plugin loader calls enumerate() on every
-    // scan (at start-up, and again on every "Scan Plugins" click), so the GUI
-    // thread would stall each time and connect would open the device a second
-    // time. Probing the USB device directly takes about a millisecond and
-    // touches no interface.
+    // HK16011_Open() would work here, and it does not hold the UART
+    // exclusively. The reason to probe with libusb instead is cost: Open
+    // spends ~365 ms, almost all of it in the 35 UART round trips it uses to
+    // prime the parameter cache (LISTPARAMS plus one GETINFO per parameter at
+    // 115200 baud), against ~1 ms for a descriptor probe.
     //
-    // The second reason matters more than the first: a scan that goes through
-    // HK16011_Open() would drop the camera from the list entirely whenever the
-    // open failed for any reason, leaving the user nothing to select and no
-    // error to read. Listing the device and letting connectToCamera() report
-    // the precise failure keeps the camera visible and the diagnosis useful.
+    // enumerate() runs on every scan — at start-up and again on each "Scan
+    // Plugins" click — and AppController (which owns those scans) also routes
+    // frameReady() from the driver on the same thread. Blocking it for 365 ms
+    // per plugin would stall frame delivery, and the SDK's frame queue is only
+    // four frames deep, so a scan during a live capture would drop frames.
     libusb_context *context = nullptr;
     if (libusb_init(&context) != 0) {
         // Cannot tell; let connectToCamera() surface the real failure.
