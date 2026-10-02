@@ -3,8 +3,6 @@
 
 #include "hk16011.h"
 
-#include <libusb-1.0/libusb.h>
-
 #include <QDateTime>
 #include <QSet>
 #include <QMetaObject>
@@ -173,43 +171,29 @@ void Hk16011Driver::reportSdkError(const QString &context, int code)
 
 QStringList Hk16011Driver::enumerate()
 {
-    // HK16011_Open() would work here, and it does not hold the UART
-    // exclusively. The reason to probe with libusb instead is cost: Open
-    // spends ~365 ms, almost all of it in the 35 UART round trips it uses to
-    // prime the parameter cache (LISTPARAMS plus one GETINFO per parameter at
-    // 115200 baud), against ~1 ms for a descriptor probe.
+    // The SDK has no separate discovery call, so enumerate() opens the device
+    // and closes it again. That costs ~365 ms — almost all of it in the 35 UART
+    // round trips HK16011_Open spends priming its parameter cache (LISTPARAMS
+    // plus one GETINFO per parameter at 115200 baud) — and enumerate() runs on
+    // every scan: at start-up and again on each "Scan Plugins" click, on the
+    // thread that also forwards frameReady() from the driver.
     //
-    // enumerate() runs on every scan — at start-up and again on each "Scan
-    // Plugins" click — and AppController (which owns those scans) also routes
-    // frameReady() from the driver on the same thread. Blocking it for 365 ms
-    // per plugin would stall frame delivery, and the SDK's frame queue is only
-    // four frames deep, so a scan during a live capture would drop frames.
-    libusb_context *context = nullptr;
-    if (libusb_init(&context) != 0) {
-        // Cannot tell; let connectToCamera() surface the real failure.
-        return QStringList{ hk16011CameraId() };
+    // Worth knowing when this is slow: an open failure makes the camera simply
+    // not appear in the list, and PluginLoader ignores the return value of
+    // enumerate(), so nothing is reported. That is the trade-off taken here —
+    // the SDK is the only thing that can confirm the UART bridge is present as
+    // well as the USB device.
+    HK16011_DeviceHandle *device = nullptr;
+    if (HK16011_Open(&device) != HK16011_OK || device == nullptr) {
+        return QStringList();
     }
 
-    libusb_device **devices = nullptr;
-    const ssize_t count = libusb_get_device_list(context, &devices);
-    bool found = false;
-    for (ssize_t i = 0; i < count && !found; ++i) {
-        struct libusb_device_descriptor descriptor;
-        if (libusb_get_device_descriptor(devices[i], &descriptor) != 0) {
-            continue;
-        }
-        if (descriptor.idVendor == HK16011_USB_VENDOR_ID
-            && descriptor.idProduct == HK16011_DEFAULT_PID) {
-            found = true;
-        }
-    }
+    const char *id = HK16011_GetDeviceId(device);
+    const QString cameraId = (id && id[0] != '\0') ? QString::fromLatin1(id)
+                                                   : hk16011CameraId();
+    HK16011_Close(device);
 
-    if (devices) {
-        libusb_free_device_list(devices, 1);
-    }
-    libusb_exit(context);
-
-    return found ? QStringList{ hk16011CameraId() } : QStringList();
+    return QStringList{ cameraId };
 }
 
 //==============================================================================
@@ -220,7 +204,10 @@ bool Hk16011Driver::connectToCamera(const QString &cameraId)
 {
     QMutexLocker locker(&m_mutex);
 
-    if (cameraId != hk16011CameraId()) {
+    // Accept the id exactly as enumerate() produced it. hk16011CameraId()
+    // rebuilds the same string the SDK returns, but comparing case
+    // insensitively keeps the two from ever disagreeing.
+    if (cameraId.compare(hk16011CameraId(), Qt::CaseInsensitive) != 0) {
         reportError(CameraError::Code::InvalidParameter,
                     QStringLiteral("Invalid camera ID: %1").arg(cameraId));
         return false;

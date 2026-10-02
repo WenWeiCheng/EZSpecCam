@@ -19,7 +19,7 @@
 - **Qt 6.2** 或更高版本（Windows 上使用 Qt 6.8）
 - **C++17** 编译器（Windows 上为 MSVC 2022；Linux 上为 GCC 11+）
 - **CMake 3.20+**
-- `hk16011` 驱动另需：Linux、厂商 SDK（用 `HK16011_ROOT` 指定）、`libusb-1.0` 与 `libserialport`
+- `hk16011` 驱动另需：Linux、厂商 SDK（用 `HK16011_ROOT` 指定）。`libHK16011.so` 运行时依赖 `libusb-1.0` 与 `libserialport`（构建 SDK 本身时才需要对应的 `-dev` 包）
 
 ## 快速开始
 

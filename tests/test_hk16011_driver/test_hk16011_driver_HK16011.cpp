@@ -29,6 +29,16 @@
 
 #include "hk16011.h"
 
+/// Skips the calling test when no camera is attached. A macro rather than a
+/// helper: QSKIP expands to `return`, which inside a helper would only return
+/// from the helper and let the test go on to fail.
+#define REQUIRE_HK16011() \
+    do { \
+        if (!m_cameraPresent) { \
+            QSKIP("No HK16011 camera attached"); \
+        } \
+    } while (false)
+
 class TestHk16011Driver : public QObject
 {
     Q_OBJECT
@@ -96,8 +106,6 @@ private slots:
     void test_startCaptureNotConnectedFails();
 
 private:
-    /// Skips the calling test when no camera is attached.
-    void requireCamera();
     /// Connects and returns the camera id.
     QString connectAndGetId();
     /// Stages + commits @p values and returns whether the device accepted them.
@@ -154,13 +162,6 @@ void TestHk16011Driver::cleanup()
     }
 }
 
-void TestHk16011Driver::requireCamera()
-{
-    if (!m_cameraPresent) {
-        QSKIP("No HK16011 camera attached");
-    }
-}
-
 QString TestHk16011Driver::connectAndGetId()
 {
     const QStringList cameras = m_driver->enumerate();
@@ -212,7 +213,7 @@ void TestHk16011Driver::test_enumerateRejectsBadIdWithoutHardware()
 
 void TestHk16011Driver::test_enumerate()
 {
-    requireCamera();
+    REQUIRE_HK16011();
 
     const QStringList cameras = m_driver->enumerate();
     QVERIFY2(!cameras.isEmpty(), "an attached camera should be enumerated");
@@ -222,7 +223,7 @@ void TestHk16011Driver::test_enumerate()
 
 void TestHk16011Driver::test_connect()
 {
-    requireCamera();
+    REQUIRE_HK16011();
 
     QSignalSpy connectionSpy(m_driver, &ICameraDriver::connectionChanged);
 
@@ -242,7 +243,7 @@ void TestHk16011Driver::test_connect()
 
 void TestHk16011Driver::test_connectTwiceReconnects()
 {
-    requireCamera();
+    REQUIRE_HK16011();
 
     const QString id = connectAndGetId();
     QVERIFY2(!id.isEmpty(), "first connect should succeed");
@@ -256,7 +257,7 @@ void TestHk16011Driver::test_connectTwiceReconnects()
 
 void TestHk16011Driver::test_connectInvalidId()
 {
-    requireCamera();
+    REQUIRE_HK16011();
 
     QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
     const bool ok = m_driver->connectToCamera(QStringLiteral("hk16011:DEAD:BEEF"));
@@ -267,7 +268,7 @@ void TestHk16011Driver::test_connectInvalidId()
 
 void TestHk16011Driver::test_disconnect()
 {
-    requireCamera();
+    REQUIRE_HK16011();
 
     const QString id = connectAndGetId();
     QVERIFY2(!id.isEmpty(), "connect should succeed");
@@ -303,7 +304,7 @@ void TestHk16011Driver::test_operationsBeforeConnect()
 
 void TestHk16011Driver::test_parameterTableShape()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     const QStringList names = m_driver->parameterNames();
@@ -328,7 +329,7 @@ void TestHk16011Driver::test_parameterTableShape()
 
 void TestHk16011Driver::test_everyDefinitionIsValid()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     const QStringList names = m_driver->parameterNames();
@@ -357,7 +358,7 @@ void TestHk16011Driver::test_everyDefinitionIsValid()
 
 void TestHk16011Driver::test_readOnlyParametersAreFlagged()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     for (const QString &name : { QStringLiteral("camera_name"),
@@ -420,14 +421,14 @@ void TestHk16011Driver::roundTripParameter(const QString &name, const QVariant &
 
 void TestHk16011Driver::test_parameter_exposure_time_us()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
     roundTripParameter(QStringLiteral("exposure_time_us"), QVariant::fromValue(qlonglong(1234)));
 }
 
 void TestHk16011Driver::test_parameter_read_mode()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     const ParameterDefinition def = m_driver->parameter(QStringLiteral("read_mode"));
@@ -440,7 +441,7 @@ void TestHk16011Driver::test_parameter_read_mode()
 
 void TestHk16011Driver::test_parameter_freq_sel()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     const ParameterDefinition def = m_driver->parameter(QStringLiteral("freq_sel"));
@@ -453,7 +454,7 @@ void TestHk16011Driver::test_parameter_freq_sel()
 
 void TestHk16011Driver::test_parameter_mock_mode()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     const ParameterDefinition def = m_driver->parameter(QStringLiteral("mock_mode"));
@@ -473,42 +474,42 @@ void TestHk16011Driver::test_parameter_mock_mode()
 
 void TestHk16011Driver::test_parameter_cdsclk_delay()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
     roundTripParameter(QStringLiteral("cdsclk_delay"), QVariant::fromValue(qlonglong(7)));
 }
 
 void TestHk16011Driver::test_parameter_image_width()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
     roundTripParameter(QStringLiteral("image_width"), QVariant::fromValue(qlonglong(2048)));
 }
 
 void TestHk16011Driver::test_parameter_image_height()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
     roundTripParameter(QStringLiteral("image_height"), QVariant::fromValue(qlonglong(32)));
 }
 
 void TestHk16011Driver::test_parameter_bevel_left()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
     roundTripParameter(QStringLiteral("bevel_left"), QVariant::fromValue(qlonglong(5)));
 }
 
 void TestHk16011Driver::test_parameter_blank_right()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
     roundTripParameter(QStringLiteral("blank_right"), QVariant::fromValue(qlonglong(3)));
 }
 
 void TestHk16011Driver::test_parameter_tec_kp()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     const ParameterDefinition def = m_driver->parameter(QStringLiteral("tec_kp"));
@@ -529,21 +530,21 @@ void TestHk16011Driver::test_parameter_tec_kp()
 
 void TestHk16011Driver::test_parameter_tec_set_temp()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
     roundTripParameter(QStringLiteral("tec_set_temp"), -10.2);
 }
 
 void TestHk16011Driver::test_parameter_adc_gain_r()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
     roundTripParameter(QStringLiteral("adc_gain_r"), QVariant::fromValue(qlonglong(63)));
 }
 
 void TestHk16011Driver::test_parameter_adc_offset_b()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
     roundTripParameter(QStringLiteral("adc_offset_b"), QVariant::fromValue(qlonglong(511)));
 }
@@ -554,7 +555,7 @@ void TestHk16011Driver::test_parameter_adc_offset_b()
 
 void TestHk16011Driver::test_readOnly_camera_name()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     const QVariant name = m_driver->parameterValue(QStringLiteral("camera_name"));
@@ -571,7 +572,7 @@ void TestHk16011Driver::test_readOnly_camera_name()
 
 void TestHk16011Driver::test_readOnly_acq_state()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     const QVariant state = m_driver->parameterValue(QStringLiteral("acq_state"));
@@ -591,7 +592,7 @@ void TestHk16011Driver::test_readOnly_acq_state()
 
 void TestHk16011Driver::test_unimplemented_telemetry()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     // The TEC loop is not wired to real sensors, so the firmware returns
@@ -630,7 +631,7 @@ void TestHk16011Driver::test_unimplemented_telemetry()
 
 void TestHk16011Driver::test_setParameterRejectsOutOfRange()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
@@ -663,7 +664,7 @@ void TestHk16011Driver::test_setParameterRejectsOutOfRange()
 
 void TestHk16011Driver::test_setParameterRejectsUnknown()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
@@ -681,7 +682,7 @@ void TestHk16011Driver::test_setParameterRejectsUnknown()
 
 void TestHk16011Driver::test_setParameterAcceptsReadOnly()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     // The GUI calls setParameter() on every control it renders, so a read-only
@@ -694,7 +695,7 @@ void TestHk16011Driver::test_setParameterAcceptsReadOnly()
 
 void TestHk16011Driver::test_setParametersBatch()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
@@ -732,7 +733,7 @@ void TestHk16011Driver::test_setParametersBatch()
 
 void TestHk16011Driver::test_setParametersCriticalRejectsWholeBatch()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     QSignalSpy errorSpy(m_driver, &ICameraDriver::errorOccurred);
@@ -761,7 +762,7 @@ void TestHk16011Driver::test_setParametersCriticalRejectsWholeBatch()
 
 void TestHk16011Driver::test_validateParameters()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     QVERIFY2(m_driver->validateParameters(), "an empty pending set should validate");
@@ -779,7 +780,7 @@ void TestHk16011Driver::test_validateParameters()
 
 void TestHk16011Driver::test_commitParameters()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     QVERIFY2(m_driver->commitParameters(), "committing nothing should succeed");
@@ -826,7 +827,7 @@ bool TestHk16011Driver::waitForFrames(QSignalSpy &spy, int expected, int timeout
 
 void TestHk16011Driver::test_captureSingleFrame()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     QSignalSpy startedSpy(m_driver, &ICameraDriver::captureStarted);
@@ -863,7 +864,7 @@ void TestHk16011Driver::test_captureSingleFrame()
 
 void TestHk16011Driver::test_captureBurst()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     const int wanted = 5;
@@ -886,7 +887,7 @@ void TestHk16011Driver::test_captureBurst()
 
 void TestHk16011Driver::test_captureLiveAndStop()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
@@ -914,7 +915,7 @@ void TestHk16011Driver::test_captureLiveAndStop()
 
 void TestHk16011Driver::test_stopCaptureWithoutStartIsNoop()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     QSignalSpy stoppedSpy(m_driver, &ICameraDriver::captureStopped);
@@ -925,7 +926,7 @@ void TestHk16011Driver::test_stopCaptureWithoutStartIsNoop()
 
 void TestHk16011Driver::test_startCaptureWhileCapturingIsNoop()
 {
-    requireCamera();
+    REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
     QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);

@@ -49,31 +49,6 @@ set(HK16011_INCLUDE_DIR "${_hk_root}/include")
 set(HK16011_LIBRARY_DIR "${_hk_root}/lib")
 message(STATUS "HK16011 SDK: ${_hk_root}")
 
-# The driver calls libusb directly to probe for the device in enumerate(),
-# because HK16011_Open() is far too heavy for a start-up scan: it claims the
-# USB interface and takes exclusive ownership of the UART.
-find_package(PkgConfig QUIET)
-if(PkgConfig_FOUND)
-    pkg_check_modules(LIBUSB QUIET libusb-1.0)
-endif()
-if(LIBUSB_FOUND)
-    set(_hk_libusb_include ${LIBUSB_INCLUDE_DIRS})
-    set(_hk_libusb_libs ${LIBUSB_LIBRARIES})
-else()
-    find_path(LIBUSB_INCLUDE_DIR NAMES libusb.h PATH_SUFFIXES libusb-1.0)
-    find_library(LIBUSB_LIBRARY NAMES usb-1.0 libusb-1.0)
-    if(NOT LIBUSB_INCLUDE_DIR OR NOT LIBUSB_LIBRARY)
-        if(EZSPECCAM_REQUIRE_HK16011)
-            message(FATAL_ERROR "libusb-1.0 development files not found.")
-        else()
-            message(WARNING "libusb-1.0 development files not found. Skipping hk16011 plugin.")
-            return()
-        endif()
-    endif()
-    set(_hk_libusb_include ${LIBUSB_INCLUDE_DIR})
-    set(_hk_libusb_libs ${LIBUSB_LIBRARY})
-endif()
-
 # —— Plugin target ——
 
 qt_add_plugin(hk16011_camera_driver MODULE)
@@ -82,13 +57,11 @@ target_link_libraries(hk16011_camera_driver PRIVATE
     ezspeccam_core
     Qt6::Core Qt6::Widgets
     "${HK16011_LIBRARY_DIR}/libHK16011.so"
-    ${_hk_libusb_libs}
 )
 
 target_include_directories(hk16011_camera_driver PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     "${HK16011_INCLUDE_DIR}"
-    ${_hk_libusb_include}
 )
 
 target_sources(hk16011_camera_driver PRIVATE

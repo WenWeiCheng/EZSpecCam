@@ -165,7 +165,7 @@ Linux 侧除厂商 SDK 外不读任何环境变量，Qt 与工具链全部来自
 
 | 环境变量 | 示例 | 用途 |
 |---------|---------|---------|
-| `HK16011_ROOT` | `/opt/hk16011` | HK16011 C SDK 源码树，需含 `include/hk16011.h` 与 `lib/libHK16011.so`；未设置时插件带警告跳过。还需要 `libusb-1.0-dev` 与 `libserialport-dev` |
+| `HK16011_ROOT` | `/opt/hk16011` | HK16011 C SDK 源码树，需含 `include/hk16011.h` 与 `lib/libHK16011.so`；未设置时插件带警告跳过。插件编译本身只依赖该头文件与 `.so`，但 `libHK16011.so` 运行时需要 `libusb-1.0` 与 `libserialport`（构建 SDK 源码时才需对应的 `-dev` 包） |
 
 `linux-debug` / `linux-release` 预设中写死了 `"CMAKE_PREFIX_PATH": "/usr"`。这在多数发行版上成立，但如果 Qt 装在别处（`/opt`、自定义 prefix），请用 `CMakeUserPresets.json` 覆盖，**不要**直接改动被跟踪的 `CMakePresets.json`。
 

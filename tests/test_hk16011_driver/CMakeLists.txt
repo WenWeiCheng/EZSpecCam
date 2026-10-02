@@ -28,27 +28,6 @@ endif()
 
 add_executable(test_hk16011_driver_HK16011)
 
-# The driver is compiled in directly, so it needs libusb for its enumerate()
-# probe just like the plugin does.
-find_package(PkgConfig QUIET)
-if(PkgConfig_FOUND)
-    pkg_check_modules(LIBUSB QUIET libusb-1.0)
-endif()
-if(LIBUSB_FOUND)
-    set(_hk_test_libusb_include ${LIBUSB_INCLUDE_DIRS})
-    set(_hk_test_libusb_libs ${LIBUSB_LIBRARIES})
-else()
-    find_path(LIBUSB_INCLUDE_DIR NAMES libusb.h PATH_SUFFIXES libusb-1.0)
-    find_library(LIBUSB_LIBRARY NAMES usb-1.0 libusb-1.0)
-    if(NOT LIBUSB_INCLUDE_DIR OR NOT LIBUSB_LIBRARY)
-        message(WARNING "libusb-1.0 development files not found. "
-                        "Skipping test_hk16011_driver_HK16011.")
-        return()
-    endif()
-    set(_hk_test_libusb_include ${LIBUSB_INCLUDE_DIR})
-    set(_hk_test_libusb_libs ${LIBUSB_LIBRARY})
-endif()
-
 target_sources(test_hk16011_driver_HK16011 PRIVATE
     test_hk16011_driver_HK16011.cpp
     ${CMAKE_SOURCE_DIR}/src/plugins/hk16011/Hk16011Driver.cpp
@@ -58,14 +37,12 @@ target_link_libraries(test_hk16011_driver_HK16011 PRIVATE
     ezspeccam_core
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test
     "${_hk_test_root}/lib/libHK16011.so"
-    ${_hk_test_libusb_libs}
 )
 
 target_include_directories(test_hk16011_driver_HK16011 PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/plugins/hk16011
     "${_hk_test_root}/include"
-    ${_hk_test_libusb_include}
 )
 
 # The driver is compiled in directly rather than loaded as a plugin, so it
