@@ -51,16 +51,27 @@
 > 真正的共同原因只有一个：早发的 `ACQ fetch` 撞上了还在进行中的采集。
 > 额外排空 EP2（512 字节为单位、连读 3 次 50 ms 超时）实测每次读到 0 字节，
 > 即 FIFO 里本就没有残留，排空这一步没有贡献。
+>
+> 上表是**有界 fetch** 的实测。它成立过，也曾因此成为驱动唯一的可用路径；
+> 固件修好连续 fetch 之后（见下）驱动不再走这条路，这张表只作为对照。
 
-### 驱动为什么仍然选择「实时 + 自停」
+### 驱动为什么一律用连续 fetch
 
-不是因为上面的错误结论，而是因为**有界 fetch 需要阻塞等待**：
-要发出 `ACQ fetch n` 就必须先等 `frame_num_ready >= n`，而驱动跑在 GUI 线程上，
-一个 20 帧的连拍就是十几秒界面卡死。
+因为**有界 fetch 需要阻塞等待**：要发出 `ACQ fetch n` 就必须先等
+`frame_num_ready >= n`，而驱动跑在 GUI 线程上，一个 20 帧的连拍就是十几秒界面卡死。
 
-所以驱动**无论调用方传多少帧，一律 `StartCapture(0)` + `StartFetch(0)`**，
-收到 N 帧后自行 `AbortFetch` + `AbortCapture`。好处是 `startCapture()` 永不阻塞、
-首帧能尽快送达，且对任何帧数行为一致。
+驱动沿用设备自己的采集模式（0 = live、1 = single、≥2 = burst），
+但**不论哪种模式一律 `StartFetch(0)`**，在第一帧曝光之前就发起；
+有界帧数由 `deliverQueuedFrames()` 发满 N 帧后自行
+`AbortFetch` + `AbortCapture` 收尾。`startCapture()` 永不阻塞，首帧能尽快送达。
+
+> **连续 fetch 对 single / burst 的丢帧已经修好**（固件 `ccd.c` v1.13）。
+> 曾经的症状是 single 一帧都不回、burst 恰好丢最后一帧，规律是「发起 fetch 时
+> 采集是否已结束」。根因：`FRAME_WRITTEN` 里「有新帧就发」的触发块原本挂在采集环
+> 继续推进的路径末尾，single 与 burst 收尾的**提前 `return` 从上方绕过了它**。
+> 修法是用 `keep_capturing` 标志消掉提前 `return`，让触发块收在唯一出口，
+> 发送与采集环是否收尾彻底解耦。
+> 所以现在「有帧即读」是安全的，也是三种模式唯一共用的策略。
 
 > 另一条真实存在的约束：`StartFetch` 报 `InvalidArg`（-1）时，几乎都是因为
 > `image_width` / `image_height` 没被**写过**。SDK 只从 `SetParamValue` 调用里学几何
@@ -282,15 +293,12 @@ cmake --preset linux-debug
 
 ## 反模式
 
-- **不要**在 `frame_num_ready` 达到目标帧数之前就发有界的 `ACQ fetch` —— 固件回 ERR 5。
-- **不要**为了「有帧即读」而在采集进行中改用连续 `ACQ fetch 0` —— **每个 burst 会恰好丢掉最后一帧**。
-  实测（1024×64，曝光 2 ms）：采集中途发起连续 fetch，burst 2/5/8 分别只回来 1/4/7 帧；
-  同一个 session 里紧接着「等 `frame_num_ready` 攒满再 `ACQ fetch <n>`」则 2/5/8 全满。
-  更精确的规律是「发起 fetch 时采集是否已结束」，而不是 FIFO 里有没有残留：
-  burst 8 **等攒满再 `fetch 0`** 同样是 8/8，只等 4 帧就取就变 7/8。
-  驱动在 StartFetch 前也确实**没有**清理 FX2 FIFO —— 但清理解决不了这个，它不是残留问题。
-  代价是首帧要等满整个 burst；要真正做到有帧即读，得让固件侧放开 `fetch <n>` 的容量校验
-  （允许 n 大于当前缓存数，语义变成「最多 n 帧、边到边发」）。
+- **不要**在 `frame_num_ready` 达到目标帧数之前就发有界的 `ACQ fetch <n>`（n ≥ 1）—— 固件回 ERR 5。
+  这条容量校验**仍然有效**，只是驱动已经不用有界 fetch 了（见上）。
+  要判断丢帧是不是这条规则造成的，先确认驱动走的是 `StartFetch(0)`。
+- **不要**把「连续 fetch 在 single/burst 下丢帧」当成固件缺陷 —— 已修（`ccd.c` v1.13）。
+  旧结论（burst 恰好丢最后一帧、single 一帧不回）是 v1.13 之前的现象；
+  现在三种模式都用 `StartFetch(0)`，有帧即读。
 - **不要**在帧回调里 emit Qt 信号或访问 QObject。
 - **不要**读取联合体里与 `type` 不匹配的成员。
 - **不要**让 `HK16011_ValueStruct` 指向一个活不过本次调用的缓冲区。

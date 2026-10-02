@@ -20,12 +20,14 @@
  * Acquisition
  * -----------
  * The device's own modes are used: 0 = live, 1 = single, >= 2 = burst of that
- * count. Live fetches continuously. A bounded count cannot: `ACQ fetch <n>` is
- * only accepted once all n frames are cached in the device's DDR3, and issuing a
- * continuous fetch while the acquisition is still running drops exactly the last
- * frame of every burst. So the driver polls frame_num_ready and then asks for
- * the whole count in one bounded fetch, which is the only path that returns
- * every frame. The cost is that the first frame waits out the whole burst.
+ * count. All three fetch the same way: a continuous `ACQ fetch 0` issued right
+ * after the acquisition starts, so frames leave the device as they are exposed
+ * instead of after the whole burst. A bounded `ACQ fetch <n>` is deliberately
+ * not used — it is only accepted once all n frames are cached, which is why
+ * asking for one meant waiting out the entire burst. It was also the only path
+ * that returned every frame, back when a continuous fetch dropped the last
+ * frame of a burst and nothing at all for a single; the firmware has since
+ * fixed that (see AGENTS.md), so the distinction no longer holds.
  */
 
 #include "core/ICameraDriver.h"
@@ -81,8 +83,9 @@ private slots:
     /// Drains the frame queue on the Qt thread and emits frameReady().
     void deliverQueuedFrames();
 
-    /// Polls frame_num_ready until a bounded capture can be fetched whole.
-    void pollCapture();
+    /// Watchdog for a bounded capture: ends it if the camera never delivers
+    /// every frame the caller asked for.
+    void checkCaptureTimeout();
 
 private:
     /// One frame handed over from the SDK reader thread to the Qt thread.
@@ -123,8 +126,9 @@ private:
     // ——— Capture plumbing ———
     static void onSdkFrame(const HK16011_FrameStruct *frame, void *user);
     void queueFrame(const HK16011_FrameStruct *frame);
-    /// Issues the fetch. Must be called with m_mutex held.
-    bool startFetchLocked(int fetchCount);
+    /// Issues the continuous fetch (`ACQ fetch 0`). Must be called with m_mutex
+    /// held.
+    bool startFetchLocked();
     /// Stops the SDK reader. Must be called with m_mutex held.
     void finishCaptureLocked();
 

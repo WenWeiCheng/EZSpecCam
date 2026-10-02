@@ -50,11 +50,12 @@ QString hk16011CameraId()
     return QStringLiteral("hk16011:%1:%2").arg(vid, pid);
 }
 
-/// Readiness poll cadence while waiting for a burst to be cached.
+/// Cadence of the bounded-capture watchdog.
 const int kCapturePollMs = 20;
 
-/// How long a bounded capture may wait for its frames to be cached before the
-/// driver gives up. A 20-frame burst at 1024x64 needs several seconds.
+/// How long a bounded capture may take to deliver every frame the caller asked
+/// for before the driver gives up. A 20-frame burst at 1024x64 needs several
+/// seconds; nothing here waits for the device, it only bounds the wait.
 const qint64 kCaptureTimeoutMs = 20000;
 
 /**
@@ -225,7 +226,7 @@ Hk16011Driver::Hk16011Driver(QObject *parent)
 {
     m_captureTimer = new QTimer(this);
     m_captureTimer->setInterval(kCapturePollMs);
-    connect(m_captureTimer, &QTimer::timeout, this, &Hk16011Driver::pollCapture);
+    connect(m_captureTimer, &QTimer::timeout, this, &Hk16011Driver::checkCaptureTimeout);
 }
 
 Hk16011Driver::~Hk16011Driver()
@@ -1079,17 +1080,28 @@ bool Hk16011Driver::startCapture(int captureCount)
     DRIVER_DEBUG << "capture started, count:" << captureCount;
     emit captureStarted(m_connectedCameraId);
 
-    // Live streams, so fetch continuously right away. A bounded count cannot:
-    // `ACQ fetch <n>` is only accepted once all n frames are cached, and issuing
-    // a continuous fetch while the acquisition is still running drops exactly
-    // the last frame of every burst (measured on the bench at n = 2/5/8). Waiting
-    // for the burst to finish and then asking for it whole is the only path that
-    // returns every frame. See AGENTS.md.
-    if (captureCount == 0) {
-        if (!startFetchLocked(0)) {
-            return false;
-        }
-    } else {
+    // One fetch strategy for every acquisition mode: continuous (`ACQ fetch 0`),
+    // started before the first exposure is due. Frames leave the device as they
+    // are exposed, so there is nothing to wait for.
+    //
+    // A bounded `ACQ fetch <n>` would be the alternative, and it used to be the
+    // only one that returned every frame: while the acquisition was still
+    // running, a continuous fetch lost the last frame of a burst and delivered
+    // none at all for a single (measured on the bench at n = 1/2/5/8). The
+    // firmware fixed that on both counts — the send trigger used to sit at the
+    // end of the acquisition loop, where the single and burst teardown returns
+    // bypassed it — so continuous fetch is now correct for both, and it starts
+    // reading a live frame immediately instead of after the whole burst. See
+    // AGENTS.md.
+    if (!startFetchLocked()) {
+        return false;
+    }
+
+    // deliverQueuedFrames() ends a bounded capture once the last frame is out.
+    // The watchdog only covers the case where that never happens — the camera
+    // stopped exposing — which would otherwise leave the driver Acquiring
+    // forever.
+    if (captureCount > 0) {
         m_captureDeadline = QDateTime::currentMSecsSinceEpoch() + kCaptureTimeoutMs;
         m_captureTimer->start(kCapturePollMs);
     }
@@ -1097,10 +1109,11 @@ bool Hk16011Driver::startCapture(int captureCount)
     return true;
 }
 
-bool Hk16011Driver::startFetchLocked(int fetchCount)
+bool Hk16011Driver::startFetchLocked()
 {
-    const HK16011_ErrorCodeEnum fetchRc =
-        HK16011_StartFetch(m_device, static_cast<quint32>(fetchCount));
+    // 0 = continuous: the device sends every frame it exposes, and keeps
+    // sending until the fetch is aborted.
+    const HK16011_ErrorCodeEnum fetchRc = HK16011_StartFetch(m_device, 0);
     if (fetchRc != HK16011_OK) {
         reportSdkError(QStringLiteral("HK16011_StartFetch"), fetchRc);
         finishCaptureLocked();
@@ -1109,43 +1122,28 @@ bool Hk16011Driver::startFetchLocked(int fetchCount)
     return true;
 }
 
-void Hk16011Driver::pollCapture()
+void Hk16011Driver::checkCaptureTimeout()
 {
     QMutexLocker locker(&m_mutex);
 
+    // deliverQueuedFrames() already stopped the capture once the requested
+    // frames were out; this only fires on the timer that outran it.
     if (!m_capturing.load()) {
         m_captureTimer->stop();
         return;
     }
 
-    if (m_captureCount > 0) {
-        // Wait until the device reports the whole count cached, then ask for it
-        // in one bounded fetch.
-        const int ready = HK16011_GetFrameNumReady(m_device);
-        if (ready < 0) {
-            reportSdkError(QStringLiteral("HK16011_GetFrameNumReady"), ready);
-            finishCaptureLocked();
-            return;
-        }
-
-        if (ready >= m_captureCount) {
-            if (!startFetchLocked(m_captureCount)) {
-                return;
-            }
-            m_captureTimer->stop();
-            return;
-        }
-
-        if (QDateTime::currentMSecsSinceEpoch() > m_captureDeadline) {
-            reportError(CameraError::Code::Timeout,
-                        QStringLiteral("The camera cached only %1 of the %2 requested frames "
-                                       "within %3 s")
-                            .arg(ready)
-                            .arg(m_captureCount)
-                            .arg(kCaptureTimeoutMs / 1000));
-            finishCaptureLocked();
-        }
+    if (QDateTime::currentMSecsSinceEpoch() <= m_captureDeadline) {
+        return;
     }
+
+    reportError(CameraError::Code::Timeout,
+                QStringLiteral("The camera delivered only %1 of the %2 requested frames "
+                               "within %3 s")
+                    .arg(m_framesDelivered.load())
+                    .arg(m_captureCount)
+                    .arg(kCaptureTimeoutMs / 1000));
+    finishCaptureLocked();
 }
 
 void Hk16011Driver::finishCaptureLocked()
