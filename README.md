@@ -4,133 +4,161 @@
 [![Qt](https://img.shields.io/badge/Qt-6.2+-green.svg)](https://www.qt.io/)
 [![C++](https://img.shields.io/badge/C++-17-blue.svg)](https://isocpp.org/)
 
-A Qt-based camera control application for scientific spectroscopy — discovery, connection, parameter management, and image capture.
+一个基于 Qt 的科学光谱相机控制应用程序 —— 提供相机发现、连接、参数管理与图像采集功能。
 
-## Features
+## 功能特性
 
-- **Plugin-based camera drivers** — Load camera drivers at runtime via Qt's plugin system
-- **Parameter management** — Configure ROI, binning, exposure, gain, and more
-- **Image & spectrum view** — Live frame display with spectrum visualization
-- **Qt GUI application** — Modern Windows UI
-- **Headless CLI** — Scripted capture, parameter sweeps, and event sequences (see `src/cli/README.md`)
+- **插件化相机驱动** —— 通过 Qt 插件系统在运行时加载相机驱动
+- **参数管理** —— 配置 ROI、binning、曝光、增益等参数
+- **图像与光谱显示** —— 实时帧显示并提供光谱可视化
+- **Qt GUI 程序** —— 现代化的 Windows 界面
+- **无界面 CLI** —— 支持脚本化采集、参数扫描与事件序列（详见 `src/cli/README.md`）
 
-## Requirements
+## 环境要求
 
-- **Qt 6.2** or higher (Qt 6.8 on Windows)
-- **C++17** compiler (MSVC 2022 on Windows; GCC 11+ on Linux)
+- **Qt 6.2** 或更高版本（Windows 上使用 Qt 6.8）
+- **C++17** 编译器（Windows 上为 MSVC 2022；Linux 上为 GCC 11+）
 - **CMake 3.20+**
+- `hk16011` 驱动另需：Linux、厂商 SDK（用 `HK16011_ROOT` 指定）、`libusb-1.0` 与 `libserialport`
 
-## Quick Start
+## 快速开始
 
 ### Linux
 
-`qhyccd` and `hamamatsu` are Windows-only and are skipped automatically. `picam` self-skips with a warning when the PICam SDK is not installed. Requires Qt 6.2+, CMake 3.20+, GCC 11+, and Ninja.
+`qhyccd` 与 `hamamatsu` 仅支持 Windows，会被自动跳过。未安装 PICam SDK 时，`picam` 插件会带警告自行跳过；未设置 `HK16011_ROOT` 时，`hk16011` 插件同样带警告跳过。需要 Qt 6.2+、CMake 3.20+、GCC 11+ 以及 Ninja。
+
+```bash
+# 可选：启用 hk16011 驱动
+export HK16011_ROOT=/path/to/hk16011/sdk/tree
+```
 
 ```bash
 git clone https://github.com/your-repo/EZSpecCam.git
 cd EZSpecCam
-./build_preset.sh debug      # or: release
+./build_preset.sh debug      # 或者：release
 QT_QPA_PLATFORM=offscreen ./build/linux-debug/bin/Debug/ezspeccam --list
 QT_QPA_PLATFORM=offscreen ./build/linux-debug/bin/Debug/ezspeccam \
     --camera mock-001 --frames 1 --set exposure=10 --output /tmp/ezspec-out
 ```
 
-Test runner: `./run_tests.sh` (default `linux-debug`).
-Distribution bundle: `./deploy.sh` (requires `linuxdeployqt` on `$PATH`).
+测试脚本：`./run_tests.sh`（默认使用 `linux-debug`）。
+打包脚本：`./deploy.sh`（需要 `$PATH` 中存在 `linuxdeployqt`）。
 
 ### Windows
 
-Requires Qt 6.8+, MSVC 2022, and CMake 3.20+. `qhyccd` and `hamamatsu` build against vendor SDKs in `src/plugins/*/sdk/winlib/`.
+需要 Qt 6.8+、MSVC 2022 与 CMake 3.20+。`qhyccd` 与 `hamamatsu` 依赖 `src/plugins/*/sdk/winlib/` 下的厂商 SDK 构建。
 
 ```powershell
 git clone https://github.com/your-repo/EZSpecCam.git
 cd EZSpecCam
-.\build_preset.bat           # or: .\build_preset.bat debug / release
+.\build_preset.bat           # 或者：.\build_preset.bat debug / release
 .\run_tests.bat
-.\deploy.bat                 # bundles release build into .\deploy\
+.\deploy.bat                 # 将 release 构建产物打包到 .\deploy\
 .\build\msvc-debug\bin\Debug\ezspeccam.exe
 ```
 
-## Architecture
+## 架构
 
 ```
 src/
-├── core/           Camera driver interface + data types (static library)
-├── app/            Unified application (CLI + GUI in one binary)
-│   ├── main.cpp           Entry point — selects mode and launches CLI or GUI
-│   ├── AppMode            Runtime mode dispatch (no args → GUI, CLI flags → headless)
-│   ├── MessageHandler     qDebug/qWarning routing (Win32 OutputDebugString / stderr)
-│   ├── PluginLoader       Qt-plugin discovery + ICameraDriver instantiation
-│   ├── HeadlessController connect → capture → save → disconnect pipeline
-│   ├── WaitStabilizer     Temperature / parameter stabilization helper
-│   ├── SequenceRunner     JSON event-sequence driver (see src/cli/README.md)
-│   ├── CliFormat          Console output helpers for CLI runs
-│   └── formats/           Frame writers + sidecar metadata
-│       ├── FrameWriter          Dispatcher (select handler by extension)
-│       ├── IImageFormatHandler  Format-handler interface
-│       ├── TiffFormatHandler    TIFF image writer
-│       ├── CsvFormatHandler     CSV row-export writer
-│       └── SaveTypes            Persisted metadata schema
-├── cli/            CLI mode glue: CliMain.cpp + QCommandLineParser front-end
-├── gui/            GUI mode: QApplication + MainWindow + AppController
-└── plugins/        Camera driver plugins
-    ├── mock/       Simulated camera (for testing)
-    ├── qhyccd/     QHYCCD camera driver (Windows-only)
-    ├── hamamatsu/  Hamamatsu camera driver (Windows-only)
-    └── picam/      Princeton Instruments camera driver
+├── core/           静态库 ezspeccam_core：驱动契约 + 数据类型 + 插件加载
+│   ├── ICameraDriver.h            相机驱动接口（详见 ICameraDriver.md）
+│   ├── CameraTypes.h              ROI / binning / 参数 / 错误 / 枚举
+│   └── PluginLoader.{h,cpp}       Qt 插件发现 + ICameraDriver 实例化
+├── formats/        帧写出器 + 附属元数据（CLI 与 GUI 共用）
+│   ├── IImageFormatHandler.h      格式处理器接口
+│   ├── FrameWriter.{h,cpp}        分发器（按扩展名选择处理器）
+│   ├── TiffFormatHandler.{h,cpp}  TIFF 图像写出器
+│   ├── CsvFormatHandler.{h,cpp}   CSV 行导出写出器
+│   └── SaveTypes.h                持久化元数据结构
+├── cli/            CLI 程序（QCoreApplication）→ 产出 ezspeccam
+│   ├── main.cpp                   入口 —— QCommandLineParser 前端
+│   ├── MessageHandler.{h,cpp}     qDebug/qWarning 路由
+│   ├── HeadlessController.{h,cpp} 连接 → 采集 → 保存 → 断开 流程
+│   ├── WaitStabilizer.{h,cpp}     温度 / 参数稳定化辅助
+│   ├── ParameterClamper.{h,cpp}   参数范围钳制
+│   ├── SequenceRunner.{h,cpp}     JSON 事件序列驱动（详见 src/cli/README.md）
+│   ├── CliFormat.h                CLI 运行时的格式 / 控制台输出辅助
+│   └── README.md                  完整选项列表与序列 schema
+├── gui/            Qt GUI 程序（QApplication）→ 产出 ezspeccam-gui
+│   ├── main.cpp                   入口 —— 创建 QApplication 与 MainWindow
+│   ├── AppController.{h,cpp}      GUI 状态机，桥接驱动与控件
+│   ├── MessageHandler.{h,cpp}     qDebug/qWarning 路由
+│   ├── qcustomplot.{h,cpp}        内置的外部库（QCustomPlot 2.1.1），只读
+│   ├── ui/                        各窗口 / 标签页的 UI 搭建代码
+│   ├── widgets/                   主窗口、显示控件、对话框、后处理
+│   └── workers/                   FileLoaderWorker / FileSaverWorker（独立线程）
+└── plugins/        相机驱动插件
+    ├── mock/       模拟相机（用于测试）
+    ├── qhyccd/     QHYCCD 相机驱动（仅 Windows）
+    ├── hamamatsu/  滨松相机驱动（仅 Windows）
+    └── picam/      Princeton Instruments 相机驱动
 ```
 
-### Core (`src/core/`)
+### 核心（`src/core/`）
 
-Static library defining the camera driver contract (`ICameraDriver`) and core data types (ROIs, binning, parameters, errors).
+静态库 `ezspeccam_core`，定义相机驱动契约（`ICameraDriver`）、核心数据类型（ROI、binning、参数、错误）以及 Qt 插件加载器（命名空间 `app::plugins`）。CLI 与 GUI 都链接它。
 
-### App
+### 应用
 
-Two separate executables are produced:
+CLI 与 GUI 是**两个独立的可执行文件**，各自拥有独立的入口与 `MessageHandler`：
 
-- `ezspeccam.exe` — CLI (console subsystem; always built; produces stdout correctly so PowerShell/cmd prompts do not double-echo).
-- `ezspeccam-gui.exe` — GUI (`WIN32` subsystem in Release, console subsystem in Debug so `qDebug` reaches the IDE/terminal).
+- `ezspeccam.exe` — CLI（控制台子系统；始终构建；正确写出 stdout，避免 PowerShell/cmd 提示符重复回显）。
+- `ezspeccam-gui.exe` — GUI（Release 下为 `WIN32` 子系统，Debug 下为控制台子系统，使 `qDebug` 能输出到 IDE/终端）。
 
-Shared infrastructure used by both:
+两者共用的基础设施：
 
-- **Plugin discovery** (`src/core/PluginLoader.cpp`, namespace `app::plugins`) — scans plugin roots, loads each `*.dll` / `*.so`, and casts to `ICameraDriver`.
-- **Logging** (`src/cli/MessageHandler.cpp`, `src/gui/MessageHandler.cpp`) — installs a `qDebug` handler so messages hit stdout / stderr consistently across modes.
-- **Capture pipeline** (`src/cli/HeadlessController.cpp`, `src/cli/WaitStabilizer.cpp`) — used by CLI to connect, wait for stable temperature, capture N frames, save each, then disconnect.
-- **Frame output** (`src/formats/`) — `FrameWriter` + per-format `TiffFormatHandler` / `CsvFormatHandler` pick the handler by extension and write a sidecar `_metadata.json` next to every image.
+- **插件发现**（`src/core/PluginLoader.cpp`，命名空间 `app::plugins`）—— 扫描插件根目录，加载每个 `*.dll` / `*.so`，并转型为 `ICameraDriver`。
+- **日志**（`src/cli/MessageHandler.cpp`、`src/gui/MessageHandler.cpp`）—— 各程序安装自己的 `qDebug` 处理器，使消息在各自模式下都能稳定输出到 stdout / stderr。
+- **采集流程**（`src/cli/HeadlessController.cpp`、`src/cli/WaitStabilizer.cpp`）—— 供 CLI 使用：连接、等待温度稳定、采集 N 帧、逐帧保存，然后断开。
+- **帧输出**（`src/formats/`）—— `FrameWriter` 以及各格式的 `TiffFormatHandler` / `CsvFormatHandler` 按扩展名选择处理器，并在每张图像旁写出 `_metadata.json` 附属文件。
 
-### CLI (`src/cli/`)
+### CLI（`src/cli/`）
 
-Front-end parser for the headless mode. `CliMain.cpp` wires `QCommandLineParser` into the `HeadlessController` and supports `--sequence <file.json>` for scripted runs. See `src/cli/README.md` for the full option list and sequence schema.
+无界面模式的完整实现。`main.cpp` 解析 `QCommandLineParser` 并组装 `HeadlessOptions`，交给 `HeadlessController` 执行；`--sequence <file.json>` 可执行脚本化任务。完整的选项列表与序列 schema 详见 `src/cli/README.md`。
 
-### GUI (`src/gui/`)
+### GUI（`src/gui/`）
 
-Qt GUI application: camera discovery, connection management, parameter configuration, live image and spectrum display. `AppController` owns the state machine (`Disconnected → Connecting → Connected → Acquiring → Error`) and bridges `ICameraDriver` to the view widgets.
+Qt GUI 应用程序：相机发现、连接管理、参数配置、实时图像与光谱显示。`AppController` 持有状态机（`Disconnected → Connecting → Connected → Acquiring → Error`），并在 `ICameraDriver` 与各显示控件之间搭桥。
 
-### Plugins (`src/plugins/`)
+### 插件（`src/plugins/`）
 
-Each camera driver is a Qt plugin implementing `ICameraDriver`. Drivers are loaded at runtime — no recompilation needed to add new cameras.
+每个相机驱动都是一个实现 `ICameraDriver` 的 Qt 插件。驱动在运行时加载 —— 新增相机无需重新编译。
 
-## Supported Cameras
+## 支持的相机
 
-| Driver | Type | Notes | **Tested on** | Drivers |
+| 驱动 | 类型 | 说明 | **已测试机型** | 驱动下载 |
 |--------|------|-------|-------|-------|
-| Mock | Simulated | For development and testing | None | None |
-| QHYCCD | Hardware | Real QHY camera support | QHY268M | [download](https://www.qhyccd.cn/download/) |
-| Hamamatsu | Hardware | Hamamatsu camera support | C16091-10 | [download](https://www.hamamatsu.com/jp/en/product/cameras/software/driver-software.html) |
-| PI | Hardware | Princeton Camera support | PIXIS100B,PIXIS400B | [download](https://www.princetoninstruments.com.cn/products_driver.html) |
+| Mock | 模拟 | 用于开发与测试 | 无 | 无 |
+| QHYCCD | 硬件 | 支持真实的 QHY 相机 | QHY268M | [下载](https://www.qhyccd.cn/download/) |
+| Hamamatsu | 硬件 | 支持滨松相机 | C16091-10 | [下载](https://www.hamamatsu.com/jp/en/product/cameras/software/driver-software.html) |
+| PI | 硬件 | 支持 Princeton 相机 | PIXIS100B,PIXIS400B | [下载](https://www.princetoninstruments.com.cn/products_driver.html) |
+| HK16011 | 硬件 | CCD 光谱相机（Linux，仅厂商 SDK） | HK16011 | 随设备提供，见 `HK16011_ROOT` |
 
-## Building
+> **HK16011 说明**：温控环尚未接入真实传感器，`sensor_temp` / `environment_temp` /
+> `tec_voltage` / `tec_current` 返回的是固件占位值，驱动会在参数描述中标注「未实现」。
+> 详见 [`src/plugins/hk16011/AGENTS.md`](src/plugins/hk16011/AGENTS.md)。
 
-See [Quick Start](#quick-start) for the platform-specific commands. The two scripts/mirrors are `build_preset.bat` (Windows) and `build_preset.sh` (Linux).
+## 构建
 
-### Build Options
+各平台的具体命令见[快速开始](#快速开始)。两个对应脚本分别是 `build_preset.bat`（Windows）与 `build_preset.sh`（Linux）。
 
-| Option | Default | Description |
+### 构建选项
+
+| 选项 | 默认值 | 说明 |
 |--------|---------|-------------|
-| `EZSPECCAM_BUILD_TESTS` | ON | Build test executables |
-| `EZSPECCAM_BUILD_APP` | ON | Build the unified `ezspeccam` application (CLI + GUI) |
-| `EZSPECCAM_BUILD_PLUGINS` | ON | Build camera driver plugins |
+| `EZSPECCAM_BUILD_TESTS` | ON | 构建测试可执行文件 |
+| `EZSPECCAM_BUILD_APP` | ON | 构建应用程序（产出 `ezspeccam` 与 `ezspeccam-gui` 两个可执行文件） |
+| `EZSPECCAM_BUILD_PLUGINS` | ON | 构建相机驱动插件 |
 
-## License
+缺失的可选 SDK 只会让对应插件带 `WARNING` 跳过，不会中断构建。需要把缺失升级为硬错误时，
+传对应的 `EZSPECCAM_REQUIRE_<SDK>` 开关：
 
-This project is licensed under the BSD 3-Clause License — see [LICENSE](LICENSE) for details.
+| 开关 | 对应插件 |
+|--------|---------|
+| `EZSPECCAM_REQUIRE_PICAM` | `picam` |
+| `EZSPECCAM_REQUIRE_HK16011` | `hk16011` |
+
+## 许可证
+
+本项目基于 BSD 3-Clause 许可证 —— 详见 [LICENSE](LICENSE)。
