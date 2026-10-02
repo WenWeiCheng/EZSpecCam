@@ -19,12 +19,12 @@
  *
  * Acquisition
  * -----------
- * The SDK's bounded fetch (`ACQ fetch <n>`) does not deliver a frame when
- * n == 1, and the very first acquisition after HK16011_Open is a cold start
- * that yields no frames. To work around both, the driver always starts a
- * *continuous* fetch (count 0) and stops it itself once the requested number
- * of frames has been emitted. That path is the only one that is reliable for
- * every capture count, including 1.
+ * The device's own modes are used: 0 = live, 1 = single, >= 2 = burst of that
+ * count. The catch is that a bounded `ACQ fetch <n>` is only accepted once all
+ * n frames are already cached in the device's DDR3 — asked for earlier the
+ * firmware answers ERR 5 (device busy). That wait lasts as long as the
+ * exposures do, so it is polled from a timer instead of blocking the thread
+ * this object lives on.
  */
 
 #include "core/ICameraDriver.h"
@@ -35,6 +35,7 @@
 #include <QObject>
 #include <QRecursiveMutex>
 #include <QSharedPointer>
+#include <QTimer>
 #include <QStringList>
 #include <QVariantMap>
 
@@ -78,6 +79,9 @@ private slots:
     /// Drains the frame queue on the Qt thread and emits frameReady().
     void deliverQueuedFrames();
 
+    /// Polls frame_num_ready until a bounded capture can be fetched.
+    void pollCapture();
+
 private:
     /// One frame handed over from the SDK reader thread to the Qt thread.
     struct QueuedFrame
@@ -107,6 +111,8 @@ private:
     // ——— Capture plumbing ———
     static void onSdkFrame(const HK16011_FrameStruct *frame, void *user);
     void queueFrame(const HK16011_FrameStruct *frame);
+    /// Issues the fetch. Must be called with m_mutex held.
+    bool startFetchLocked(int fetchCount);
     /// Stops the SDK reader. Must be called with m_mutex held.
     void finishCaptureLocked();
 
@@ -131,6 +137,9 @@ private:
     // ——— Capture ———
     std::atomic<bool> m_capturing{false};
     int m_captureCount = 0;                  ///< Qt thread only
+    bool m_fetchStarted = false;             ///< Qt thread only
+    qint64 m_captureDeadline = 0;            ///< epoch ms, Qt thread only
+    QTimer *m_captureTimer = nullptr;
     std::atomic<int> m_framesDelivered{0};
     std::atomic<int> m_frameNumber{0};
 

@@ -22,38 +22,49 @@
 
 ---
 
-## 三个必须知道的设备行为
+## 采集：唯一真正需要记住的规则
 
-这三条是实测结论，不是文档抄的。**改动采集路径前务必先读这一节。**
+### `ACQ fetch <n>` 要求 n 帧已全部缓存，否则 ERR 5
 
-### 1. 有界的 fetch 收不到帧
+有界 fetch 只有在设备的 n 帧**都已经进了 DDR3 缓存**之后才会被接受，
+否则固件回 **ERR 5（device busy）**。这与曝光速率直接相关：1024×64 下 8 秒
+只能缓存 13 帧，所以 `burst 20` 会因等不到 20 帧而被拒。
 
-`ACQ fetch <n>` 在 `n == 1` 时**一帧都收不到**（4/4 次，3 秒与 5 秒超时均失败）；
-`n >= 2` 正常；`ACQ fetch 0`（连续）始终正常。
+厂商例程 `examples/capture_burst.cpp` 演示的就是正确写法 ——
+`StartCapture` 之后轮询 `HK16011_GetFrameNumReady()` 直到 `>= count`，再 `StartFetch(count)`。
+厂商自己的回归测试 `test_acq_fetch_insufficient` 也把这条钉死了
+（1 帧缓存时 `ACQ fetch 3` → ERR 5）。**这是设计行为，不是缺陷。**
 
-### 2. 任何「会结束」的采集都丢最后一帧
+`ACQ fetch 0`（连续）没有帧数前置条件，任何时候都能用。
 
-`ACQ burst <n>` 稳定只送 n−1 帧（15/15 次，n = 1/2/3/5 全部正好少一帧），且
-`frame_num_ready` 停在 1 —— 最后一帧卡在 DDR3 缓存里没被推上 EP2。
+### 实测：正确的时序下一切正常
 
-原因：帧数据没有帧头，SDK reader 一旦被残留数据打乱字节流就无法重新同步，
-只能靠 `HK16011_SoftReset` 清空。
+| 序列 | 结果 |
+|------|------|
+| `StartCapture(n)` → 等 `frame_num_ready >= n` → `StartFetch(n)` | N=1,1,2,3,5 全部 5/5 精确命中 |
+| 同上但**不做** RESET | 6/6 命中 —— 不需要 RESET |
+| 同上，Open 之后的**第一次**采集 | 3/3 命中 —— 不存在冷启动 |
+| `StartCapture(0)` + `StartFetch(0)`，收到 N 帧自停 | 3/3 命中 |
 
-### 3. 实时采集是唯一可靠路径
+> 这些行曾经被误读成「`ACQ burst` 会丢最后一帧」「`fetch 1` 有固件 bug」
+> 「首次采集是冷启动」「EP2 FIFO 里有脏数据」。**都不成立。**
+> 真正的共同原因只有一个：早发的 `ACQ fetch` 撞上了还在进行中的采集。
+> 额外排空 EP2（512 字节为单位、连读 3 次 50 ms 超时）实测每次读到 0 字节，
+> 即 FIFO 里本就没有残留，排空这一步没有贡献。
 
-`ACQ live`（`StartCapture(0)`）没有「终止帧」：下一次曝光会把待发的那帧顶出去，
-所以缓存始终排空到 0、不丢帧。实测 1024×64 下 2 秒 13 帧，
-「实时 + 收到 N 帧自停」在 N = 1..5 共 20 次试验中 19 次精确命中。
+### 驱动为什么仍然选择「实时 + 自停」
 
-### 驱动因此采用的策略
+不是因为上面的错误结论，而是因为**有界 fetch 需要阻塞等待**：
+要发出 `ACQ fetch n` 就必须先等 `frame_num_ready >= n`，而驱动跑在 GUI 线程上，
+一个 20 帧的连拍就是十几秒界面卡死。
 
-**无论调用方传多少帧，一律 `HK16011_StartCapture(dev, 0)` + `HK16011_StartFetch(dev, 0)`，
-收到 N 帧后自行 `AbortFetch` + `AbortCapture`。** 这样 `startCapture(1)` 与
-`startCapture(n)` 行为一致。
+所以驱动**无论调用方传多少帧，一律 `StartCapture(0)` + `StartFetch(0)`**，
+收到 N 帧后自行 `AbortFetch` + `AbortCapture`。好处是 `startCapture()` 永不阻塞、
+首帧能尽快送达，且对任何帧数行为一致。
 
-> 注：`StartFetch` 失败时若报 `InvalidArg`（-1），多半是 `image_width` / `image_height`
-> 没被**写过**。SDK 只从 `SetParamValue` 调用里学几何尺寸，单纯读取不填内部字段。
-> 驱动因此在每次开始采集前主动回写一次当前几何值（幂等）。
+> 另一条真实存在的约束：`StartFetch` 报 `InvalidArg`（-1）时，几乎都是因为
+> `image_width` / `image_height` 没被**写过**。SDK 只从 `SetParamValue` 调用里学几何
+> 尺寸，单纯读取不填内部字段。驱动因此在每次开始采集前主动回写一次当前几何值（幂等）。
 
 ---
 
@@ -126,9 +137,17 @@
 
 ## enumerate() 为什么不用 HK16011_Open
 
-`PluginLoader::scan()` 在每次启动时会对每个已加载插件调用 `enumerate()`，
-而 `HK16011_Open()` 会 claim USB 接口并独占 UART —— 启动扫描绝不能做这件事。
-驱动改为直接用 libusb 探测 VID/PID，不碰任何接口。
+`HK16011_Open()` 当然可以用来枚举，实测也**没有**独占 UART 的问题
+（用 pyserial 同时占着 `/dev/ttyACM0` 时，SDK 依然能正常打开）。
+选 libusb 直接探测的理由只有两条，都是成本与健壮性，不是正确性：
+
+- `PluginLoader::scan()` 每次扫描（启动时一次，用户每点一次「Scan Plugins」
+  再一次）都会调用 `enumerate()`。实测 `HK16011_Open` 约 **365 ms**，
+  全部走 Open 会让 GUI 线程每次都卡住，而且 `connect` 还要再开一次。
+  libusb 探测约 1 ms。
+- 经由 `HK16011_Open()` 的扫描一旦打开失败，相机就会从列表里**整个消失**，
+  用户既选不中也看不到原因。列出设备、让 `connectToCamera()` 报出具体错误码，
+  相机仍在列表里，诊断信息也才有意义。
 
 ---
 
@@ -153,11 +172,11 @@ cmake --preset linux-debug
 `tests/test_hk16011_driver/`，编译期直接编入驱动源码（不通过 QPluginLoader）。
 已注册进 ctest；**没接硬件时全部用例 `QSKIP`**，因此 CI 上是安全的。
 
-两处设备行为直接影响测试写法：
+两处测试注意事项：
 
-- `HK16011_Open` 之后的**第一次**采集是冷启动，不出帧 → 每个采集用例先跑一次
-  `warmUpCapture()` 预热。
-- 复位后首帧偶尔要等数秒 → 帧等待超时给到 15 秒，不用紧超时。
+- 帧等待超时给到 15 秒：1024×64 下曝光本身要几百毫秒，且设备偶有秒级延迟，
+  紧超时会让测试变脆。
+- 参数往返用例会改动设备状态，务必在结束时把原值写回。
 
 覆盖范围：`enumerate` / 连接与重连 / 非法 id / 断开、参数表形状与逐个定义合法性、
 13 个已验证可回读参数各一个用例、只读参数与未实测遥测、越界与未知参数拒绝、
@@ -167,8 +186,7 @@ cmake --preset linux-debug
 
 ## 反模式
 
-- **不要**把调用方给的帧数传给 `HK16011_StartCapture` —— 会稳定丢最后一帧。
-- **不要**用有界的 `HK16011_StartFetch` —— `n == 1` 完全不工作。
+- **不要**在 `frame_num_ready` 达到目标帧数之前就发有界的 `ACQ fetch` —— 固件回 ERR 5。
 - **不要**在帧回调里 emit Qt 信号或访问 QObject。
 - **不要**读取联合体里与 `type` 不匹配的成员。
 - **不要**在 CMakeLists 里写死 SDK 的绝对路径。

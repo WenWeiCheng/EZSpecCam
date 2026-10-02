@@ -8,6 +8,7 @@
 #include <QDateTime>
 #include <QSet>
 #include <QMetaObject>
+#include <QTimer>
 #include <QMutexLocker>
 #include <QtEndian>
 
@@ -51,6 +52,13 @@ QString hk16011CameraId()
     return QStringLiteral("hk16011:%1:%2").arg(vid, pid);
 }
 
+/// Readiness poll cadence while waiting for a burst to be cached.
+const int kCapturePollMs = 20;
+
+/// How long a bounded capture may wait for its frames to be cached before the
+/// driver gives up. A 20-frame burst at 1024x64 needs several seconds.
+const qint64 kCaptureTimeoutMs = 20000;
+
 ParameterCategory mapCategory(HK16011_CategoryEnum category, bool readOnly)
 {
     // EZSpecCam defines Info as "read-only informational parameters", so every
@@ -83,6 +91,9 @@ ParameterCategory mapCategory(HK16011_CategoryEnum category, bool readOnly)
 Hk16011Driver::Hk16011Driver(QObject *parent)
     : ICameraDriver(parent)
 {
+    m_captureTimer = new QTimer(this);
+    m_captureTimer->setInterval(kCapturePollMs);
+    connect(m_captureTimer, &QTimer::timeout, this, &Hk16011Driver::pollCapture);
 }
 
 Hk16011Driver::~Hk16011Driver()
@@ -90,6 +101,9 @@ Hk16011Driver::~Hk16011Driver()
     // Never emit from the destructor: the GUI may already be tearing down.
     if (m_capturing.load()) {
         m_capturing.store(false);
+        if (m_captureTimer) {
+            m_captureTimer->stop();
+        }
         if (m_device) {
             HK16011_AbortFetch(m_device);
             HK16011_AbortCapture(m_device);
@@ -159,10 +173,18 @@ void Hk16011Driver::reportSdkError(const QString &context, int code)
 
 QStringList Hk16011Driver::enumerate()
 {
-    // HK16011_Open() is the SDK's only discovery entry point, but it claims the
-    // USB interface and takes exclusive ownership of the UART — far too heavy
-    // for a scan that the plugin loader runs on every start-up. Probe for the
-    // USB device directly instead, which touches no interface.
+    // HK16011_Open() is the SDK's only discovery entry point, and it works —
+    // but it costs ~365 ms and the plugin loader calls enumerate() on every
+    // scan (at start-up, and again on every "Scan Plugins" click), so the GUI
+    // thread would stall each time and connect would open the device a second
+    // time. Probing the USB device directly takes about a millisecond and
+    // touches no interface.
+    //
+    // The second reason matters more than the first: a scan that goes through
+    // HK16011_Open() would drop the camera from the list entirely whenever the
+    // open failed for any reason, leaving the user nothing to select and no
+    // error to read. Listing the device and letting connectToCamera() report
+    // the precise failure keeps the camera visible and the diagnosis useful.
     libusb_context *context = nullptr;
     if (libusb_init(&context) != 0) {
         // Cannot tell; let connectToCamera() surface the real failure.
@@ -830,19 +852,14 @@ bool Hk16011Driver::startCapture(int captureCount)
 
     m_captureCount = captureCount;
     m_framesDelivered.store(0);
+    m_fetchStarted = false;
     m_capturing.store(true);
     m_state.store(CameraState::Acquiring);
 
-    // Always acquire live, whatever count the caller asked for.
-    //
-    // The device holds the last frame of any terminating acquisition in its
-    // DDR3 cache instead of pushing it to the bulk endpoint, so a burst of N
-    // yields only N-1 frames and a bounded `ACQ fetch <n>` yields nothing at
-    // all (and never anything when n == 1). A live capture has no terminating
-    // frame: the next exposure pushes the pending one out, which is why live
-    // streams cleanly and drains the cache to zero. So we run live and stop
-    // ourselves once captureCount frames have been delivered.
-    const HK16011_ErrorCodeEnum capRc = HK16011_StartCapture(m_device, 0);
+    // Use the device's own acquisition modes: count 0 = live, 1 = single,
+    // >= 2 = burst of count.
+    const HK16011_ErrorCodeEnum capRc =
+        HK16011_StartCapture(m_device, static_cast<quint32>(captureCount));
     if (capRc != HK16011_OK) {
         m_capturing.store(false);
         m_state.store(CameraState::Connected);
@@ -850,19 +867,74 @@ bool Hk16011Driver::startCapture(int captureCount)
         return false;
     }
 
-    // Continuous fetch for the same reason.
-    const HK16011_ErrorCodeEnum fetchRc = HK16011_StartFetch(m_device, 0);
-    if (fetchRc != HK16011_OK) {
-        HK16011_AbortCapture(m_device);
-        m_capturing.store(false);
-        m_state.store(CameraState::Connected);
-        reportSdkError(QStringLiteral("HK16011_StartFetch"), fetchRc);
-        return false;
-    }
-
     DRIVER_DEBUG << "capture started, count:" << captureCount;
     emit captureStarted(m_connectedCameraId);
+
+    // A bounded `ACQ fetch <n>` is only accepted once all n frames are already
+    // cached in the device's DDR3; asked for earlier the firmware answers
+    // ERR 5 (device busy). Waiting for that takes as long as the exposure
+    // does — seconds for a long burst — so it is polled from a timer rather
+    // than blocking this thread. `ACQ fetch 0` has no such precondition and
+    // starts straight away.
+    if (captureCount == 0) {
+        if (!startFetchLocked(0)) {
+            return false;
+        }
+    } else {
+        m_captureDeadline = QDateTime::currentMSecsSinceEpoch() + kCaptureTimeoutMs;
+        m_captureTimer->start(kCapturePollMs);
+    }
+
     return true;
+}
+
+bool Hk16011Driver::startFetchLocked(int fetchCount)
+{
+    const HK16011_ErrorCodeEnum fetchRc =
+        HK16011_StartFetch(m_device, static_cast<quint32>(fetchCount));
+    if (fetchRc != HK16011_OK) {
+        reportSdkError(QStringLiteral("HK16011_StartFetch"), fetchRc);
+        finishCaptureLocked();
+        return false;
+    }
+    m_fetchStarted = true;
+    return true;
+}
+
+void Hk16011Driver::pollCapture()
+{
+    QMutexLocker locker(&m_mutex);
+
+    if (!m_capturing.load() || m_fetchStarted) {
+        m_captureTimer->stop();
+        return;
+    }
+
+    // Negative means the SDK returned an error code, not a frame count.
+    const int ready = HK16011_GetFrameNumReady(m_device);
+    if (ready < 0) {
+        reportSdkError(QStringLiteral("HK16011_GetFrameNumReady"), ready);
+        finishCaptureLocked();
+        return;
+    }
+
+    if (ready >= m_captureCount) {
+        if (!startFetchLocked(m_captureCount)) {
+            return;
+        }
+        m_captureTimer->stop();
+        return;
+    }
+
+    if (QDateTime::currentMSecsSinceEpoch() > m_captureDeadline) {
+        reportError(CameraError::Code::Timeout,
+                    QStringLiteral("The camera cached only %1 of the %2 requested frames "
+                                   "within %3 s")
+                        .arg(ready)
+                        .arg(m_captureCount)
+                        .arg(kCaptureTimeoutMs / 1000));
+        finishCaptureLocked();
+    }
 }
 
 void Hk16011Driver::finishCaptureLocked()
@@ -871,6 +943,9 @@ void Hk16011Driver::finishCaptureLocked()
         return;
     }
     m_capturing.store(false);
+    if (m_captureTimer) {
+        m_captureTimer->stop();
+    }
 
     if (m_device) {
         HK16011_AbortFetch(m_device);

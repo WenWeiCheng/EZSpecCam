@@ -9,10 +9,9 @@
  * Two device behaviours shape the capture tests and are worth re-reading if a
  * capture test starts failing:
  *
- *  - The first acquisition after HK16011_Open is a cold start that returns no
- *    frames, so every capture test burns a warm-up capture first.
- *  - Frames can take several seconds to appear after a reset, so the waits
- *    here are generous rather than tight.
+ *  - Frames can take a while to appear (a 1024x64 exposure is hundreds of
+ *    milliseconds, and the device occasionally stalls for seconds), so the
+ *    waits here are generous rather than tight.
  *
  * Parameters the firmware reports but does not actually measure are never
  * asserted for real values — see test_unimplemented_telemetry().
@@ -101,8 +100,6 @@ private:
     void requireCamera();
     /// Connects and returns the camera id.
     QString connectAndGetId();
-    /// Burn one capture: the first acquisition after Open yields no frames.
-    void warmUpCapture();
     /// Stages + commits @p values and returns whether the device accepted them.
     bool applyAndCommit(const QVariantMap &values);
     /// Round-trips one parameter and restores the original value.
@@ -118,7 +115,6 @@ namespace {
 
 /// Frame waits are generous: a reset can delay the first frame by seconds.
 const int kFrameTimeoutMs = 15000;
-const int kWarmUpTimeoutMs = 4000;
 const int kBurstTimeoutMs = 20000;
 
 } // namespace
@@ -828,30 +824,10 @@ bool TestHk16011Driver::waitForFrames(QSignalSpy &spy, int expected, int timeout
     return spy.count() >= expected;
 }
 
-void TestHk16011Driver::warmUpCapture()
-{
-    // The first acquisition after HK16011_Open is a cold start and returns no
-    // frames. One warm-up attempt is normally enough; a second covers the case
-    // where the warm-up itself was the one that got dropped.
-    for (int attempt = 0; attempt < 2; ++attempt) {
-        QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
-        if (!m_driver->startCapture(1)) {
-            QFAIL("the warm-up capture could not be started");
-        }
-        if (frameSpy.wait(kWarmUpTimeoutMs)) {
-            m_driver->stopCapture();
-            return;
-        }
-        m_driver->stopCapture();
-    }
-    QFAIL("the camera never delivered a frame in two warm-up attempts");
-}
-
 void TestHk16011Driver::test_captureSingleFrame()
 {
     requireCamera();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
-    warmUpCapture();
 
     QSignalSpy startedSpy(m_driver, &ICameraDriver::captureStarted);
     QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
@@ -889,7 +865,6 @@ void TestHk16011Driver::test_captureBurst()
 {
     requireCamera();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
-    warmUpCapture();
 
     const int wanted = 5;
     QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
@@ -913,7 +888,6 @@ void TestHk16011Driver::test_captureLiveAndStop()
 {
     requireCamera();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
-    warmUpCapture();
 
     QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
     QSignalSpy stoppedSpy(m_driver, &ICameraDriver::captureStopped);
@@ -953,7 +927,6 @@ void TestHk16011Driver::test_startCaptureWhileCapturingIsNoop()
 {
     requireCamera();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
-    warmUpCapture();
 
     QSignalSpy frameSpy(m_driver, &ICameraDriver::frameReady);
     QVERIFY2(m_driver->startCapture(0), "live capture should start");
