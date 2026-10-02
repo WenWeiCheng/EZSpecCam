@@ -9,13 +9,23 @@
 # The test is registered with ctest. It skips itself at runtime when no camera
 # is attached, so it is safe to run in CI.
 
-set(HK16011_TEST_SDK_ROOT "" CACHE PATH "Override HK16011 SDK path (default: $ENV{HK16011_ROOT})")
+set(HK16011_TEST_SDK_ROOT "" CACHE PATH
+    "Override HK16011 SDK path (default: HK16011_SDK_ROOT, then \$ENV{HK16011_ROOT})")
 
-if(HK16011_TEST_SDK_ROOT)
-    set(_hk_test_root "${HK16011_TEST_SDK_ROOT}")
-elseif(DEFINED ENV{HK16011_ROOT})
-    set(_hk_test_root "$ENV{HK16011_ROOT}")
+# Reuse whatever src/plugins/hk16011 already resolved instead of re-deriving it:
+# that subdirectory is added first, so HK16011_SDK_ROOT is settled by now. Without
+# this the test silently drops out of ctest whenever the SDK was located through
+# -D or a cache value left by an earlier configure rather than the environment —
+# the plugin builds, the test does not exist, and nothing says so.
+if(NOT HK16011_TEST_SDK_ROOT)
+    if(HK16011_SDK_ROOT)
+        set(HK16011_TEST_SDK_ROOT "${HK16011_SDK_ROOT}" CACHE PATH "HK16011 SDK path" FORCE)
+    elseif(DEFINED ENV{HK16011_ROOT})
+        set(HK16011_TEST_SDK_ROOT "$ENV{HK16011_ROOT}" CACHE PATH "HK16011 SDK path" FORCE)
+    endif()
 endif()
+
+set(_hk_test_root "${HK16011_TEST_SDK_ROOT}")
 
 if(NOT _hk_test_root
         OR NOT EXISTS "${_hk_test_root}/include/hk16011.h"
