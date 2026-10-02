@@ -12,6 +12,8 @@
 namespace {
 // 读数框字号。原来 9 磅在放大后的绘图区里显得偏小，看着像一坨看不清的小字
 constexpr int kCursorFontPointSize = 12;
+// 读数框距离绘图区左上角的像素
+constexpr int kCursorLabelInset = 10;
 } // namespace
 
 SpectrumViewWidget::SpectrumViewWidget(QWidget *parent)
@@ -454,6 +456,10 @@ void SpectrumViewWidget::resizeEvent(QResizeEvent *event)
 {
     if (m_plot) {
         m_plot->resize(size());
+        // 读数框是按像素定位的，窗口一变就得重新贴回绘图区左上角
+        if (m_cursorActive) {
+            applyCursor(m_lastCursorX, intensityAt(m_lastCursorX));
+        }
     }
     QWidget::resizeEvent(event);
 }
@@ -552,9 +558,11 @@ void SpectrumViewWidget::applyCursor(double x, double y)
 
     m_cursorLabel->setText(labelText);
 
-    double labelX = m_plot->xAxis->range().lower + 5;
-
-    m_cursorLabel->position->setCoords(labelX, maxY - (maxY - minY) * 0.05);
+    // 按像素贴住绘图区左上角。原来是按数据坐标偏 5 个单位，量程一变宽这点偏移
+    // 就不剩几个像素了，读数框会紧贴左边框
+    const QRect area = m_plot->axisRect()->rect();
+    m_cursorLabel->position->setPixelPosition(area.topLeft()
+                                              + QPointF(kCursorLabelInset, kCursorLabelInset));
     m_cursorLabel->setVisible(true);
 }
 
