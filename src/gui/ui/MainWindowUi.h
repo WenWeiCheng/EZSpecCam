@@ -23,6 +23,10 @@ public:
 
     void setupUi(QMainWindow *mainWindow);
 
+    // 十字线读数。没有十字线时传空串：标签整个隐藏，而不是留一条
+    // "Crosshair: --" 占着状态栏的位置
+    void setCrosshairInfo(const QString &text);
+
     QAction *actionConfig;
     QAction *actionAbout;
     QAction *actionStart;

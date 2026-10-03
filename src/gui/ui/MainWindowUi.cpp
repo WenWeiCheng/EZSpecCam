@@ -210,9 +210,14 @@ void MainWindowUi::createStatusBar(QMainWindow *mainWindow)
     stateLabel->setMinimumWidth(150);
     statusBar->addWidget(stateLabel);
 
-    coordLabel = new QLabel("Crosshair: --", statusBar);
+    coordLabel = new QLabel(QString(), statusBar);
+    coordLabel->setObjectName(QStringLiteral("coordLabel"));
     coordLabel->setMinimumWidth(150);
     statusBar->addWidget(coordLabel);
+    // 还没有十字线时不占位：隐藏会让布局把它的 150 像素一并收回去，
+    // 而不是留下一个空标签。初始状态也走 setCrosshairInfo，可见性只有
+    // 这一处说了算
+    setCrosshairInfo(QString());
 
     fpsLabel = new QLabel("FPS: 0", statusBar);
     fpsLabel->setMinimumWidth(80);
@@ -221,6 +226,15 @@ void MainWindowUi::createStatusBar(QMainWindow *mainWindow)
     frameCountLabel = new QLabel("Frames: 0", statusBar);
     frameCountLabel->setAlignment(Qt::AlignRight);
     statusBar->addPermanentWidget(frameCountLabel);
+}
+
+void MainWindowUi::setCrosshairInfo(const QString &text)
+{
+    if (!coordLabel) {
+        return;
+    }
+    coordLabel->setText(text);
+    coordLabel->setVisible(!text.isEmpty());
 }
 
 void MainWindowUi::initializeLabels()
@@ -234,9 +248,7 @@ void MainWindowUi::initializeLabels()
     if (fpsLabel) {
         fpsLabel->setText("FPS: 0");
     }
-    if (coordLabel) {
-        coordLabel->setText("Crosshair: --");
-    }
+    setCrosshairInfo(QString());
 }
 
 void MainWindowUi::setupCentralWidget(QMainWindow *mainWindow)

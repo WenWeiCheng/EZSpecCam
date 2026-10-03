@@ -1147,17 +1147,15 @@ void MainWindow::cancelDarkAcquisition(const QString &reason)
 
 void MainWindow::onCrosshairCleared()
 {
-    if (ui->coordLabel) {
-        ui->coordLabel->setText("Crosshair: --");
-    }
+    ui->setCrosshairInfo(QString());
 }
 
 void MainWindow::onCrosshairMoved(const QPointF &position, int value)
 {
-    ui->coordLabel->setText(QString("Crosshair: X: %1, Y: %2, Value: %3")
-                            .arg(static_cast<int>(position.x()))
-                            .arg(static_cast<int>(position.y()))
-                            .arg(value));
+    ui->setCrosshairInfo(QString("Crosshair: X: %1, Y: %2, Value: %3")
+                         .arg(static_cast<int>(position.x()))
+                         .arg(static_cast<int>(position.y()))
+                         .arg(value));
 
     if (m_profileWindow && m_imageViewWidget->hasImage()) {
         int x = static_cast<int>(position.x());
