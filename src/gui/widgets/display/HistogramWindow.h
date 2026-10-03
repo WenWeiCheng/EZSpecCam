@@ -25,6 +25,12 @@ public:
     int overexposureThreshold() const { return m_threshold; }
     void setOverexposureThreshold(int value);
 
+    //! 一个 bin 覆盖多少个灰度取值
+    int valuesPerBin() const { return m_valuesPerBin; }
+    void setValuesPerBin(int value);
+    //! 按当前取值范围和每箱取值数算出来的实际箱数
+    int binCount() const { return m_binCounts.size(); }
+
     bool isLogAxis() const;
 
     HistogramViewWidget *histogramWidget() const { return m_histogram; }
@@ -43,6 +49,7 @@ private:
 
     HistogramViewWidget *m_histogram = nullptr;
     QCheckBox *m_logAxisCheck = nullptr;
+    QSpinBox *m_valuesPerBinSpin = nullptr;
     QSpinBox *m_thresholdSpin = nullptr;
     QLabel *m_overexposureLabel = nullptr;
 
@@ -55,6 +62,8 @@ private:
     //! 阈值控件就停在 65535 上，和真正参与判定的值对不上
     int m_maxValue = 0;
     int m_threshold = 255;
+    //! 一个 bin 覆盖多少个灰度取值
+    int m_valuesPerBin = 10;
     int m_overexposedCount = 0;
     int m_totalPixels = 0;
 };

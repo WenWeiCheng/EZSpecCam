@@ -1,4 +1,5 @@
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QImage>
 #include <QMouseEvent>
 #include <QTest>
@@ -27,6 +28,18 @@ static QImage flatImage(int size, int value)
 {
     QImage image(size, size, QImage::Format_Grayscale8);
     image.fill(static_cast<uchar>(value));
+    return image;
+}
+
+// 0..255 全都出现一遍的斜坡图，用来检查每个像素都落进了某个箱
+static QImage rampImage(int size)
+{
+    QImage image(size, size, QImage::Format_Grayscale8);
+    for (int y = 0; y < size; ++y) {
+        for (int x = 0; x < size; ++x) {
+            image.setPixel(x, y, qRgb(x, x, x));
+        }
+    }
     return image;
 }
 
@@ -147,7 +160,6 @@ private slots:
         window.setImage(flatImage(16, 100));
 
         QCOMPARE(window.totalPixelCount(), 256);
-        QCOMPARE(window.binCounts().size(), 256);
 
         int nonEmpty = 0;
         int total = 0;
@@ -160,9 +172,84 @@ private slots:
         QCOMPARE(total, 256);
         QCOMPARE(nonEmpty, 1);
 
-        // 值 100 在 0..255 上分 256 箱，箱宽正好 1，落在第 100 箱
+        // 整幅同一个值，非空的当然只有一箱
+        int filled = 0;
+        for (int c : window.binCounts()) {
+            if (c == 256) {
+                filled = 1;
+            }
+        }
+        QCOMPARE(filled, 1);
+    }
+
+    void test_values_per_bin_defaults_to_ten()
+    {
+        HistogramWindow window;
+        QCOMPARE(window.valuesPerBin(), 10);
+
+        // 8 位图 256 个取值，每箱 10 个 → 26 个箱
+        window.setImage(flatImage(16, 100));
+        QCOMPARE(window.maxValue(), 255);
+        QCOMPARE(window.valuesPerBin(), 10);
+        QCOMPARE(window.binCount(), 26);
+
+        // 16 位图 65536 个取值，每箱 10 个 → 6554 个箱
+        window.setImage(flatImage16(8, 50000));
+        QCOMPARE(window.maxValue(), 65535);
+        QCOMPARE(window.valuesPerBin(), 10);
+        QCOMPARE(window.binCount(), 6554);
+    }
+
+    void test_values_per_bin_is_adjustable()
+    {
+        HistogramWindow window;
+        window.setImage(flatImage(16, 100));
+
+        // 每箱一个取值：8 位图回到一个值一个箱
+        window.setValuesPerBin(1);
+        QCOMPARE(window.valuesPerBin(), 1);
+        QCOMPARE(window.binCount(), 256);
         QCOMPARE(window.binCounts().at(100), 256);
         QVERIFY(qAbs(window.binCenters().at(100) - 100.5) < 1e-9);
+
+        // 每箱 20 个：13 个箱
+        window.setValuesPerBin(20);
+        QCOMPARE(window.binCount(), 13);
+
+        // 换一个不整除的数：箱数向上取整，但所有箱仍要正好铺满值域，
+        // 横坐标的量程不能超出 0~256
+        window.setValuesPerBin(7);
+        QCOMPARE(window.binCount(), 37);
+        auto *plot = plotOf(window.histogramWidget());
+        QVERIFY(plot);
+        QVERIFY(qAbs(rangeWidth(plot->xAxis) - 256.0) < 1e-6);
+    }
+
+    void test_every_pixel_lands_in_a_bin()
+    {
+        // 箱宽是摊平后的分数（256/37 ≈ 6.92），除法取整最容易在边界上
+        // 丢像素或越界。用一幅 0..15 的斜坡图逐箱核对
+        HistogramWindow window;
+        window.setValuesPerBin(7);
+        window.setImage(rampImage(16));
+
+        QCOMPARE(window.binCount(), 37);
+
+        int total = 0;
+        for (int c : window.binCounts()) {
+            total += c;
+        }
+        QCOMPARE(total, 16 * 16);
+
+        // 斜坡图里 0..15 每个值各占 16 个像素（一列），
+        // 按箱宽 256/37 算：值 0~6 进第 0 箱，7~13 进第 1 箱，14~15 进第 2 箱
+        QCOMPARE(window.binCounts().at(0), 7 * 16);
+        QCOMPARE(window.binCounts().at(1), 7 * 16);
+        QCOMPARE(window.binCounts().at(2), 2 * 16);
+        // 剩下全是空的，没有像素被塞到范围外
+        for (int i = 3; i < window.binCount(); ++i) {
+            QCOMPARE(window.binCounts().at(i), 0);
+        }
     }
 
     void test_overexposure_threshold_is_customisable()
@@ -235,9 +322,17 @@ private slots:
 
         QCOMPARE(window.maxValue(), 65535);
         QCOMPARE(window.totalPixelCount(), 16);
-        // 箱宽 256，50000 落在 195 号箱（50000/256 = 195.3）
-        QCOMPARE(window.binCounts().at(195), 16);
+        QCOMPARE(window.binCount(), 6554);
+
+        // 箱宽 65536/6554 ≈ 10，50000 落在第 5000 号箱
+        const int expectedBin = static_cast<int>(50000 / (65536.0 / 6554));
+        QCOMPARE(window.binCounts().at(expectedBin), 16);
         QCOMPARE(window.binCounts().at(0), 0);
+
+        // 每箱一个取值时，50000 自己的箱就是 50000 号箱
+        window.setValuesPerBin(1);
+        QCOMPARE(window.binCount(), 65536);
+        QCOMPARE(window.binCounts().at(50000), 16);
     }
 
     void test_log_axis_keeps_bar_geometry_finite()
@@ -324,6 +419,9 @@ private slots:
     {
         // live 模式下窗口开着就该跟着新帧重算
         HistogramWindow window;
+        // 每箱一个取值，这样箱号就是灰度值本身，断言写得死一点
+        window.setValuesPerBin(1);
+
         window.setImage(flatImage(8, 10));
         QCOMPARE(window.binCounts().at(10), 64);
         QCOMPARE(window.overexposedPixelCount(), 0);
@@ -332,6 +430,41 @@ private slots:
         QCOMPARE(window.binCounts().at(10), 0);
         QCOMPARE(window.binCounts().at(255), 64);
         QCOMPARE(window.overexposedPixelCount(), 64);
+
+        // 换成分箱模式：两个值都进第 1 箱（箱宽 256/26 ≈ 9.85）
+        window.setValuesPerBin(10);
+        window.setImage(flatImage(8, 10));
+        QCOMPARE(window.binCount(), 26);
+        QCOMPARE(window.binCounts().at(1), 64);
+        QCOMPARE(window.binCounts().at(10), 0);
+    }
+
+    void test_many_bins_still_render_quickly()
+    {
+        // 16 位图 + 每箱一个取值 = 65536 个箱。实测渲染约 2.7 ms，
+        // 所以箱数上限不用为此让步；留这条是为了挡住将来把柱子换成
+        // 更贵的画法。阈值给得很宽松，只抓数量级的退化。
+        HistogramViewWidget widget;
+        QVector<double> bins;
+        QVector<double> counts;
+        for (int i = 0; i < 65536; ++i) {
+            bins.append(i + 0.5);
+            counts.append(10);
+        }
+        widget.resize(800, 600);
+        widget.show();
+        QCoreApplication::processEvents();
+
+        widget.setHistogram(bins, counts);   // 热身
+
+        QElapsedTimer timer;
+        timer.start();
+        widget.setHistogram(bins, counts);
+        widget.grab();                       // 强制真的画一遍
+        const double ms = timer.nsecsElapsed() / 1e6;
+
+        QVERIFY2(ms < 200.0,
+                 qPrintable(QStringLiteral("65536 个箱渲染用了 %1 ms").arg(ms)));
     }
 
     void test_bars_fill_the_plot_area()
@@ -494,7 +627,7 @@ private slots:
 
     void test_zoom_cannot_go_below_floor()
     {
-        // 不许无限放大。8 位图的箱宽是 1，下界是 4 个箱，也就是 4 个取值
+        // 不许无限放大：下界是 4 个箱，箱宽是多少就跟着放大到多少倍
         HistogramViewWidget widget;
         widget.resize(600, 400);
 
@@ -505,22 +638,26 @@ private slots:
         showLayout(&widget);
 
         auto *plot = plotOf(&widget);
+        // uniformBins 的箱宽是 1，所以下界是 4 个箱 = 4 个取值
+        const double floor = widget.binWidth() * 4.0;
+        QVERIFY(qAbs(floor - 4.0) < 1e-6);
+
         const QRect area = plot->axisRect()->rect();
         const int center = area.left() + area.width() / 2;
 
         // 一次比一次窄，最狠的是只拖 2 个像素
         for (int span : {area.width() / 2, area.width() / 20, 2}) {
             dragInPlotArea(&widget, center - span / 2, center + span / 2);
-            QVERIFY2(rangeWidth(plot->xAxis) >= 4.0 - 1e-6,
-                     qPrintable(QStringLiteral("拖了 %1 像素后量程缩到 %2，低于 4 个箱的下界")
-                                    .arg(span).arg(rangeWidth(plot->xAxis))));
+            QVERIFY2(rangeWidth(plot->xAxis) >= floor - 1e-6,
+                     qPrintable(QStringLiteral("拖了 %1 像素后量程缩到 %2，低于 4 个箱的下界 %3")
+                                    .arg(span).arg(rangeWidth(plot->xAxis)).arg(floor)));
         }
     }
 
     void test_zoom_floor_scales_with_bin_width()
     {
-        // 16 位图的箱宽是 256，下界应该跟着放大到 4 个箱（1024 个取值），
-        // 而不是沿用 8 位那个绝对值
+        // 下界跟着箱宽走，而不是写死一个绝对值：16 位图每箱 10 个取值时，
+        // 下界是 4 个箱 = 约 40 个取值；每箱一个取值时则是 4 个取值
         HistogramWindow window;
         window.setImage(flatImage16(8, 50000));
         showLayout(&window);
@@ -532,8 +669,19 @@ private slots:
 
         dragInPlotArea(window.histogramWidget(), center - 1, center + 1);
 
-        QVERIFY2(rangeWidth(plot->xAxis) >= 1024.0 - 1e-6,
-                 qPrintable(QStringLiteral("16 位图下界只有 %1").arg(rangeWidth(plot->xAxis))));
+        const double coarse = rangeWidth(plot->xAxis);
+        QVERIFY2(coarse >= window.histogramWidget()->binWidth() * 4.0 - 1e-6,
+                 qPrintable(QStringLiteral("下界只有 %1").arg(coarse)));
+        QVERIFY2(coarse > 30.0, qPrintable(QStringLiteral("每箱 10 个时下界只有 %1").arg(coarse)));
+
+        // 换成一箱一个取值，下界跟着缩回去
+        window.setValuesPerBin(1);
+        dragInPlotArea(window.histogramWidget(), center - 1, center + 1);
+        const double fine = rangeWidth(plot->xAxis);
+        QVERIFY2(fine < coarse,
+                 qPrintable(QStringLiteral("换成一箱一个取值后下界反而变大了：%1 -> %2")
+                                .arg(coarse).arg(fine)));
+        QVERIFY(qAbs(fine - 4.0) < 1e-6);
     }
 
     void test_x_axis_labels_have_no_decimals()
