@@ -191,9 +191,6 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::onCrosshairCleared);
     connect(m_imageViewWidget, &ImageViewWidget::crosshairMoved,
             this, &MainWindow::onCrosshairMoved);
-    connect(m_imageViewWidget, &ImageViewWidget::overexposureDetected,
-            this, &MainWindow::onOverexposureDetected);
-
     connect(m_appController, &AppController::stateChanged,
             this, &MainWindow::onCameraStateChanged);
     connect(m_appController, &AppController::frameReady,
@@ -1169,11 +1166,6 @@ void MainWindow::onCrosshairMoved(const QPointF &position, int value)
         QVector<double> colData = m_imageViewWidget->extractColumnAsVector(x);
         m_profileWindow->updateProfile(x, y, rowData, colData);
     }
-}
-
-void MainWindow::onOverexposureDetected(QPoint position)
-{
-    ui->overexposureLabel->setText(QString("Overexposed: X: %1, Y: %2").arg(position.x()).arg(position.y()));
 }
 
 void MainWindow::on_profile_triggered()
