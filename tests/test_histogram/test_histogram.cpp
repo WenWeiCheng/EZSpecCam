@@ -182,22 +182,22 @@ private slots:
         QCOMPARE(filled, 1);
     }
 
-    void test_values_per_bin_defaults_to_ten()
+    void test_values_per_bin_defaults_to_one()
     {
         HistogramWindow window;
-        QCOMPARE(window.valuesPerBin(), 10);
+        QCOMPARE(window.valuesPerBin(), 1);
 
-        // 8 位图 256 个取值，每箱 10 个 → 26 个箱
+        // 8 位图 256 个取值，每箱 1 个 → 256 个箱
         window.setImage(flatImage(16, 100));
         QCOMPARE(window.maxValue(), 255);
-        QCOMPARE(window.valuesPerBin(), 10);
-        QCOMPARE(window.binCount(), 26);
+        QCOMPARE(window.valuesPerBin(), 1);
+        QCOMPARE(window.binCount(), 256);
 
-        // 16 位图 65536 个取值，每箱 10 个 → 6554 个箱
+        // 16 位图 65536 个取值，每箱 1 个 → 65536 个箱
         window.setImage(flatImage16(8, 50000));
         QCOMPARE(window.maxValue(), 65535);
-        QCOMPARE(window.valuesPerBin(), 10);
-        QCOMPARE(window.binCount(), 6554);
+        QCOMPARE(window.valuesPerBin(), 1);
+        QCOMPARE(window.binCount(), 65536);
     }
 
     void test_values_per_bin_is_adjustable()
@@ -318,6 +318,8 @@ private slots:
     void test_16bit_image_uses_16bit_bins()
     {
         HistogramWindow window;
+        // 显式设成每箱 10 个：默认值是 1，下面要断言的是 10-per-bin 下的箱号
+        window.setValuesPerBin(10);
         window.setImage(flatImage16(4, 50000));
 
         QCOMPARE(window.maxValue(), 65535);
@@ -659,6 +661,8 @@ private slots:
         // 下界跟着箱宽走，而不是写死一个绝对值：16 位图每箱 10 个取值时，
         // 下界是 4 个箱 = 约 40 个取值；每箱一个取值时则是 4 个取值
         HistogramWindow window;
+        // 显式设成每箱 10 个：默认值是 1，下面要比较的是 10-per-bin 的下界
+        window.setValuesPerBin(10);
         window.setImage(flatImage16(8, 50000));
         showLayout(&window);
 
@@ -676,6 +680,9 @@ private slots:
 
         // 换成一箱一个取值，下界跟着缩回去
         window.setValuesPerBin(1);
+        QVERIFY2(window.valuesPerBin() == 1,
+                 qPrintable(QStringLiteral("setValuesPerBin(1) 没生效，还是 %1")
+                                .arg(window.valuesPerBin())));
         dragInPlotArea(window.histogramWidget(), center - 1, center + 1);
         const double fine = rangeWidth(plot->xAxis);
         QVERIFY2(fine < coarse,

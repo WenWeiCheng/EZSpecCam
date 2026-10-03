@@ -10,9 +10,6 @@
 namespace {
 // 16 位灰度图的取值上限
 constexpr int kMaxValue16Bit = 65535;
-// 「每箱取值数」的默认值和量程。默认 10 是因为 8 位图这样有 26 个箱，
-// 曲线已经够顺；再密对读分布没什么帮助，反而把过曝数淹没在噪声里
-constexpr int kDefaultValuesPerBin = 10;
 } // namespace
 
 HistogramWindow::HistogramWindow(QWidget *parent)

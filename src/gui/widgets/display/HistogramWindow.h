@@ -43,6 +43,15 @@ public:
     int maxValue() const { return m_maxValue; }
 
 private:
+    // 「每箱取值数」的默认值 1，即一个灰度值一箱：8 位图 256 个箱、16 位图
+    // 65536 个箱，读单个灰度级上有多少像素不用再换算；想看整体分布时在窗口
+    // 上把这个数调大即可。
+    // 只在这里定一处：spin box 构造时按它 setValue，成员也按它初始化。曾经
+    // 成员和常量各写一份 10，默认值改成 1 之后 spin 早就停在 1 上，
+    // setValuesPerBin(1) 便不再发 valueChanged，成员留在 10 上——箱数和缩放
+    // 下界一起错，而且不报错
+    static constexpr int kDefaultValuesPerBin = 1;
+
     void setupUi();
     void recompute();
     void updateOverexposureReadout();
@@ -63,7 +72,7 @@ private:
     int m_maxValue = 0;
     int m_threshold = 255;
     //! 一个 bin 覆盖多少个灰度取值
-    int m_valuesPerBin = 10;
+    int m_valuesPerBin = kDefaultValuesPerBin;
     int m_overexposedCount = 0;
     int m_totalPixels = 0;
 };
