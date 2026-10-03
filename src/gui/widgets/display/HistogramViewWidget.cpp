@@ -183,8 +183,8 @@ void HistogramViewWidget::resetZoom()
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
-// 缩放靠拖横坐标轴本身：按下必须落在绘图区下方那条轴上，而不是在图上
-// 拉一个矩形框——框住的是数据，读者容易误以为是框选像素
+// 缩放是在绘图区里横向拖一条：选区是纵向的一条，高度占满整个绘图区，
+// 只有宽度跟着拖动走。横坐标才是要放大的量，纵向拖没有意义
 bool HistogramViewWidget::eventFilter(QObject *obj, QEvent *event)
 {
     if (obj != m_plot) {
@@ -194,10 +194,9 @@ bool HistogramViewWidget::eventFilter(QObject *obj, QEvent *event)
     if (event->type() == QEvent::MouseButtonPress) {
         auto *me = static_cast<QMouseEvent *>(event);
         if (me->button() == Qt::LeftButton) {
-            const QRect strip = xAxisStrip();
-            if (strip.contains(me->pos())) {
+            if (m_plot->axisRect()->rect().contains(me->pos())) {
                 m_selectionOrigin = me->pos();
-                m_axisSelection->setGeometry(QRect(m_selectionOrigin, QSize()));
+                m_axisSelection->setGeometry(selectionRect(m_selectionOrigin.x(), me->pos().x()));
                 m_axisSelection->show();
                 return true;
             }
@@ -206,21 +205,17 @@ bool HistogramViewWidget::eventFilter(QObject *obj, QEvent *event)
             return true;
         }
     } else if (event->type() == QEvent::MouseMove) {
-        auto *me = static_cast<QMouseEvent *>(event);
         if (m_axisSelection->isVisible()) {
-            // 选区只留在轴上，不往绘图区里画
-            m_axisSelection->setGeometry(selectionRect(m_selectionOrigin, me->pos()));
+            auto *me = static_cast<QMouseEvent *>(event);
+            m_axisSelection->setGeometry(selectionRect(m_selectionOrigin.x(), me->pos().x()));
             return true;
         }
-        // 没在拖的时候给个横着的鼠标指针，提示这条轴可以拖
-        m_plot->setCursor(xAxisStrip().contains(me->pos()) ? Qt::SizeHorCursor
-                                                          : Qt::ArrowCursor);
     } else if (event->type() == QEvent::MouseButtonRelease) {
         if (m_axisSelection->isVisible()) {
             m_axisSelection->hide();
             auto *me = static_cast<QMouseEvent *>(event);
             if (me->button() == Qt::LeftButton) {
-                applySelection(selectionRect(m_selectionOrigin, me->pos()));
+                applySelection(selectionRect(m_selectionOrigin.x(), me->pos().x()));
             }
             return true;
         }
@@ -229,22 +224,13 @@ bool HistogramViewWidget::eventFilter(QObject *obj, QEvent *event)
     return QWidget::eventFilter(obj, event);
 }
 
-// 横坐标轴所在的那条：绘图区下方，刻度和标签占的地方
-QRect HistogramViewWidget::xAxisStrip() const
+// 选区矩形：纵向占满绘图区，横向只由拖动的起止决定，并夹在绘图区之内
+QRect HistogramViewWidget::selectionRect(int fromX, int toX) const
 {
     const QRect area = m_plot->axisRect()->rect();
-    return QRect(area.left(), area.top() + area.height(),
-                 area.width(), m_plot->height() - area.top() - area.height());
-}
-
-// 选区矩形：只占轴那条，高度固定，并夹在轴的横向范围之内
-QRect HistogramViewWidget::selectionRect(const QPoint &from, const QPoint &to) const
-{
-    const QRect strip = xAxisStrip();
-    const int height = qMax(1, strip.height() / 2);
-    const int left = qBound(strip.left(), qMin(from.x(), to.x()), strip.right());
-    const int right = qBound(strip.left(), qMax(from.x(), to.x()), strip.right());
-    return QRect(left, strip.top(), qMax(1, right - left), height);
+    const int left = qBound(area.left(), qMin(fromX, toX), area.right());
+    const int right = qBound(area.left(), qMax(fromX, toX), area.right());
+    return QRect(left, area.top(), qMax(1, right - left), area.height());
 }
 
 void HistogramViewWidget::applySelection(const QRect &selection)

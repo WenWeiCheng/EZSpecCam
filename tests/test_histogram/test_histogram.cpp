@@ -70,13 +70,14 @@ static int countColor(QWidget *widget, const QColor &color)
     return n;
 }
 
-// 在横坐标轴上拖一段完成一次缩放，走的是真实事件通道。
-// 按下必须落在轴带上而不是绘图区里，否则新交互下什么都不会发生
-static void dragOnAxis(HistogramViewWidget *widget, int x1, int x2)
+// 在绘图区里横向拖一段完成一次缩放，走的是真实事件通道
+static void dragInPlotArea(HistogramViewWidget *widget, int x1, int x2, int y = -1)
 {
     auto *plot = plotOf(widget);
     const QRect area = plot->axisRect()->rect();
-    const int y = area.bottom() + (plot->height() - area.bottom()) / 2;
+    if (y < 0) {
+        y = area.center().y();
+    }
 
     QMouseEvent press(QEvent::MouseButtonPress, QPointF(x1, y), QPointF(x1, y),
                       Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
@@ -91,12 +92,10 @@ static void dragOnAxis(HistogramViewWidget *widget, int x1, int x2)
     QCoreApplication::sendEvent(plot, &release);
 }
 
-// 在绘图区里拖，模拟「还在用旧办法框选」——新交互下不该触发缩放
-static void dragInPlotArea(HistogramViewWidget *widget, int x1, int x2)
+// 按下并拖到一半就停住，用来检查拖动过程中的选区形状
+static QRubberBand *beginDrag(HistogramViewWidget *widget, int x1, int x2, int y)
 {
     auto *plot = plotOf(widget);
-    const int y = plot->axisRect()->rect().center().y();
-
     QMouseEvent press(QEvent::MouseButtonPress, QPointF(x1, y), QPointF(x1, y),
                       Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
     QCoreApplication::sendEvent(plot, &press);
@@ -105,9 +104,7 @@ static void dragInPlotArea(HistogramViewWidget *widget, int x1, int x2)
                      Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
     QCoreApplication::sendEvent(plot, &move);
 
-    QMouseEvent release(QEvent::MouseButtonRelease, QPointF(x2, y), QPointF(x2, y),
-                        Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
-    QCoreApplication::sendEvent(plot, &release);
+    return plot->findChild<QRubberBand *>();
 }
 
 static void rightClick(HistogramViewWidget *widget, const QPoint &pos)
@@ -371,7 +368,7 @@ private slots:
         QVERIFY(plot->xAxis->coordToPixel(0.0) >= area.left() - 1.0);
         QVERIFY(plot->xAxis->coordToPixel(256.0) <= area.right() + 1.0);
     }
-    void test_drag_on_x_axis_zooms_x_only()
+    void test_drag_in_plot_area_zooms_x_only()
     {
         HistogramViewWidget widget;
         widget.resize(600, 400);
@@ -390,7 +387,7 @@ private slots:
         const QCPRange yBefore = plot->yAxis->range();
 
         const QRect area = plot->axisRect()->rect();
-        dragOnAxis(&widget,
+        dragInPlotArea(&widget,
                    area.left() + area.width() / 4,
                    area.left() + area.width() * 3 / 4);
 
@@ -404,9 +401,70 @@ private slots:
         QCOMPARE(plot->yAxis->range().upper, yBefore.upper);
     }
 
-    void test_drag_in_plot_area_does_not_zoom()
+    void test_selection_band_is_full_height()
     {
-        // 缩放入口从绘图区挪到了横坐标轴上，在图里拖不再框选
+        // 选区是纵向的一条：高度占满整个绘图区，只有宽度跟着拖动走
+        HistogramViewWidget widget;
+        widget.resize(600, 400);
+
+        QVector<double> bins;
+        QVector<double> counts;
+        uniformBins(256, 100.0, bins, counts);
+        widget.setHistogram(bins, counts);
+        showLayout(&widget);
+
+        auto *plot = plotOf(&widget);
+        const QRect area = plot->axisRect()->rect();
+        QVERIFY(area.height() > 10);
+
+        QRubberBand *band = beginDrag(&widget,
+                                      area.left() + area.width() / 4,
+                                      area.left() + area.width() * 3 / 4,
+                                      area.center().y());
+        QVERIFY(band);
+        QVERIFY(band->isVisible());
+
+        QVERIFY2(band->geometry().top() == area.top()
+                     && band->geometry().height() == area.height(),
+                 qPrintable(QStringLiteral("选区高度 %1，绘图区 %2~%3")
+                                .arg(band->geometry().height())
+                                .arg(area.top()).arg(area.bottom())));
+        QVERIFY(band->geometry().width() > 0);
+        QVERIFY(band->geometry().width() < area.width());
+    }
+
+    void test_selection_band_follows_mouse_vertically()
+    {
+        // 鼠标上下移动不该影响选区：横坐标才是要放大的量
+        HistogramViewWidget widget;
+        widget.resize(600, 400);
+
+        QVector<double> bins;
+        QVector<double> counts;
+        uniformBins(256, 100.0, bins, counts);
+        widget.setHistogram(bins, counts);
+        showLayout(&widget);
+
+        auto *plot = plotOf(&widget);
+        const QRect area = plot->axisRect()->rect();
+        const int x1 = area.left() + area.width() / 4;
+        const int x2 = area.left() + area.width() * 3 / 4;
+
+        QRubberBand *band = beginDrag(&widget, x1, x2, area.top() + 2);
+        QVERIFY(band);
+        const QRect atTop = band->geometry();
+
+        QMouseEvent move(QEvent::MouseMove, QPointF(x2, area.bottom() - 2),
+                         QPointF(x2, area.bottom() - 2),
+                         Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(plot, &move);
+
+        QCOMPARE(band->geometry(), atTop);
+    }
+
+    void test_drag_outside_plot_area_does_not_zoom()
+    {
+        // 按在坐标轴刻度那一带（绘图区之外）不该触发缩放
         HistogramViewWidget widget;
         widget.resize(600, 400);
 
@@ -420,13 +478,17 @@ private slots:
         const double full = rangeWidth(plot->xAxis);
         const QRect area = plot->axisRect()->rect();
 
+        // 绘图区下方：横坐标轴刻度和标签占的那条
+        const int yBelow = area.bottom() + (plot->height() - area.bottom()) / 2;
+        QVERIFY(yBelow < plot->height());
         dragInPlotArea(&widget,
                        area.left() + area.width() / 4,
-                       area.left() + area.width() * 3 / 4);
+                       area.left() + area.width() * 3 / 4,
+                       yBelow);
 
         QVERIFY(!widget.isZoomed());
         QVERIFY2(qAbs(rangeWidth(plot->xAxis) - full) < 1e-6,
-                 qPrintable(QStringLiteral("在绘图区里拖也缩放了：%1 -> %2")
+                 qPrintable(QStringLiteral("在绘图区外拖也缩放了：%1 -> %2")
                                 .arg(full).arg(rangeWidth(plot->xAxis))));
     }
 
@@ -448,7 +510,7 @@ private slots:
 
         // 一次比一次窄，最狠的是只拖 2 个像素
         for (int span : {area.width() / 2, area.width() / 20, 2}) {
-            dragOnAxis(&widget, center - span / 2, center + span / 2);
+            dragInPlotArea(&widget, center - span / 2, center + span / 2);
             QVERIFY2(rangeWidth(plot->xAxis) >= 4.0 - 1e-6,
                      qPrintable(QStringLiteral("拖了 %1 像素后量程缩到 %2，低于 4 个箱的下界")
                                     .arg(span).arg(rangeWidth(plot->xAxis))));
@@ -468,7 +530,7 @@ private slots:
         const QRect area = plot->axisRect()->rect();
         const int center = area.left() + area.width() / 2;
 
-        dragOnAxis(window.histogramWidget(), center - 1, center + 1);
+        dragInPlotArea(window.histogramWidget(), center - 1, center + 1);
 
         QVERIFY2(rangeWidth(plot->xAxis) >= 1024.0 - 1e-6,
                  qPrintable(QStringLiteral("16 位图下界只有 %1").arg(rangeWidth(plot->xAxis))));
@@ -492,7 +554,7 @@ private slots:
 
         // 缩到很窄，量程会落在非整数位置上，标签仍要是整数
         const QRect area = plot->axisRect()->rect();
-        dragOnAxis(&widget,
+        dragInPlotArea(&widget,
                    area.left() + area.width() / 3,
                    area.left() + area.width() * 2 / 3);
 
@@ -534,7 +596,7 @@ private slots:
 
         auto *plot = plotOf(&widget);
         const QRect area = plot->axisRect()->rect();
-        dragOnAxis(&widget,
+        dragInPlotArea(&widget,
                    area.left() + area.width() / 4,
                    area.left() + area.width() * 3 / 4);
 
@@ -564,7 +626,7 @@ private slots:
         const double full = rangeWidth(plot->xAxis);
         const QRect area = plot->axisRect()->rect();
 
-        dragOnAxis(&widget,
+        dragInPlotArea(&widget,
                    area.left() + area.width() / 4,
                    area.left() + area.width() * 3 / 4);
         QVERIFY(widget.isZoomed());
@@ -591,7 +653,7 @@ private slots:
 
         auto *plot = plotOf(&widget);
         const QRect area = plot->axisRect()->rect();
-        dragOnAxis(&widget,
+        dragInPlotArea(&widget,
                    area.left() + area.width() / 4,
                    area.left() + area.width() * 3 / 4);
         QVERIFY(widget.isZoomed());

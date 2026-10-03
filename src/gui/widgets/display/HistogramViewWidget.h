@@ -45,8 +45,7 @@ private:
     void applyTheme();
     void applyAxisRange();
     void applyScaleType();
-    QRect xAxisStrip() const;
-    QRect selectionRect(const QPoint &from, const QPoint &to) const;
+    QRect selectionRect(int fromX, int toX) const;
     void applySelection(const QRect &selection);
     double minRangeWidth() const;
 
@@ -61,7 +60,7 @@ private:
     QString m_yAxisLabel;
 
     //! 框选缩放只动横坐标，纵坐标始终按数据自动。
-    //! 选区画在横坐标轴那条上，不往绘图区里画框
+    //! 选区是纵向一条：高度占满绘图区，宽度跟着横向拖动走
     QRubberBand *m_axisSelection = nullptr;
     QPoint m_selectionOrigin;
     bool m_userHasZoomed = false;
