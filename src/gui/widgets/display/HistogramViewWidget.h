@@ -45,6 +45,10 @@ private:
     void applyTheme();
     void applyAxisRange();
     void applyScaleType();
+    QRect xAxisStrip() const;
+    QRect selectionRect(const QPoint &from, const QPoint &to) const;
+    void applySelection(const QRect &selection);
+    double minRangeWidth() const;
 
     QCustomPlot *m_plot;
     QCPBars *m_bars;
@@ -56,9 +60,10 @@ private:
     QString m_xAxisLabel;
     QString m_yAxisLabel;
 
-    //! 框选缩放只动横坐标，纵坐标始终按数据自动
-    QRubberBand *m_rubberBand = nullptr;
-    QPoint m_rubberBandOrigin;
+    //! 框选缩放只动横坐标，纵坐标始终按数据自动。
+    //! 选区画在横坐标轴那条上，不往绘图区里画框
+    QRubberBand *m_axisSelection = nullptr;
+    QPoint m_selectionOrigin;
     bool m_userHasZoomed = false;
 };
 

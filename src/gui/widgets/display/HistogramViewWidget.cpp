@@ -13,6 +13,9 @@ namespace {
 constexpr double kLogBase = 1.0;
 // 对数轴纵轴下界
 constexpr double kLogRangeLower = 1.0;
+// 框选缩放后至少保留几个箱。再小的话横坐标的刻度间距会掉到 1 以下，
+// 刻度位置就成了 12.1、12.2 这种，分数标签和重复标签一起冒出来
+constexpr int kMinZoomBins = 4;
 } // namespace
 
 HistogramViewWidget::HistogramViewWidget(QWidget *parent)
@@ -24,8 +27,7 @@ HistogramViewWidget::HistogramViewWidget(QWidget *parent)
 {
     m_plot = new QCustomPlot(this);
 
-    m_rubberBand = new QRubberBand(QRubberBand::Rectangle, m_plot);
-    m_plot->setInteractions(QCP::iSelectPlottables);
+    m_axisSelection = new QRubberBand(QRubberBand::Rectangle, m_plot);
     m_plot->installEventFilter(this);
 
     QVBoxLayout *layout = new QVBoxLayout(this);
@@ -53,6 +55,13 @@ void HistogramViewWidget::setupPlot()
     m_plot->axisRect()->setupFullAxesBox(true);
     m_plot->xAxis->setLabel(m_xAxisLabel);
     m_plot->yAxis->setLabel(m_yAxisLabel);
+
+    // 横坐标是像素值，标签必须是整数。QCPAxis::setNumberFormat 只认首字符
+    // 是 eEfgG 的格式码，传 "%.0f" 会被它静默拒绝（只打一行 qDebug），
+    // 所以这里给 "f" 再单独把精度压到 0。
+    // 放在 setupFullAxesBox 之前：那一刻它会把刻度器复制一份给顶部轴
+    m_plot->xAxis->setNumberFormat("f");
+    m_plot->xAxis->setNumberPrecision(0);
 
     applyTheme();
 
@@ -174,8 +183,8 @@ void HistogramViewWidget::resetZoom()
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
-// 框选缩放：按住左键在绘图区里拉一个框，只把横坐标缩到框住的范围。
-// 和 SpectrumViewWidget 的框选是同一套写法，区别是这里不碰纵坐标
+// 缩放靠拖横坐标轴本身：按下必须落在绘图区下方那条轴上，而不是在图上
+// 拉一个矩形框——框住的是数据，读者容易误以为是框选像素
 bool HistogramViewWidget::eventFilter(QObject *obj, QEvent *event)
 {
     if (obj != m_plot) {
@@ -185,10 +194,11 @@ bool HistogramViewWidget::eventFilter(QObject *obj, QEvent *event)
     if (event->type() == QEvent::MouseButtonPress) {
         auto *me = static_cast<QMouseEvent *>(event);
         if (me->button() == Qt::LeftButton) {
-            if (m_plot->axisRect()->rect().contains(me->pos())) {
-                m_rubberBandOrigin = me->pos();
-                m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, QSize()));
-                m_rubberBand->show();
+            const QRect strip = xAxisStrip();
+            if (strip.contains(me->pos())) {
+                m_selectionOrigin = me->pos();
+                m_axisSelection->setGeometry(QRect(m_selectionOrigin, QSize()));
+                m_axisSelection->show();
                 return true;
             }
         } else if (me->button() == Qt::RightButton) {
@@ -196,31 +206,80 @@ bool HistogramViewWidget::eventFilter(QObject *obj, QEvent *event)
             return true;
         }
     } else if (event->type() == QEvent::MouseMove) {
-        if (m_rubberBand->isVisible()) {
-            auto *me = static_cast<QMouseEvent *>(event);
-            m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, me->pos()).normalized());
+        auto *me = static_cast<QMouseEvent *>(event);
+        if (m_axisSelection->isVisible()) {
+            // 选区只留在轴上，不往绘图区里画
+            m_axisSelection->setGeometry(selectionRect(m_selectionOrigin, me->pos()));
             return true;
         }
+        // 没在拖的时候给个横着的鼠标指针，提示这条轴可以拖
+        m_plot->setCursor(xAxisStrip().contains(me->pos()) ? Qt::SizeHorCursor
+                                                          : Qt::ArrowCursor);
     } else if (event->type() == QEvent::MouseButtonRelease) {
-        if (m_rubberBand->isVisible()) {
-            m_rubberBand->hide();
+        if (m_axisSelection->isVisible()) {
+            m_axisSelection->hide();
             auto *me = static_cast<QMouseEvent *>(event);
             if (me->button() == Qt::LeftButton) {
-                const QRectF selection = QRectF(m_rubberBandOrigin, me->pos()).normalized();
-                const double x1 = m_plot->xAxis->pixelToCoord(selection.left());
-                const double x2 = m_plot->xAxis->pixelToCoord(selection.right());
-                // 框得太窄（点了一下没拖动）就别当成缩放，否则会把量程压成一条线
-                if (qAbs(x2 - x1) > 0) {
-                    m_plot->xAxis->setRange(x1, x2);
-                    m_plot->replot(QCustomPlot::rpQueuedReplot);
-                    m_userHasZoomed = true;
-                }
+                applySelection(selectionRect(m_selectionOrigin, me->pos()));
             }
             return true;
         }
     }
 
     return QWidget::eventFilter(obj, event);
+}
+
+// 横坐标轴所在的那条：绘图区下方，刻度和标签占的地方
+QRect HistogramViewWidget::xAxisStrip() const
+{
+    const QRect area = m_plot->axisRect()->rect();
+    return QRect(area.left(), area.top() + area.height(),
+                 area.width(), m_plot->height() - area.top() - area.height());
+}
+
+// 选区矩形：只占轴那条，高度固定，并夹在轴的横向范围之内
+QRect HistogramViewWidget::selectionRect(const QPoint &from, const QPoint &to) const
+{
+    const QRect strip = xAxisStrip();
+    const int height = qMax(1, strip.height() / 2);
+    const int left = qBound(strip.left(), qMin(from.x(), to.x()), strip.right());
+    const int right = qBound(strip.left(), qMax(from.x(), to.x()), strip.right());
+    return QRect(left, strip.top(), qMax(1, right - left), height);
+}
+
+void HistogramViewWidget::applySelection(const QRect &selection)
+{
+    if (!m_hasData) {
+        return;
+    }
+
+    double x1 = m_plot->xAxis->pixelToCoord(selection.left());
+    double x2 = m_plot->xAxis->pixelToCoord(selection.right());
+    if (x1 > x2) {
+        qSwap(x1, x2);
+    }
+
+    // 点了一下没拖动
+    if (x2 - x1 <= 0.0) {
+        return;
+    }
+
+    // 不许无限放大：拖得比最小宽度还窄时，按最小宽度居中放回去
+    const double minWidth = minRangeWidth();
+    if (x2 - x1 < minWidth) {
+        const double center = (x1 + x2) * 0.5;
+        x1 = center - minWidth * 0.5;
+        x2 = center + minWidth * 0.5;
+    }
+
+    m_plot->xAxis->setRange(x1, x2);
+    m_plot->replot(QCustomPlot::rpQueuedReplot);
+    m_userHasZoomed = true;
+}
+
+double HistogramViewWidget::minRangeWidth() const
+{
+    return m_binWidth * kMinZoomBins;
 }
 
 void HistogramViewWidget::setXAxisLabel(const QString &label)
