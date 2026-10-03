@@ -8,6 +8,7 @@
 #include "CameraTypes.h"
 #include "display/StatisticsDialog.h"
 #include "display/ProfileWindow.h"
+#include "display/HistogramWindow.h"
 #include "dialogs/RowRangeDialog.h"
 #include "dialogs/CalibrationDialog.h"
 #include "dialogs/AcquireDarkFrameDialog.h"
@@ -283,6 +284,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->menuActionProfile, &QAction::triggered,
             this, &MainWindow::on_profile_triggered);
+
+    connect(ui->menuActionHistogram, &QAction::triggered,
+            this, &MainWindow::on_histogram_triggered);
 
     connect(ui->menuActionScale, &QAction::triggered,
             this, &MainWindow::on_scale_triggered);
@@ -1198,6 +1202,19 @@ void MainWindow::on_profile_triggered()
     }
 }
 
+void MainWindow::on_histogram_triggered()
+{
+    if (!m_histogramWindow) {
+        m_histogramWindow = new HistogramWindow(this);
+    }
+
+    if (m_imageViewWidget->hasImage()) {
+        m_histogramWindow->setImage(m_imageViewWidget->image());
+    }
+
+    m_histogramWindow->show();
+}
+
 void MainWindow::onLiveModeTriggered()
 {
     if (m_appController) {
@@ -1280,6 +1297,10 @@ void MainWindow::updateDisplay(const ImageData &frame)
                 m_profileWindow->updateProfile(x, y, rowData, colData);
             }
         }
+
+        if (m_histogramWindow && m_histogramWindow->isVisible()) {
+            m_histogramWindow->setImage(frame.image);
+        }
     }
 }
 
@@ -1296,6 +1317,15 @@ void MainWindow::switchView(int height)
     } else {
         ui->centralStackedWidget->setCurrentWidget(m_imageViewWidget);
         QCoreApplication::processEvents();
+    }
+
+    // 直方图统计的是图像，spectrumView 下没有可统计的对象，所以只在
+    // imageView 模式下放开菜单项。只在模式真的变了时才动，switchView
+    // 是每帧都调的，没必要每帧都去碰一遍 QAction
+    const bool imageViewActive = (height != 1);
+    if (imageViewActive != m_imageViewActive) {
+        m_imageViewActive = imageViewActive;
+        ui->menuActionHistogram->setEnabled(imageViewActive);
     }
 }
 

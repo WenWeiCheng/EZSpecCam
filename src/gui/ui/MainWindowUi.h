@@ -44,6 +44,7 @@ public:
     QAction *menuActionFillWindow;
     QAction *menuActionDisplayStyle;
     QAction *menuActionProfile;
+    QAction *menuActionHistogram;
 
     QAction *menuActionThemeSystem;
     QAction *menuActionThemeLight;

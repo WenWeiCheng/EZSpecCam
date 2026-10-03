@@ -32,6 +32,7 @@ MainWindowUi::MainWindowUi(QObject *parent)
     , menuActionFillWindow(nullptr)
     , menuActionDisplayStyle(nullptr)
     , menuActionProfile(nullptr)
+    , menuActionHistogram(nullptr)
     , menuActionStatistics(nullptr)
     , menuActionPostProcess(nullptr)
     , menuActionVerticalBinning(nullptr)
@@ -134,6 +135,14 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     menuActionProfile->setShortcut(QKeySequence(Qt::Key_P));
     menuActionProfile->setShortcutContext(Qt::ApplicationShortcut);
     menuView->addAction(menuActionProfile);
+
+    menuActionHistogram = new QAction("&Histogram", mainWindow);
+    menuActionHistogram->setShortcut(QKeySequence(Qt::Key_H));
+    menuActionHistogram->setShortcutContext(Qt::ApplicationShortcut);
+    // 直方图统计的是图像，spectrumView 模式下没有可统计的对象，
+    // 等切到 imageView 再由 MainWindow::switchView 放开
+    menuActionHistogram->setEnabled(false);
+    menuView->addAction(menuActionHistogram);
 
     menuView->addSeparator();
     QMenu *menuTheme = menuView->addMenu("&Theme");

@@ -153,6 +153,10 @@ set(EZSPECCAM_GUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/StatisticsDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/ProfileWindow.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/ProfileWindow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/HistogramViewWidget.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/HistogramViewWidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/HistogramWindow.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/HistogramWindow.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/ImageViewWidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/ImageViewWidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/SpectrumViewWidget.h

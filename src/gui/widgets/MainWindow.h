@@ -19,6 +19,7 @@ class CameraConfigDialog;
 class ImageViewWidget;
 class SpectrumViewWidget;
 class ProfileWindow;
+class HistogramWindow;
 class ScaleControlDialog;
 class DisplayStyleDialog;
 class CalibrationDialog;
@@ -61,6 +62,7 @@ private slots:
     void on_verticalBinning_triggered();
     void on_rowRange_triggered();
     void on_profile_triggered();
+    void on_histogram_triggered();
 
     void onCameraStateChanged(CameraState newState);
     void onCameraFrameReady(const ImageData &frame);
@@ -116,6 +118,7 @@ private:
     FileLoaderWorker *m_fileLoaderWorker = nullptr;
     CameraConfigDialog *m_configDialog = nullptr;
     ProfileWindow *m_profileWindow = nullptr;
+    HistogramWindow *m_histogramWindow = nullptr;
     ScaleControlDialog *m_scaleDialog = nullptr;
     DisplayStyleDialog *m_displayStyleDialog = nullptr;
     CalibrationDialog *m_calibrationDialog = nullptr;
@@ -123,6 +126,8 @@ private:
 
     int m_frameCount = 0;
     int m_autoSaveFrameCounter = 0;
+    //! 当前是否停在 imageView。直方图入口只在这个模式下可点
+    bool m_imageViewActive = false;
 
     QDateTime m_launchTimestamp;
     QString m_autoSaveDir;

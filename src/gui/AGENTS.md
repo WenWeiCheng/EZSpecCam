@@ -28,6 +28,8 @@ gui/
     │   ├── ImageViewWidget      # QCustomPlot-based frame rendering
     │   ├── SpectrumViewWidget   # Spectrum plot
     │   ├── ProfileWindow        # Cross-section profile
+    │   ├── HistogramViewWidget  # Bar-chart plot (histogram only)
+    │   ├── HistogramWindow      # Histogram + overexposure statistics
     │   └── StatisticsDialog     # Frame statistics
     └── dialogs/                 # Utility dialogs
         ├── CustomRangeDialog    # Custom spectrum range input
@@ -42,6 +44,7 @@ gui/
 | UI layout construction | `ui/MainWindowUi.cpp` |
 | Frame rendering | `widgets/display/ImageViewWidget.cpp` |
 | Spectrum display | `widgets/display/SpectrumViewWidget.cpp` |
+| Histogram + overexposure count | `widgets/display/HistogramWindow.cpp` |
 | Dynamic parameter widgets | `widgets/config/ParameterWidgetFactory.cpp` |
 | Colours (GUI chrome + plots) | `Theme.cpp` |
 
@@ -54,6 +57,11 @@ gui/
   explicitly. New plots go through `Theme::applyToPlot()` rather than being
   styled in place, or they will stay light in dark mode
 - Camera state machine: Disconnected → Connecting → Connected → Acquiring → Error
+- `QCPBars` cannot draw a bar whose base is 0 on a logarithmic axis —
+  `QCPBars::getBarRect` computes `coordToPixel(base + value)` and `log10(0)`
+  is `-inf`, which destroys the bar geometry. `HistogramViewWidget` therefore
+  moves the bar base up to the axis lower bound while the log scale is on
+  (`kLogBase`), which also makes zero-count bins draw as nothing
 - Frame delivery via `frameReady(const ImageData &)` signal (not polling)
 - Functions defined with slots in `AppController` must be invoked via `QMetaObject::invokeMethod()`.
 
