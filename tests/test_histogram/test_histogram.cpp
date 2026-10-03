@@ -1,5 +1,6 @@
 #include <QCoreApplication>
 #include <QImage>
+#include <QMouseEvent>
 #include <QTest>
 
 #include "HistogramViewWidget.h"
@@ -67,6 +68,44 @@ static int countColor(QWidget *widget, const QColor &color)
         }
     }
     return n;
+}
+
+// 在绘图区里拉一个框完成一次框选缩放，走的是真实事件通道
+static void dragOver(HistogramViewWidget *widget, const QPoint &from, const QPoint &to)
+{
+    auto *plot = plotOf(widget);
+    QMouseEvent press(QEvent::MouseButtonPress, QPointF(from), QPointF(from),
+                      Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(plot, &press);
+
+    QMouseEvent move(QEvent::MouseMove, QPointF(to), QPointF(to),
+                     Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(plot, &move);
+
+    QMouseEvent release(QEvent::MouseButtonRelease, QPointF(to), QPointF(to),
+                        Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(plot, &release);
+}
+
+static void rightClick(HistogramViewWidget *widget, const QPoint &pos)
+{
+    auto *plot = plotOf(widget);
+    QMouseEvent press(QEvent::MouseButtonPress, QPointF(pos), QPointF(pos),
+                      Qt::RightButton, Qt::RightButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(plot, &press);
+    QMouseEvent release(QEvent::MouseButtonRelease, QPointF(pos), QPointF(pos),
+                        Qt::RightButton, Qt::NoButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(plot, &release);
+}
+
+static void uniformBins(int n, double count, QVector<double> &bins, QVector<double> &counts)
+{
+    bins.clear();
+    counts.clear();
+    for (int i = 0; i < n; ++i) {
+        bins.append(i + 0.5);
+        counts.append(count);
+    }
 }
 
 class TestHistogram : public QObject
@@ -302,7 +341,149 @@ private slots:
         // 首尾两根柱子都要落在绘图区里，不能被边沿切掉
         const QRect area = plot->axisRect()->rect();
         QVERIFY(plot->xAxis->coordToPixel(0.0) >= area.left() - 1.0);
-        QVERIFY(plot->xAxis->coordToPixel(256.0) <= area.right() + 1.0);    }
+        QVERIFY(plot->xAxis->coordToPixel(256.0) <= area.right() + 1.0);
+    }
+
+    void test_rubber_band_zooms_x_axis_only()
+    {
+        HistogramViewWidget widget;
+        widget.resize(600, 400);
+
+        QVector<double> bins;
+        QVector<double> counts;
+        uniformBins(256, 100.0, bins, counts);
+        widget.setHistogram(bins, counts);
+        showLayout(&widget);
+
+        auto *plot = plotOf(&widget);
+        QVERIFY(plot);
+        QVERIFY(!widget.isZoomed());
+
+        const double xBefore = (plot->xAxis->range().upper - plot->xAxis->range().lower);
+        const QCPRange yBefore = plot->yAxis->range();
+
+        const QRect area = plot->axisRect()->rect();
+        const QPoint from(area.left() + area.width() / 4, area.center().y());
+        const QPoint to(area.left() + area.width() * 3 / 4, area.center().y());
+        dragOver(&widget, from, to);
+
+        QVERIFY(widget.isZoomed());
+        const double xAfter = (plot->xAxis->range().upper - plot->xAxis->range().lower);
+        QVERIFY2(xAfter < xBefore,
+                 qPrintable(QStringLiteral("横坐标量程没缩小：%1 -> %2").arg(xBefore).arg(xAfter)));
+
+        // 只缩横轴：纵坐标必须原样不动
+        QCOMPARE(plot->yAxis->range().lower, yBefore.lower);
+        QCOMPARE(plot->yAxis->range().upper, yBefore.upper);
+    }
+
+    void test_zoom_survives_new_frame()
+    {
+        // live 模式每帧都来，不能把用户框出来的量程又拉回去
+        HistogramViewWidget widget;
+        widget.resize(600, 400);
+
+        QVector<double> bins;
+        QVector<double> counts;
+        uniformBins(256, 100.0, bins, counts);
+        widget.setHistogram(bins, counts);
+        showLayout(&widget);
+
+        auto *plot = plotOf(&widget);
+        const QRect area = plot->axisRect()->rect();
+        dragOver(&widget,
+                 QPoint(area.left() + area.width() / 4, area.center().y()),
+                 QPoint(area.left() + area.width() * 3 / 4, area.center().y()));
+
+        const double zoomed = (plot->xAxis->range().upper - plot->xAxis->range().lower);
+        QVERIFY(zoomed > 0.0);
+
+        // 换一帧数据
+        uniformBins(256, 40.0, bins, counts);
+        widget.setHistogram(bins, counts);
+
+        QVERIFY2(qAbs((plot->xAxis->range().upper - plot->xAxis->range().lower) - zoomed) < 1e-6,
+                 qPrintable(QStringLiteral("新帧把框选的横坐标量程冲掉了：%1 -> %2")
+                                .arg(zoomed).arg((plot->xAxis->range().upper - plot->xAxis->range().lower))));
+    }
+
+    void test_right_click_resets_zoom()
+    {
+        HistogramViewWidget widget;
+        widget.resize(600, 400);
+
+        QVector<double> bins;
+        QVector<double> counts;
+        uniformBins(256, 100.0, bins, counts);
+        widget.setHistogram(bins, counts);
+        showLayout(&widget);
+
+        auto *plot = plotOf(&widget);
+        const double full = (plot->xAxis->range().upper - plot->xAxis->range().lower);
+
+        const QRect area = plot->axisRect()->rect();
+        dragOver(&widget,
+                 QPoint(area.left() + area.width() / 4, area.center().y()),
+                 QPoint(area.left() + area.width() * 3 / 4, area.center().y()));
+        QVERIFY(widget.isZoomed());
+        QVERIFY((plot->xAxis->range().upper - plot->xAxis->range().lower) < full);
+
+        rightClick(&widget, area.center());
+        QVERIFY(!widget.isZoomed());
+        QVERIFY2(qAbs((plot->xAxis->range().upper - plot->xAxis->range().lower) - full) < 1e-6,
+                 qPrintable(QStringLiteral("右键复位后量程没还原：%1 -> %2")
+                                .arg(full).arg((plot->xAxis->range().upper - plot->xAxis->range().lower))));
+    }
+
+    void test_clear_resets_zoom()
+    {
+        // 数据清空后还留着框选量程的话，下一帧进来横坐标会卡在上一个图的范围内
+        HistogramViewWidget widget;
+        widget.resize(600, 400);
+
+        QVector<double> bins;
+        QVector<double> counts;
+        uniformBins(256, 100.0, bins, counts);
+        widget.setHistogram(bins, counts);
+        showLayout(&widget);
+
+        auto *plot = plotOf(&widget);
+        const QRect area = plot->axisRect()->rect();
+        dragOver(&widget,
+                 QPoint(area.left() + area.width() / 4, area.center().y()),
+                 QPoint(area.left() + area.width() * 3 / 4, area.center().y()));
+        QVERIFY(widget.isZoomed());
+
+        widget.clearHistogram();
+        QVERIFY(!widget.isZoomed());
+
+        uniformBins(256, 100.0, bins, counts);
+        widget.setHistogram(bins, counts);
+        QVERIFY2(qAbs((plot->xAxis->range().upper - plot->xAxis->range().lower) - 256.0) < 1.0,
+                 qPrintable(QStringLiteral("清图后量程没按新数据重排：%1").arg((plot->xAxis->range().upper - plot->xAxis->range().lower))));
+    }
+
+    void test_click_without_drag_does_not_zoom()
+    {
+        // 点一下没拖动不能当成缩放，否则量程会被压成一条线
+        HistogramViewWidget widget;
+        widget.resize(600, 400);
+
+        QVector<double> bins;
+        QVector<double> counts;
+        uniformBins(256, 100.0, bins, counts);
+        widget.setHistogram(bins, counts);
+        showLayout(&widget);
+
+        auto *plot = plotOf(&widget);
+        const double full = (plot->xAxis->range().upper - plot->xAxis->range().lower);
+        const QPoint at = plot->axisRect()->rect().center();
+
+        dragOver(&widget, at, at);
+
+        QVERIFY(!widget.isZoomed());
+        QVERIFY(qAbs((plot->xAxis->range().upper - plot->xAxis->range().lower) - full) < 1e-6);
+    }
 };
 
 QTEST_MAIN(TestHistogram)

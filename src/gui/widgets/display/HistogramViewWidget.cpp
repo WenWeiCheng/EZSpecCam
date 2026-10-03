@@ -24,6 +24,10 @@ HistogramViewWidget::HistogramViewWidget(QWidget *parent)
 {
     m_plot = new QCustomPlot(this);
 
+    m_rubberBand = new QRubberBand(QRubberBand::Rectangle, m_plot);
+    m_plot->setInteractions(QCP::iSelectPlottables);
+    m_plot->installEventFilter(this);
+
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(m_plot);
@@ -99,6 +103,8 @@ void HistogramViewWidget::clearHistogram()
     m_hasData = false;
     m_binCenters.clear();
     m_counts.clear();
+    // 数据都清了还留着框选量程的话，下一帧进来时横坐标会卡在上一个图的范围内
+    m_userHasZoomed = false;
     m_bars->data()->clear();
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
@@ -139,9 +145,13 @@ void HistogramViewWidget::applyAxisRange()
         return;
     }
 
-    // 头尾各留半个箱宽，否则最外侧两根柱子会被绘图区边沿切掉
-    const double half = m_binWidth * 0.5;
-    m_plot->xAxis->setRange(m_binCenters.first() - half, m_binCenters.last() + half);
+    // 框选缩放只动横坐标：缩放过之后新帧不再把横坐标拉回去，
+    // 纵坐标则始终按当前数据自动——否则「只缩横轴」就名不副实了
+    if (!m_userHasZoomed) {
+        // 头尾各留半个箱宽，否则最外侧两根柱子会被绘图区边沿切掉
+        const double half = m_binWidth * 0.5;
+        m_plot->xAxis->setRange(m_binCenters.first() - half, m_binCenters.last() + half);
+    }
 
     const double maxCount = *std::max_element(m_counts.constBegin(), m_counts.constEnd());
     if (m_logScale) {
@@ -152,6 +162,65 @@ void HistogramViewWidget::applyAxisRange()
     } else {
         m_plot->yAxis->setRange(0.0, (maxCount > 0.0) ? maxCount * 1.05 : 1.0);
     }
+}
+
+void HistogramViewWidget::resetZoom()
+{
+    if (!m_userHasZoomed) {
+        return;
+    }
+    m_userHasZoomed = false;
+    applyAxisRange();
+    m_plot->replot(QCustomPlot::rpQueuedReplot);
+}
+
+// 框选缩放：按住左键在绘图区里拉一个框，只把横坐标缩到框住的范围。
+// 和 SpectrumViewWidget 的框选是同一套写法，区别是这里不碰纵坐标
+bool HistogramViewWidget::eventFilter(QObject *obj, QEvent *event)
+{
+    if (obj != m_plot) {
+        return QWidget::eventFilter(obj, event);
+    }
+
+    if (event->type() == QEvent::MouseButtonPress) {
+        auto *me = static_cast<QMouseEvent *>(event);
+        if (me->button() == Qt::LeftButton) {
+            if (m_plot->axisRect()->rect().contains(me->pos())) {
+                m_rubberBandOrigin = me->pos();
+                m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, QSize()));
+                m_rubberBand->show();
+                return true;
+            }
+        } else if (me->button() == Qt::RightButton) {
+            resetZoom();
+            return true;
+        }
+    } else if (event->type() == QEvent::MouseMove) {
+        if (m_rubberBand->isVisible()) {
+            auto *me = static_cast<QMouseEvent *>(event);
+            m_rubberBand->setGeometry(QRect(m_rubberBandOrigin, me->pos()).normalized());
+            return true;
+        }
+    } else if (event->type() == QEvent::MouseButtonRelease) {
+        if (m_rubberBand->isVisible()) {
+            m_rubberBand->hide();
+            auto *me = static_cast<QMouseEvent *>(event);
+            if (me->button() == Qt::LeftButton) {
+                const QRectF selection = QRectF(m_rubberBandOrigin, me->pos()).normalized();
+                const double x1 = m_plot->xAxis->pixelToCoord(selection.left());
+                const double x2 = m_plot->xAxis->pixelToCoord(selection.right());
+                // 框得太窄（点了一下没拖动）就别当成缩放，否则会把量程压成一条线
+                if (qAbs(x2 - x1) > 0) {
+                    m_plot->xAxis->setRange(x1, x2);
+                    m_plot->replot(QCustomPlot::rpQueuedReplot);
+                    m_userHasZoomed = true;
+                }
+            }
+            return true;
+        }
+    }
+
+    return QWidget::eventFilter(obj, event);
 }
 
 void HistogramViewWidget::setXAxisLabel(const QString &label)

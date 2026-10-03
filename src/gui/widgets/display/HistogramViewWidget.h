@@ -2,6 +2,8 @@
 #define HISTOGRAMVIEWWIDGET_H
 
 #include <QWidget>
+#include <QPoint>
+#include <QRubberBand>
 #include <QString>
 #include <QVector>
 
@@ -27,11 +29,16 @@ public:
     bool isLogScale() const { return m_logScale; }
     void setLogScale(bool enabled);
 
+    //! 用户是否框选缩放过。缩放过之后新帧不再重置横坐标量程
+    bool isZoomed() const { return m_userHasZoomed; }
+    void resetZoom();
+
     void setXAxisLabel(const QString &label);
     void setYAxisLabel(const QString &label);
 
 protected:
     void showEvent(QShowEvent *event) override;
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
 private:
     void setupPlot();
@@ -48,6 +55,11 @@ private:
     bool m_logScale = false;
     QString m_xAxisLabel;
     QString m_yAxisLabel;
+
+    //! 框选缩放只动横坐标，纵坐标始终按数据自动
+    QRubberBand *m_rubberBand = nullptr;
+    QPoint m_rubberBandOrigin;
+    bool m_userHasZoomed = false;
 };
 
 #endif // HISTOGRAMVIEWWIDGET_H
