@@ -101,7 +101,7 @@ private:
     void buildParameterTable();
     void clearParameterTable();
     /// Drops parameters hk16011ParameterMetadata() does not list, then applies its
-    /// category and unit to the ones that survive.
+    /// category, description, units and dynamic/extrinsic flags to the survivors.
     void applyParameterMetadata();
 
     // ——— Value conversion ———
@@ -147,7 +147,9 @@ private:
     /// Recursive because disconnectCamera() reaches stopCapture() while holding it.
     mutable QRecursiveMutex m_mutex;
     QMap<QString, ParameterDefinition> m_parameterDefinitions;
-    QVariantMap m_parameters;        ///< last known values read from the device
+    /// Mutable because parameterValue() refreshes the cached reading of
+    /// isDynamic/isExtrinsic parameters; every mutation happens under m_mutex.
+    mutable QVariantMap m_parameters;        ///< last known values read from the device
     QVariantMap m_pendingParameters; ///< staged by setParameter(), applied on commit
 
     /// Enumeration parameters carry labels, but the device only speaks tokens.

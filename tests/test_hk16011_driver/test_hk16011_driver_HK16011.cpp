@@ -96,6 +96,7 @@ private slots:
     void test_parameter_tec_set_temp();
     void test_parameter_adc_gain_r();
     void test_parameter_adc_offset_b();
+    void test_parameter_mon_dwell_ms();
 
     // ——— Enumeration labels vs. wire tokens ———
     void test_enumValuesAreLabels();
@@ -176,7 +177,14 @@ void TestHk16011Driver::init()
 
 void TestHk16011Driver::cleanup()
 {
-    if (m_driver && m_driver->isConnected()) {
+    if (!m_driver) {
+        return;
+    }
+    // isConnected() alone would skip a driver stuck in Acquiring — a capture
+    // whose frames never came — and leave m_capturing set, which poisons every
+    // later test (startCapture() then short-circuits to "already running").
+    // disconnectCamera() stops the capture on the way, so just always tear down.
+    if (m_driver->state() != CameraState::Disconnected) {
         m_driver->disconnectCamera();
     }
 }
@@ -339,7 +347,7 @@ void TestHk16011Driver::test_parameterTableShape()
         QStringLiteral("image_height"),    QStringLiteral("bevel_left"),
         QStringLiteral("blank_right"),     QStringLiteral("tec_kp"),
         QStringLiteral("tec_set_temp"),    QStringLiteral("camera_name"),
-        QStringLiteral("frame_num_ready"),
+        QStringLiteral("frame_num_ready"), QStringLiteral("mon_dwell_ms"),
         QStringLiteral("adc_gain_r"),      QStringLiteral("adc_gain_g"),
         QStringLiteral("adc_gain_b"),      QStringLiteral("adc_offset_r"),
         QStringLiteral("adc_offset_g"),    QStringLiteral("adc_offset_b"),
@@ -400,6 +408,31 @@ void TestHk16011Driver::test_readOnlyParametersAreFlagged()
         QVERIFY2(!def.isReadOnly,
                  qPrintable(QString("'%1' should be writable").arg(name)));
     }
+
+    // Read-only parameters that change on their own are the GUI's live
+    // telemetry: CameraTab polls parameterValue() for exactly this set
+    // (isReadOnly && isDynamic && isExtrinsic) while the config tab is open.
+    for (const QString &name : { QStringLiteral("sensor_temp"),
+                                 QStringLiteral("environment_temp"),
+                                 QStringLiteral("tec_voltage"),
+                                 QStringLiteral("tec_current"),
+                                 QStringLiteral("acq_state"),
+                                 QStringLiteral("frame_num_ready"),
+                                 QStringLiteral("exception_flag"),
+                                 QStringLiteral("exception_cnt") }) {
+        const ParameterDefinition def = m_driver->parameter(name);
+        QVERIFY2(def.isDynamic && def.isExtrinsic,
+                 qPrintable(QString("'%1' should be dynamic + extrinsic").arg(name)));
+    }
+
+    // Constant read-only values are neither: polling them would only ever
+    // return the same number.
+    for (const QString &name : { QStringLiteral("camera_name"),
+                                 QStringLiteral("frame_capacity") }) {
+        const ParameterDefinition def = m_driver->parameter(name);
+        QVERIFY2(!def.isDynamic && !def.isExtrinsic,
+                 qPrintable(QString("'%1' should not be marked dynamic/extrinsic").arg(name)));
+    }
 }
 
 void TestHk16011Driver::test_parameterCategories()
@@ -416,6 +449,7 @@ void TestHk16011Driver::test_parameterCategories()
         { QStringLiteral("freq_sel"),         ParameterCategory::Core },
         { QStringLiteral("tec_enable"),       ParameterCategory::Cooling },
         { QStringLiteral("tec_set_temp"),     ParameterCategory::Cooling },
+        { QStringLiteral("mon_dwell_ms"),     ParameterCategory::Advanced },
         { QStringLiteral("camera_name"),      ParameterCategory::Info },
         { QStringLiteral("tec_kp"),           ParameterCategory::Advanced },
         { QStringLiteral("tec_ki"),           ParameterCategory::Advanced },
@@ -638,14 +672,24 @@ void TestHk16011Driver::test_parameter_adc_gain_r()
 {
     REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
-    roundTripParameter(QStringLiteral("adc_gain_r"), QVariant::fromValue(qlonglong(63)));
+    // The firmware reworked the adc parameters into physical units: gain is
+    // a float in [1, 6] V/V (it used to be an integer code 0-63).
+    roundTripParameter(QStringLiteral("adc_gain_r"), QVariant(3.5));
 }
 
 void TestHk16011Driver::test_parameter_adc_offset_b()
 {
     REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
-    roundTripParameter(QStringLiteral("adc_offset_b"), QVariant::fromValue(qlonglong(511)));
+    // Same rework: offsets are floats in [-300, 300] mV (used to be codes 0-511).
+    roundTripParameter(QStringLiteral("adc_offset_b"), QVariant(-64.0));
+}
+
+void TestHk16011Driver::test_parameter_mon_dwell_ms()
+{
+    REQUIRE_HK16011();
+    QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
+    roundTripParameter(QStringLiteral("mon_dwell_ms"), QVariant::fromValue(qlonglong(250)));
 }
 
 void TestHk16011Driver::test_enumValuesAreLabels()
@@ -913,7 +957,7 @@ void TestHk16011Driver::test_setParametersBatch()
     QVariantMap batch;
     batch.insert(QStringLiteral("mock_mode"), true);
     batch.insert(QStringLiteral("exposure_time_us"), QVariant::fromValue(qlonglong(1500)));
-    batch.insert(QStringLiteral("adc_gain_r"), QVariant::fromValue(qlonglong(999)));  // max 63
+    batch.insert(QStringLiteral("adc_gain_r"), QVariant::fromValue(qlonglong(999)));  // max 6.0
     batch.insert(QStringLiteral("nope"), QVariant::fromValue(qlonglong(1)));
 
     QStringList failed;
@@ -977,15 +1021,22 @@ void TestHk16011Driver::test_validateParameters()
 
     QVERIFY2(m_driver->validateParameters(), "an empty pending set should validate");
 
-    QVERIFY2(m_driver->setParameter(QStringLiteral("adc_gain_r"), QVariant::fromValue(qlonglong(10))),
+    const QVariant original = m_driver->parameterValue(QStringLiteral("adc_gain_r"));
+
+    QVERIFY2(m_driver->setParameter(QStringLiteral("adc_gain_r"), QVariant(2.5)),
              "a valid value should stage");
     QVERIFY2(m_driver->validateParameters(), "a valid pending value should validate");
     QVERIFY2(m_driver->commitParameters(), "it should also commit");
 
     // validateParameters() only ever sees what setParameter() already
     // accepted, so a rejection has to come from setParameter() itself.
-    QVERIFY2(!m_driver->setParameter(QStringLiteral("adc_gain_r"), QVariant::fromValue(qlonglong(-1))),
+    QVERIFY2(!m_driver->setParameter(QStringLiteral("adc_gain_r"), QVariant(-1.0)),
              "an out-of-range value should never reach validateParameters()");
+
+    // The commit above changed the device; put the original gain back.
+    QVERIFY2(m_driver->setParameter(QStringLiteral("adc_gain_r"), original),
+             "restoring adc_gain_r should be accepted");
+    QVERIFY2(m_driver->commitParameters(), "restoring adc_gain_r should commit");
 }
 
 void TestHk16011Driver::test_commitParameters()

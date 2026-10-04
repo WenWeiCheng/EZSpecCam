@@ -85,6 +85,8 @@ struct ParameterMetadata
     QString description;          ///< shown as the GUI tooltip; empty falls back to the SDK's
     QStringList units{};          ///< empty: keep whatever unit the SDK reported
     QVector<double> unitScale{};  ///< empty: no unit selector
+    bool isDynamic{};   ///< the value can change on the device without EZSpecCam writing it
+    bool isExtrinsic{}; ///< changes with environment/time but no user write path (read-only)
 };
 
 const QMap<QString, ParameterMetadata> &hk16011ParameterMetadata()
@@ -106,22 +108,25 @@ const QMap<QString, ParameterMetadata> &hk16011ParameterMetadata()
                            "It bounds the shortest exposure the sensor can use.") } },
         { QStringLiteral("adc_gain_r"),
           { ParameterCategory::Core,
-            QStringLiteral("Gain code applied to the red channel by the on-chip ADC (0-63).") } },
+            QStringLiteral("Analog gain applied to the red channel before conversion, in V/V.") } },
         { QStringLiteral("adc_gain_g"),
           { ParameterCategory::Core,
-            QStringLiteral("Gain code applied to the green channel by the on-chip ADC (0-63).") } },
+            QStringLiteral("Analog gain applied to the green channel before conversion, in V/V.") } },
         { QStringLiteral("adc_gain_b"),
           { ParameterCategory::Core,
-            QStringLiteral("Gain code applied to the blue channel by the on-chip ADC (0-63).") } },
+            QStringLiteral("Analog gain applied to the blue channel before conversion, in V/V.") } },
         { QStringLiteral("adc_offset_r"),
           { ParameterCategory::Core,
-            QStringLiteral("Offset code subtracted on the red channel before conversion (0-511).") } },
+            QStringLiteral("Offset voltage subtracted from the red channel before conversion, "
+                           "in mV.") } },
         { QStringLiteral("adc_offset_g"),
           { ParameterCategory::Core,
-            QStringLiteral("Offset code subtracted on the green channel before conversion (0-511).") } },
+            QStringLiteral("Offset voltage subtracted from the green channel before conversion, "
+                           "in mV.") } },
         { QStringLiteral("adc_offset_b"),
           { ParameterCategory::Core,
-            QStringLiteral("Offset code subtracted on the blue channel before conversion (0-511).") } },
+            QStringLiteral("Offset voltage subtracted from the blue channel before conversion, "
+                           "in mV.") } },
 
         // —— Cooling ——
         { QStringLiteral("tec_enable"),
@@ -131,18 +136,27 @@ const QMap<QString, ParameterMetadata> &hk16011ParameterMetadata()
         { QStringLiteral("tec_set_temp"),
           { ParameterCategory::Cooling,
             QStringLiteral("Temperature the cooler loop drives towards, in degrees Celsius.") } },
+        { QStringLiteral("mon_dwell_ms"),
+          { ParameterCategory::Advanced,
+            QStringLiteral("Settle delay, in ms, between switching an ADS1118 monitor channel "
+                           "and reading it. The four telemetry channels rotate with a period "
+                           "of 4x this value; a new value takes effect on the next rotation.") } },
         { QStringLiteral("sensor_temp"),
           { ParameterCategory::Cooling,
-            QStringLiteral("Temperature reported at the sensor package.") } },
+            QStringLiteral("Temperature reported at the sensor package."),
+            {}, {}, true, true } },
         { QStringLiteral("environment_temp"),
           { ParameterCategory::Cooling,
-            QStringLiteral("Ambient temperature reported near the camera.") } },
+            QStringLiteral("Ambient temperature reported near the camera."),
+            {}, {}, true, true } },
         { QStringLiteral("tec_voltage"),
           { ParameterCategory::Cooling,
-            QStringLiteral("Voltage the cooler is being driven at.") } },
+            QStringLiteral("Voltage the cooler is being driven at."),
+            {}, {}, true, true } },
         { QStringLiteral("tec_current"),
           { ParameterCategory::Cooling,
-            QStringLiteral("Current the cooler is drawing.") } },
+            QStringLiteral("Current the cooler is drawing."),
+            {}, {}, true, true } },
 
         // —— Info ——
         { QStringLiteral("camera_name"),
@@ -196,21 +210,25 @@ const QMap<QString, ParameterMetadata> &hk16011ParameterMetadata()
         { QStringLiteral("acq_state"),
           { ParameterCategory::Debug,
             QStringLiteral("What the acquisition engine is doing right now: idle, exposing "
-                           "or reading.") } },
+                           "or reading."),
+            {}, {}, true, true } },
         { QStringLiteral("frame_num_ready"),
           { ParameterCategory::Debug,
             QStringLiteral("Frames already buffered in the camera that have not been fetched. "
-                           "A bounded fetch is only accepted once this reaches the count.") } },
+                           "A bounded fetch is only accepted once this reaches the count."),
+            {}, {}, true, true } },
         { QStringLiteral("frame_capacity"),
           { ParameterCategory::Debug,
             QStringLiteral("How many frames the camera's buffer can hold.") } },
         { QStringLiteral("exception_flag"),
           { ParameterCategory::Debug,
             QStringLiteral("Set when the firmware has raised an exception; read exception_cnt "
-                           "alongside it.") } },
+                           "alongside it."),
+            {}, {}, true, true } },
         { QStringLiteral("exception_cnt"),
           { ParameterCategory::Debug,
-            QStringLiteral("Exception code or count recorded by the firmware.") } },
+            QStringLiteral("Exception code or count recorded by the firmware."),
+            {}, {}, true, true } },
     };
     return table;
 }
@@ -474,6 +492,8 @@ void Hk16011Driver::applyParameterMetadata()
             continue;
         }
         def->category = it.value().category;
+        def->isDynamic = it.value().isDynamic;
+        def->isExtrinsic = it.value().isExtrinsic;
         if (!it.value().description.isEmpty()) {
             def->description = it.value().description;
         } else {
@@ -759,9 +779,26 @@ ParameterDefinition Hk16011Driver::parameter(const QString &name) const
 QVariant Hk16011Driver::parameterValue(const QString &name) const
 {
     QMutexLocker locker(&m_mutex);
+
     if (m_pendingParameters.contains(name)) {
         return m_pendingParameters.value(name);
     }
+
+    // Dynamic/extrinsic parameters change on the device without EZSpecCam
+    // writing them, so their cached value goes stale the moment it is taken.
+    // Re-read the device on every call — the same contract PicamDriver and
+    // HamamatsuDriver follow — and fall back to the cache when the device
+    // does not answer so the UI stays responsive.
+    const ParameterDefinition def = m_parameterDefinitions.value(name);
+    if (def.isValid() && (def.isDynamic || def.isExtrinsic)) {
+        bool ok = false;
+        const QVariant live = readValue(name, &ok);
+        if (ok) {
+            m_parameters.insert(name, live);
+            return live;
+        }
+    }
+
     return m_parameters.value(name);
 }
 

@@ -18,7 +18,7 @@
 
 构建 SDK 本身：`mkdir -p lib && make lib`（`lib/` 目录不存在时 `make` 会直接失败）。
 
-**参数总量 34 个**，由 `LISTPARAMS` + 逐个 `GETINFO` 在 `HK16011_Open` 时探测并缓存。
+**参数总量 35 个**，由 `LISTPARAMS` + 逐个 `GETINFO` 在 `HK16011_Open` 时探测并缓存。
 
 ---
 
@@ -158,11 +158,31 @@ EZSpecCam 漂移，与其让两份对不上，不如只留一份。`displayName`
 | Core | `exposure_time_us` `read_mode` `freq_sel` `adc_gain_r` `adc_gain_g` `adc_gain_b` `adc_offset_r` `adc_offset_g` `adc_offset_b` |
 | Cooling | `tec_enable` `tec_set_temp` `sensor_temp` `environment_temp` `tec_voltage` `tec_current` |
 | Info | `camera_name` |
-| Advanced | `tec_kp` `tec_ki` `tec_kd` |
+| Advanced | `tec_kp` `tec_ki` `tec_kd` `mon_dwell_ms` |
 | Debug | `mock_mode` `cdsclk_delay` `image_width` `image_height` `bevel_left` `bevel_top` `bevel_right` `bevel_bottom` `blank_left` `blank_right` `acq_state` `frame_num_ready` `frame_capacity` `exception_flag` `exception_cnt` |
 
 **只读 ≠ Info。** `sensor_temp` 等四个遥测虽然只读，但归 `Cooling` —— 它们和
 `tec_set_temp` 是同一件事的设定端与读数端。归组看的是参数**拿来干什么**。
+
+**adc_\* 与 `mon_dwell_ms`（2026-10 固件改版）。** 固件把六个 adc 参数从整型码值
+改成了物理量浮点：增益 [1, 6] V/V、偏移 [-300, 300] mV，描述文案随改；同时新增
+`mon_dwell_ms`（ADS1118 四通道遥测轮询的通道切换稳定延时，四通道一圈 =
+4×此值，下次轮转才生效）。它 pacing 的虽然是那四个 Cooling 遥测，但作为
+监控环的调节旋钮归 **`Advanced`**（与 `tec_kp/ki/kd` 同组）。
+
+### isDynamic / isExtrinsic 与 parameterValue() 的实读
+
+`hk16011ParameterMetadata()` 同时给每个参数标注 `isDynamic` / `isExtrinsic`。
+四个 Cooling 遥测和 Debug 的 `acq_state` / `frame_num_ready` / `exception_flag` /
+`exception_cnt` 只读且会自行变化，两个标志都给 —— CameraTab 对
+`isReadOnly && isDynamic && isExtrinsic` 的参数每 100 ms 轮询一次；
+`camera_name` / `frame_capacity` 恒定不变，两个都不给，轮询没有意义。
+
+`parameterValue()` 对这两类参数**每次调用都回设备实读**（与 PicamDriver /
+HamamatsuDriver 同一契约），实读成功就更新缓存，失败回落到缓存。代价是
+每次 GETPARAM 都是 ~9 ms 的 UART 往返：GUI 轮询的 tick 最多会被 8 个参数
+阻塞掉大半，读遥测期间也会短暂占住 `m_mutex`、推迟 `deliverQueuedFrames()`
+—— 这是接受的取舍，**不要**在这里再加缓存或限频。
 
 ### `exposure_time_us` 的单位下拉
 
@@ -285,9 +305,9 @@ cmake --preset linux-debug
 覆盖范围：`enumerate` / 连接与重连 / 非法 id / 断开、参数表形状与逐个定义合法性、
 逐类别归属（Core/Cooling/Info/Advanced/Debug 各取代表，外加六个 `adc_*`）、
 枚举的 label 与 token 双向换算、枚举写入是否真的到达设备（靠重连后复读）、
-`exposure_time_us` 单位换算、
-13 个已验证可回读参数各一个用例、只读参数与未实测遥测、越界与未知参数拒绝、
-批量语义与关键参数整批拒绝、单帧 / 定量 / 实时采集。共 48 项。
+`exposure_time_us` 单位换算、只读与 dynamic/extrinsic 标志、
+14 个已验证可回读参数各一个用例、只读参数与未实测遥测、越界与未知参数拒绝、
+批量语义与关键参数整批拒绝、单帧 / 定量 / 实时采集。共 49 项。
 
 ---
 
