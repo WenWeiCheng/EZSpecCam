@@ -715,14 +715,8 @@ void MainWindow::on_actionAbout_triggered()
 
 void MainWindow::on_actionStart_triggered()
 {
-    if (!m_appController) {
-        return;
-    }
-
     int captureCount = m_configDialog ? m_configDialog->getCaptureCount() : 1;
-
-    QMetaObject::invokeMethod(m_appController, "startCapture", Qt::QueuedConnection,
-        Q_ARG(int, captureCount));
+    requestStartCapture(captureCount);
 }
 
 void MainWindow::on_actionStop_triggered()
@@ -732,6 +726,19 @@ void MainWindow::on_actionStop_triggered()
     }
 
     QMetaObject::invokeMethod(m_appController, "stopCapture", Qt::QueuedConnection);
+}
+
+void MainWindow::requestStartCapture(int captureCount)
+{
+    if (!m_appController) {
+        return;
+    }
+
+    // AppController 活在 m_controllerThread 上，startCapture 只能经队列过去：
+    // 直接调用会在 GUI 线程执行，驱动里属于那个线程的采集看门狗 QTimer
+    // 会因跨线程启动而失败。
+    QMetaObject::invokeMethod(m_appController, "startCapture", Qt::QueuedConnection,
+        Q_ARG(int, captureCount));
 }
 
 void MainWindow::on_scale_triggered()
@@ -1208,7 +1215,7 @@ void MainWindow::on_histogram_triggered()
 void MainWindow::onLiveModeTriggered()
 {
     if (m_appController) {
-        m_appController->startCapture(0);
+        requestStartCapture(0);
         showStatusMessage("Mode: Live", 3000);
     }
 }
@@ -1216,7 +1223,7 @@ void MainWindow::onLiveModeTriggered()
 void MainWindow::onSingleModeTriggered()
 {
     if (m_appController) {
-        m_appController->startCapture(1);
+        requestStartCapture(1);
         showStatusMessage("Mode: Single", 3000);
     }
 }
@@ -1224,7 +1231,7 @@ void MainWindow::onSingleModeTriggered()
 void MainWindow::onBurstModeTriggered()
 {
     if (m_appController) {
-        m_appController->startCapture(5);
+        requestStartCapture(5);
         showStatusMessage("Mode: Burst (5 frames)", 3000);
     }
 }

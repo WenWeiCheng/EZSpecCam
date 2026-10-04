@@ -98,6 +98,7 @@ private:
     void showStatusMessage(const QString &message, int timeoutMs = 3000);
     void saveFrameToFile(const QString &filePath);
     void cancelDarkAcquisition(const QString &reason);
+    void requestStartCapture(int captureCount);
 
     QElapsedTimer m_frameTimer;
     static constexpr int MIN_FRAME_INTERVAL_MS = 33;
