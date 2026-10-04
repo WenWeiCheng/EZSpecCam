@@ -729,11 +729,21 @@ bool ImageViewWidget::eventFilter(QObject *obj, QEvent *event)
                     if (m_imageValid && !m_originalImage.isNull()) {
                         QRectF selectionRect = QRectF(m_rubberBandOrigin, me->pos()).normalized();
 
-                        double x1 = m_plot->xAxis->pixelToCoord(selectionRect.left());
-                        double x2 = m_plot->xAxis->pixelToCoord(selectionRect.right());
-                        double y1 = m_plot->yAxis->pixelToCoord(selectionRect.bottom());
-                        double y2 = m_plot->yAxis->pixelToCoord(selectionRect.top());
-                        if (qAbs(x2 - x1) > 0 && qAbs(y2 - y1) > 0) {
+                        // 选框拖到图像外面时，pixelToCoord 会沿直线外推，给出一个越界的坐标。
+                        // 越界的轴范围会让读数和画面对不上：裁剪出来的图像照旧被拉伸铺满绘图区，
+                        // 看着像一次正常缩放，但十字线和 tooltip 都得多带上那一段根本不存在的空白。
+                        // 所以先和图像边界求交，越界部分直接丢掉。
+                        const double maxX = m_originalImage.width();
+                        const double maxY = m_originalImage.height();
+
+                        double x1 = qBound(0.0, m_plot->xAxis->pixelToCoord(selectionRect.left()), maxX);
+                        double x2 = qBound(0.0, m_plot->xAxis->pixelToCoord(selectionRect.right()), maxX);
+                        double y1 = qBound(0.0, m_plot->yAxis->pixelToCoord(selectionRect.top()), maxY);
+                        double y2 = qBound(0.0, m_plot->yAxis->pixelToCoord(selectionRect.bottom()), maxY);
+                        if (x2 < x1) qSwap(x1, x2);
+                        if (y2 < y1) qSwap(y1, y2);
+
+                        if (x2 > x1 && y2 > y1) {
                             m_plot->xAxis->setRange(x1, x2);
                             m_plot->yAxis->setRange(y1, y2);
                             m_plot->replot(QCustomPlot::rpQueuedReplot);
@@ -848,6 +858,9 @@ void ImageViewWidget::updateDisplayData()
         QCPRange xRange = m_plot->xAxis->range();
         QCPRange yRange = m_plot->yAxis->range();
 
+        // 下面这层 qMax/qMin 依赖一个前提：轴范围本身已经落在图像内（eventFilter()
+        // 里的选框会先和图像边界求交）。否则裁剪出的数据就比 updateColorMap() 拿去
+        // 当作 key/value 范围的轴范围小，两者对不上，读数会整体偏掉。
         int x0 = qMax(0, static_cast<int>(qFloor(xRange.lower)));
         int y0 = qMax(0, static_cast<int>(qFloor(yRange.lower)));
         int x1 = qMin(m_originalImage.width(), static_cast<int>(qCeil(xRange.upper)));
