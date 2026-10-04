@@ -85,9 +85,6 @@ public:
     void clearCrosshairs();
     void addCrosshair(int x, int y);
 
-    bool isDownsamplingEnabled() const;
-    void setDownsamplingEnabled(bool enabled);
-
     int pixelValue(int x, int y) const;
 
     QVector<double> extractRowAsVector(int y) const;
@@ -148,7 +145,6 @@ private:
 
     int m_downsampleX = 1;
     int m_downsampleY = 1;
-    bool m_downsamplingEnabled = true;
 
     int m_originalPixelCount = 0;
     int m_displayPixelCount = 0;

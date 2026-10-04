@@ -804,12 +804,6 @@ void ImageViewWidget::calculateDownsampleFactors()
         return;
     }
 
-    if (!m_downsamplingEnabled) {
-        m_downsampleX = 1;
-        m_downsampleY = 1;
-        return;
-    }
-
     int viewWidth = m_plot->axisRect()->width();
     int viewHeight = m_plot->axisRect()->height();
 
@@ -883,6 +877,8 @@ void ImageViewWidget::updateDisplayData()
         if (viewWidth <= 0) viewWidth = 600;
         if (viewHeight <= 0) viewHeight = 400;
 
+        // 这一段降采样没有开关，也不该有：放大之后要画的正是这块裁剪区，
+        // 它比视口大时 QCPColorMap 根本画不动，只能减。整幅图的降采样同样如此。
         int factorX = qMax(1, cropW / viewWidth);
         int factorY = qMax(1, cropH / viewHeight);
 
@@ -908,24 +904,6 @@ void ImageViewWidget::updateDisplayData()
     m_displayPixelCount = m_displayImage.width() * m_displayImage.height();
 
     updateColorMap(m_displayImage);
-}
-
-bool ImageViewWidget::isDownsamplingEnabled() const
-{
-    return m_downsamplingEnabled;
-}
-
-void ImageViewWidget::setDownsamplingEnabled(bool enabled)
-{
-    if (m_downsamplingEnabled == enabled) {
-        return;
-    }
-
-    m_downsamplingEnabled = enabled;
-
-    if (m_imageValid && !m_originalImage.isNull()) {
-        updateDisplayData();
-    }
 }
 
 QVector<double> ImageViewWidget::extractRowAsVector(int y) const
