@@ -53,14 +53,14 @@ CalibrationDialog::CalibrationDialog(QWidget *parent)
     m_acquireButton = new QPushButton(tr("Acquire"), this);
     m_acquireButton->setObjectName("acquireButton");
 
-    // 帧数框贴左边，和下面 Custom Bias 的输入框左边缘对齐；Acquire 靠右，
-    // 和上一行的 Browse 对齐
+    // 和上面路径行同一种结构：输入框吃掉多余宽度，按钮保持自身宽度。
+    // 这样帧数框和路径框一样长，Acquire 也和 Browse 对齐。
     QHBoxLayout *acquireRow = new QHBoxLayout();
-    acquireRow->addWidget(m_frameCountSpinBox);
-    acquireRow->addStretch(1);
+    acquireRow->addWidget(m_frameCountSpinBox, 1);
     acquireRow->addWidget(m_acquireButton);
     formLayout->addRow(tr("Frames to average:"), acquireRow);
 
+    // 这一行右边没有按钮，输入框独占整列，不需要和上面两行等长
     m_biasSpinBox = new QSpinBox(this);
     m_biasSpinBox->setRange(-32768, 32767);
     m_biasSpinBox->setValue(0);
