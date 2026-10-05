@@ -53,10 +53,11 @@ CalibrationDialog::CalibrationDialog(QWidget *parent)
     m_acquireButton = new QPushButton(tr("Acquire"), this);
     m_acquireButton->setObjectName("acquireButton");
 
-    // Acquire 和上一行的 Browse 一样靠右，两颗按钮才对得成一条竖线
+    // 帧数框贴左边，和下面 Custom Bias 的输入框左边缘对齐；Acquire 靠右，
+    // 和上一行的 Browse 对齐
     QHBoxLayout *acquireRow = new QHBoxLayout();
-    acquireRow->addStretch(1);
     acquireRow->addWidget(m_frameCountSpinBox);
+    acquireRow->addStretch(1);
     acquireRow->addWidget(m_acquireButton);
     formLayout->addRow(tr("Frames to average:"), acquireRow);
 
