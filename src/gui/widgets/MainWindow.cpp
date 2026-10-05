@@ -60,6 +60,11 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->setupUi(this);
 
+    // 状态栏那一格的内容以后统一由 updateStateLabel() 拼，初始值也从这里给，
+    // 不再让 MainWindowUi 里写死的 "State: Disconnected" 和实际格式对不上
+    m_cameraStateText = tr("Disconnected");
+    updateStateLabel();
+
     ui->centralStackedWidget->hide();
     shortcutLive = new QShortcut(QKeySequence(Qt::Key_L), this);
     connect(shortcutLive, &QShortcut::activated, this, &MainWindow::onLiveModeTriggered);
@@ -944,7 +949,8 @@ void MainWindow::onCameraStateChanged(CameraState newState)
         shortcutBurst->setEnabled(false);
         break;
     }
-    ui->stateLabel->setText(stateText);
+    m_cameraStateText = stateText;
+    updateStateLabel();
 
     updateToolbarState();
 }
@@ -1207,27 +1213,49 @@ void MainWindow::on_histogram_triggered()
     m_histogramWindow->show();
 }
 
+void MainWindow::updateStateLabel()
+{
+    QString text = tr("State: %1").arg(m_cameraStateText);
+    switch (m_captureMode) {
+    case CaptureMode::Live:
+        text += tr(" · Mode: Live");
+        break;
+    case CaptureMode::Single:
+        text += tr(" · Mode: Single");
+        break;
+    case CaptureMode::Burst:
+        text += tr(" · Mode: Burst (5)");
+        break;
+    case CaptureMode::None:
+        break;
+    }
+    ui->stateLabel->setText(text);
+}
+
 void MainWindow::onLiveModeTriggered()
 {
     if (m_appController) {
+        m_captureMode = CaptureMode::Live;
+        updateStateLabel();
         requestStartCapture(0);
-        showStatusMessage("Mode: Live", 3000);
     }
 }
 
 void MainWindow::onSingleModeTriggered()
 {
     if (m_appController) {
+        m_captureMode = CaptureMode::Single;
+        updateStateLabel();
         requestStartCapture(1);
-        showStatusMessage("Mode: Single", 3000);
     }
 }
 
 void MainWindow::onBurstModeTriggered()
 {
     if (m_appController) {
+        m_captureMode = CaptureMode::Burst;
+        updateStateLabel();
         requestStartCapture(5);
-        showStatusMessage("Mode: Burst (5 frames)", 3000);
     }
 }
 

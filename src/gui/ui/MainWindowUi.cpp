@@ -202,6 +202,7 @@ void MainWindowUi::createStatusBar(QMainWindow *mainWindow)
     QStatusBar *statusBar = mainWindow->statusBar();
 
     stateLabel = new QLabel("State: Disconnected", statusBar);
+    stateLabel->setObjectName(QStringLiteral("stateLabel"));
     stateLabel->setMinimumWidth(150);
     statusBar->addWidget(stateLabel);
 

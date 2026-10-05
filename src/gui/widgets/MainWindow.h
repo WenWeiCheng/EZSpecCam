@@ -98,6 +98,13 @@ private:
     void cancelDarkAcquisition(const QString &reason);
     void requestStartCapture(int captureCount);
     void refreshCalibrationDialog();
+    void updateStateLabel();
+
+    // L / S / B 选中的采集模式。这是常驻状态，挂在状态栏那条常驻带子上；
+    // 早先它走 QStatusBar::showMessage() 当 3 秒提示，而那条提示会把常驻
+    // widget 全藏起来，随后 setCrosshairInfo() 又无条件 setVisible(true)
+    // 把十字线读数拉回同一块矩形，两段文字就叠在了一起。
+    enum class CaptureMode { None, Live, Single, Burst };
 
     QElapsedTimer m_frameTimer;
     static constexpr int MIN_FRAME_INTERVAL_MS = 33;
@@ -126,6 +133,10 @@ private:
     int m_autoSaveFrameCounter = 0;
     //! 当前是否停在 imageView。直方图入口只在这个模式下可点
     bool m_imageViewActive = false;
+
+    // 状态栏那一格显示的东西：相机状态 + 当前采集模式
+    QString m_cameraStateText;
+    CaptureMode m_captureMode = CaptureMode::None;
 
     QDateTime m_launchTimestamp;
     QString m_autoSaveDir;
