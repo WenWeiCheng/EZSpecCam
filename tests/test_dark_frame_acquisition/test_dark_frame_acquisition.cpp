@@ -6,6 +6,11 @@
 // elements and the very next statement indexed it out of bounds. Nothing
 // covered this path, so it shipped. These tests drive the real burst and check
 // both that it survives and that the running average is correct.
+//
+// The last case is about where the burst is *started from*: the acquisition
+// controls now live inside the Calibration dialog (reached from
+// Process -> Calibration), so that a freshly acquired dark frame can be
+// enabled from the same window.
 #include <QObject>
 #include <QApplication>
 #include <QTest>
@@ -14,8 +19,15 @@
 #include <QDialog>
 #include <QDateTime>
 #include <QDebug>
+#include <QCheckBox>
+#include <QLineEdit>
+#include <QMenu>
+#include <QMenuBar>
+#include <QPushButton>
+#include <QSignalSpy>
 
 #include "widgets/MainWindow.h"
+#include "widgets/dialogs/CalibrationDialog.h"
 #include "widgets/display/ImageViewWidget.h"
 #include "CameraTypes.h"
 
@@ -32,12 +44,16 @@ private slots:
     void test_burst_does_not_crash();
     void test_burst_averages_pixels();
     void test_burst_handles_odd_and_even_widths();
+    void test_acquire_moved_into_calibration_dialog();
+    void test_acquired_dark_is_enabled_from_the_same_dialog();
 
 private:
     // Runs a full burst of `frames` Grayscale16 frames whose every pixel is
     // (baseValue + i) for frame i, and returns the running average as shown by
     // the image view. Returns a null image if the view never received one.
     QImage runBurst(MainWindow &window, int w, int h, int frames, int baseValue);
+
+    static CalibrationDialog *openCalibrationDialog(MainWindow &window);
 
     QTimer *m_modalDismiss = nullptr;
 };
@@ -72,7 +88,7 @@ void TestDarkFrameAcquisition::cleanup()
 QImage TestDarkFrameAcquisition::runBurst(MainWindow &window, int w, int h,
                                           int frames, int baseValue)
 {
-    // Same entry point as clicking "Start" in AcquireDarkFrameDialog.
+    // Same entry point as clicking "Acquire" in the Calibration dialog.
     const bool armed = QMetaObject::invokeMethod(&window,
                                                  "onAcquireDarkFrameStartRequested",
                                                  Qt::DirectConnection,
@@ -162,6 +178,105 @@ void TestDarkFrameAcquisition::test_burst_handles_odd_and_even_widths()
                  qPrintable(QStringLiteral("no frame for width %1").arg(width)));
         QCOMPARE(shown.width(), width);
     }
+}
+
+CalibrationDialog *TestDarkFrameAcquisition::openCalibrationDialog(MainWindow &window)
+{
+    if (!QMetaObject::invokeMethod(&window, "on_actionCalibration_triggered",
+                                   Qt::DirectConnection)) {
+        return nullptr;
+    }
+    QCoreApplication::processEvents();
+    return window.findChild<CalibrationDialog *>();
+}
+
+void TestDarkFrameAcquisition::test_acquire_moved_into_calibration_dialog()
+{
+    MainWindow window;
+    window.resize(1130, 870);
+    window.show();
+    QCoreApplication::processEvents();
+
+    QMenuBar *bar = window.menuBar();
+    QVERIFY(bar);
+
+    QMenu *processMenu = nullptr;
+    QMenu *cameraMenu = nullptr;
+    for (QMenu *menu : bar->findChildren<QMenu *>()) {
+        if (menu->title() == "&Process") {
+            processMenu = menu;
+        } else if (menu->title() == "&Camera") {
+            cameraMenu = menu;
+        }
+        QVERIFY2(menu->title() != "&Post-Process",
+                 "Post-Process 菜单没有改名为 Process");
+    }
+
+    QVERIFY2(processMenu, "找不到 Process 菜单");
+    QVERIFY(cameraMenu);
+
+    bool hasCalibration = false;
+    for (QAction *action : processMenu->actions()) {
+        if (action->text().contains(QStringLiteral("Calibration"))) {
+            hasCalibration = true;
+        }
+    }
+    QVERIFY2(hasCalibration, "Process 菜单里没有 Calibration");
+
+    // 采集暗帧不再是 Camera 菜单下的一项
+    for (QAction *action : cameraMenu->actions()) {
+        QVERIFY2(!action->text().contains(QStringLiteral("Dark"), Qt::CaseInsensitive),
+                 qPrintable(QStringLiteral("Camera 菜单里还留着：%1").arg(action->text())));
+    }
+
+    // 入口搬进了 Calibration 对话框
+    auto *dialog = openCalibrationDialog(window);
+    QVERIFY(dialog);
+    QVERIFY2(dialog->findChild<QPushButton *>(QStringLiteral("acquireButton")),
+             "Calibration 对话框里没有 Acquire 按钮");
+}
+
+void TestDarkFrameAcquisition::test_acquired_dark_is_enabled_from_the_same_dialog()
+{
+    MainWindow window;
+    window.resize(1130, 870);
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *dialog = openCalibrationDialog(window);
+    QVERIFY(dialog);
+
+    auto *pathField = dialog->findChild<QLineEdit *>();
+    auto *enableCheck = dialog->findChild<QCheckBox *>();
+    auto *okButton = dialog->findChild<QPushButton *>(QStringLiteral("okButton"));
+    QVERIFY(pathField);
+    QVERIFY(enableCheck);
+    QVERIFY(okButton);
+
+    // 还没采过：不能冒充已经有暗帧
+    QVERIFY(!pathField->placeholderText().contains(QStringLiteral("in-memory")));
+
+    constexpr int kFrames = 4;
+    const QImage shown = runBurst(window, 32, 24, kFrames, 100);
+    QVERIFY(!shown.isNull());
+
+    // 窗口不用关掉重开，采完当场就显示「已经采到 N 帧平均」
+    QVERIFY2(pathField->placeholderText().contains(QStringLiteral("in-memory dark frame")),
+             qPrintable(pathField->placeholderText()));
+    QVERIFY2(pathField->placeholderText().contains(QStringLiteral("4-frame average")),
+             qPrintable(pathField->placeholderText()));
+    QVERIFY(pathField->text().isEmpty());
+
+    // Enable 就在同一个窗口里，采完立刻能勾上并生效
+    QVERIFY(enableCheck->isEnabled());
+    QSignalSpy applied(dialog, &CalibrationDialog::applied);
+    enableCheck->click();
+    okButton->click();
+
+    QCOMPARE(applied.count(), 1);
+    QCOMPARE(applied.at(0).at(0).toBool(), true);
+    // 走的是内存里的暗帧，路径必须是空的
+    QCOMPARE(applied.at(0).at(1).toString(), QString());
 }
 
 QTEST_MAIN(TestDarkFrameAcquisition)

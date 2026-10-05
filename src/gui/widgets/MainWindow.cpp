@@ -11,7 +11,6 @@
 #include "display/HistogramWindow.h"
 #include "dialogs/RowRangeDialog.h"
 #include "dialogs/CalibrationDialog.h"
-#include "dialogs/AcquireDarkFrameDialog.h"
 #include "dialogs/ScaleControlDialog.h"
 #include "dialogs/DisplayStyleDialog.h"
 #include "config/CameraConfigDialog.h"
@@ -274,8 +273,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->menuActionRowRange, &QAction::triggered,
             this, &MainWindow::on_rowRange_triggered);
 
-    connect(ui->menuActionAcquireDarkFrame, &QAction::triggered,
-            this, &MainWindow::on_actionAcquireDarkFrame_triggered);
     connect(ui->menuActionCalibration, &QAction::triggered,
             this, &MainWindow::on_actionCalibration_triggered);
 
@@ -611,32 +608,28 @@ void MainWindow::on_actionConfig_triggered()
     }
     m_configDialog->show();
 }
-void MainWindow::on_actionAcquireDarkFrame_triggered()
-{
-    if (!m_appController || !m_appController->isConnected()) {
-        showStatusMessage(tr("Connect a camera before acquiring a dark frame."), 3000);
-        return;
-    }
-
-    if (!m_acquireDarkDialog) {
-        m_acquireDarkDialog = new AcquireDarkFrameDialog(this);
-        connect(m_acquireDarkDialog, &AcquireDarkFrameDialog::startRequested,
-                this, &MainWindow::onAcquireDarkFrameStartRequested);
-    }
-
-    m_acquireDarkDialog->setFrameCount(m_darkBurstTotal);
-    m_acquireDarkDialog->setAcquireInProgress(m_acquiringDark);
-    m_acquireDarkDialog->show();
-    m_acquireDarkDialog->raise();
-    m_acquireDarkDialog->activateWindow();
-}
-
 void MainWindow::on_actionCalibration_triggered()
 {
     if (!m_calibrationDialog) {
         m_calibrationDialog = new CalibrationDialog(this);
         connect(m_calibrationDialog, &CalibrationDialog::applied,
                 this, &MainWindow::onCalibrationApplied);
+        connect(m_calibrationDialog, &CalibrationDialog::acquireRequested,
+                this, &MainWindow::onAcquireDarkFrameStartRequested);
+    }
+
+    refreshCalibrationDialog();
+    m_calibrationDialog->show();
+    m_calibrationDialog->raise();
+    m_calibrationDialog->activateWindow();
+}
+
+// 窗口开着的时候状态也得跟着变：采完暗帧当场把「已经采到 N 帧平均」显示出来，
+// 用户不用关掉再打开就能勾 Enable。
+void MainWindow::refreshCalibrationDialog()
+{
+    if (!m_calibrationDialog) {
+        return;
     }
 
     m_calibrationDialog->setDarkFrameEnabled(m_darkEnabled);
@@ -648,9 +641,12 @@ void MainWindow::on_actionCalibration_triggered()
     m_calibrationDialog->setInMemoryDarkFrameUsed(
         m_darkPath.isEmpty() && m_darkFrameValid, m_darkBurstTotal);
     m_calibrationDialog->setCustomBias(m_darkBias);
-    m_calibrationDialog->show();
-    m_calibrationDialog->raise();
-    m_calibrationDialog->activateWindow();
+    m_calibrationDialog->setFrameCount(m_darkBurstTotal);
+    m_calibrationDialog->setAcquireInProgress(m_acquiringDark);
+
+    const bool connected = m_appController && m_appController->isConnected();
+    const bool capturing = connected && m_appController->state() == CameraState::Acquiring;
+    m_calibrationDialog->setAcquireEnabled(connected && !capturing && !m_acquiringDark);
 }
 
 void MainWindow::onCalibrationApplied(bool enabled, const QString &path, int bias)
@@ -690,8 +686,8 @@ void MainWindow::onAcquireDarkFrameStartRequested(int frameCount)
         Qt::QueuedConnection, Q_ARG(int, n));
 
     m_acquiringDark = true;
-    if (m_acquireDarkDialog) {
-        m_acquireDarkDialog->setAcquireInProgress(true);
+    if (m_calibrationDialog) {
+        m_calibrationDialog->setAcquireInProgress(true);
     }
 
     showStatusMessage(tr("Acquiring dark frame (%1/%2)...").arg(0).arg(n), 3000);
@@ -1054,9 +1050,8 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
                 m_darkFrame = result;
                 m_darkFrameValid = true;
                 m_acquiringDark = false;
-                if (m_acquireDarkDialog) {
-                    m_acquireDarkDialog->setAcquireInProgress(false);
-                }
+                // 窗口开着就把新采到的暗帧显示出来，用户当场能勾 Enable
+                refreshCalibrationDialog();
                 showStatusMessage(
                     tr("Dark frame acquired (%1-frame average). Use Save Frame to keep it.")
                     .arg(m_darkBurstTotal), 10000);
@@ -1146,8 +1141,8 @@ void MainWindow::cancelDarkAcquisition(const QString &reason)
     m_darkAccumInit = false;
     m_darkAccumFrames = 0;
     m_darkAccumSum.clear();
-    if (m_acquireDarkDialog) {
-        m_acquireDarkDialog->setAcquireInProgress(false);
+    if (m_calibrationDialog) {
+        m_calibrationDialog->setAcquireInProgress(false);
     }
     showStatusMessage(QString("Dark-frame acquisition cancelled: %1").arg(reason), 5000);
 }
@@ -1243,7 +1238,6 @@ void MainWindow::updateToolbarState()
         ui->toolbarActionConfig->setEnabled(false);
         ui->actionStart->setEnabled(false);
         ui->actionStop->setEnabled(false);
-        ui->menuActionAcquireDarkFrame->setEnabled(false);
         ui->menuActionCalibration->setEnabled(false);
     }
 
@@ -1252,8 +1246,11 @@ void MainWindow::updateToolbarState()
 
     ui->actionStart->setEnabled(connected && !acquiring);
     ui->actionStop->setEnabled(acquiring);
-    ui->menuActionAcquireDarkFrame->setEnabled(connected && !acquiring);
     ui->menuActionCalibration->setEnabled(connected);
+
+    if (m_calibrationDialog) {
+        m_calibrationDialog->setAcquireEnabled(connected && !acquiring && !m_acquiringDark);
+    }
 }
 
 

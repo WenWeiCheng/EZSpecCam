@@ -172,8 +172,6 @@ set(EZSPECCAM_GUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/RowRangeDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/CalibrationDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/CalibrationDialog.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/AcquireDarkFrameDialog.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/AcquireDarkFrameDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/ScaleControlDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/ScaleControlDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/DisplayStyleDialog.h

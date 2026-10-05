@@ -23,7 +23,6 @@ class HistogramWindow;
 class ScaleControlDialog;
 class DisplayStyleDialog;
 class CalibrationDialog;
-class AcquireDarkFrameDialog;
 class FileSaverWorker;
 struct ImageData;
 
@@ -81,7 +80,6 @@ private slots:
     void onSingleModeTriggered();
     void onBurstModeTriggered();
 
-    void on_actionAcquireDarkFrame_triggered();
     void on_actionCalibration_triggered();
     void onCalibrationApplied(bool enabled, const QString &path, int bias);
     void onAcquireDarkFrameStartRequested(int frameCount);
@@ -99,6 +97,7 @@ private:
     void saveFrameToFile(const QString &filePath);
     void cancelDarkAcquisition(const QString &reason);
     void requestStartCapture(int captureCount);
+    void refreshCalibrationDialog();
 
     QElapsedTimer m_frameTimer;
     static constexpr int MIN_FRAME_INTERVAL_MS = 33;
@@ -122,7 +121,6 @@ private:
     ScaleControlDialog *m_scaleDialog = nullptr;
     DisplayStyleDialog *m_displayStyleDialog = nullptr;
     CalibrationDialog *m_calibrationDialog = nullptr;
-    AcquireDarkFrameDialog *m_acquireDarkDialog = nullptr;
 
     int m_frameCount = 0;
     int m_autoSaveFrameCounter = 0;
@@ -153,7 +151,7 @@ private:
     QImage::Format m_darkAccumFormat = QImage::Format_Invalid;
     // Per-pixel (per-channel for RGB) running sum. quint64 keeps the accumulator
     // safe from wrap-around across the full range of supported frame counts
-    // (up to AcquireDarkFrameDialog::maxFrameCount) and pixel depths (8/16-bit).
+    // (up to CalibrationDialog's frame-count spin box) and pixel depths (8/16-bit).
     QVector<quint64> m_darkAccumSum;
 
     // Discriminator: when true, onFrameLoaded stores result as m_darkFrame

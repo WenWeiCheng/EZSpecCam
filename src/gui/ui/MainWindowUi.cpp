@@ -36,7 +36,6 @@ MainWindowUi::MainWindowUi(QObject *parent)
     , menuActionPostProcess(nullptr)
     , menuActionVerticalBinning(nullptr)
     , menuActionRowRange(nullptr)
-    , menuActionAcquireDarkFrame(nullptr)
     , menuActionCalibration(nullptr)
     , menuActionSaveFrameAs(nullptr)
     , menuActionAutoSaveToggle(nullptr)
@@ -104,10 +103,6 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     menuCamera->addAction(menuActionConfig);
     actionConfig = menuActionConfig;
 
-    menuCamera->addSeparator();
-    menuActionAcquireDarkFrame = new QAction("Acquire Dark Frame", mainWindow);
-    menuCamera->addAction(menuActionAcquireDarkFrame);
-
     QMenu *menuAnalyse = menuBar->addMenu("&Analyse");
     menuActionStatistics = new QAction("&Statistics", mainWindow);
     menuActionStatistics->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_A));
@@ -160,19 +155,19 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     // 默认跟着系统，设置在 MainWindow 里同步过来
     menuActionThemeSystem->setChecked(true);
 
-    QMenu *menuPostProcess = menuBar->addMenu("&Post-Process");
+    QMenu *menuProcess = menuBar->addMenu("&Process");
     menuActionVerticalBinning = new QAction("Software Vertical Binning", mainWindow);
     menuActionVerticalBinning->setShortcut(QKeySequence(Qt::Key_V));
     menuActionVerticalBinning->setShortcutContext(Qt::ApplicationShortcut);
     menuActionVerticalBinning->setCheckable(true);
-    menuPostProcess->addAction(menuActionVerticalBinning);
+    menuProcess->addAction(menuActionVerticalBinning);
 
     menuActionRowRange = new QAction("Row Range...", mainWindow);
-    menuPostProcess->addAction(menuActionRowRange);
+    menuProcess->addAction(menuActionRowRange);
 
-    menuPostProcess->addSeparator();
+    menuProcess->addSeparator();
     menuActionCalibration = new QAction("Calibration...", mainWindow);
-    menuPostProcess->addAction(menuActionCalibration);
+    menuProcess->addAction(menuActionCalibration);
     QMenu *menuHelp = menuBar->addMenu("&Help");
     menuActionAbout = new QAction("&About", mainWindow);
     menuHelp->addAction(menuActionAbout);
