@@ -1,6 +1,6 @@
 # EZSpecCam
 
-[![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 [![Qt](https://img.shields.io/badge/Qt-6.2+-green.svg)](https://www.qt.io/)
 [![C++](https://img.shields.io/badge/C++-17-blue.svg)](https://isocpp.org/)
 
@@ -161,4 +161,14 @@ Qt GUI 应用程序：相机发现、连接管理、参数配置、实时图像�
 
 ## 许可证
 
-本项目基于 BSD 3-Clause 许可证 —— 详见 [LICENSE](LICENSE)。
+本项目基于 **GNU General Public License v3.0** 发行，完整条款见 [LICENSE](LICENSE)。
+
+之所以选用 GPLv3 而不是更宽松的许可证，是因为项目内置了 [QCustomPlot](https://www.qcustomplot.com/) 2.1.1
+（`src/gui/qcustomplot.{h,cpp}`，上游原始副本，未作修改）。QCustomPlot 以 GPLv3 或商业授权双重许可，
+其源文件被直接编译进 `ezspeccam-gui` 可执行文件，因此 GPLv3 的 copyleft 条款会覆盖整个 GUI 程序。
+QCustomPlot 同时提供商业授权；若需要在保持宽松许可证的前提下闭源分发 GUI，可向其作者咨询。
+
+历史提交中，曾有以 BSD 3-Clause 发布的早期版本；自本次变更起改为 GPLv3。
+
+本程序按「原样」提供，不附带任何明示或默示担保。QCustomPlot 版权归 Emanuel Eichhammer 所有，
+其原始版权声明保留在源文件头部。
