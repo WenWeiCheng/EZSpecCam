@@ -5,6 +5,18 @@
 
 #include "../../../gui/workers/FileLoaderWorker.h"
 
+namespace {
+// 帧数上限。placeholder 的宽度按这个上限预留，所以两处必须用同一个数。
+// 注意 MainWindow::onAcquireDarkFrameStartRequested 还会把请求值夹到 1000，
+// 对话框这里仍按自己的上限显示。
+constexpr int kMaxFrameCount = 10000;
+
+// 留给 QLineEdit 边框和左右内边距的宽度。QLineEdit 放不下 placeholder 时会直接
+// 截成省略号，而它自己的 sizeHint 不看这段文字，所以宽度得自己算。
+// test_calibration_dialog 里有一份同样的数，改这里要同步改那边。
+constexpr int kPlaceholderSlack = 16;
+} // namespace
+
 CalibrationDialog::CalibrationDialog(QWidget *parent)
     : QDialog(parent)
     , m_enableCheckBox(nullptr)
@@ -19,9 +31,9 @@ CalibrationDialog::CalibrationDialog(QWidget *parent)
     , m_acquireEnabled(true)
 {
     setWindowTitle("Calibration");
-    // 够宽才放得下「(in-memory dark frame, 10-frame average)」整条提示 ——
-    // 采完暗帧之后用户第一眼看的就是这一行
-    setMinimumWidth(540);
+    // 宽度不写死：下面会按当前字体把路径框撑到刚好放得下最长的那条提示，
+    // 由 QFormLayout 顺势把窗口顶开，换字体也不会截断
+    setMinimumWidth(360);
     // 采暗帧时主窗口还得能用（按 Stop、看实时画面），所以不能挡住主窗口
     setModal(false);
 
@@ -33,6 +45,15 @@ CalibrationDialog::CalibrationDialog(QWidget *parent)
     m_pathLineEdit = new QLineEdit(this);
     m_pathLineEdit->setReadOnly(true);
     m_pathLineEdit->setPlaceholderText(tr("(no dark frame selected)"));
+    // QLineEdit 的 sizeHint 不看 placeholder 文字，窗口开到多宽都可能把提示
+    // 截成「(in-memory dark frame, …」。而这一行恰恰是采完暗帧之后用户第一眼
+    // 要读的，所以按当前字体把最长的一条量出来当最小宽度 —— 写死像素换个字体
+    // 就对不上了。留给 QFormLayout 撑开对话框，这里不再写死窗口宽度。
+    const QString widestPlaceholder = tr("(in-memory dark frame, %1-frame average)")
+                                          .arg(kMaxFrameCount);
+    m_pathLineEdit->setMinimumWidth(m_pathLineEdit->fontMetrics().horizontalAdvance(
+                                        widestPlaceholder)
+                                    + kPlaceholderSlack);
     m_browseButton = new QPushButton(tr("Browse..."), this);
     m_browseButton->setObjectName("browseButton");
 
@@ -46,7 +67,7 @@ CalibrationDialog::CalibrationDialog(QWidget *parent)
     // 不用来回切窗口。
     m_frameCountSpinBox = new QSpinBox(this);
     m_frameCountSpinBox->setMinimum(1);
-    m_frameCountSpinBox->setMaximum(10000);
+    m_frameCountSpinBox->setMaximum(kMaxFrameCount);
     m_frameCountSpinBox->setValue(10);
     m_frameCountSpinBox->setSingleStep(1);
     m_frameCountSpinBox->setObjectName("frameCountSpinBox");

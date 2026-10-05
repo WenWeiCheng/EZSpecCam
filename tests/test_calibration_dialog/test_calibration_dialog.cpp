@@ -5,6 +5,7 @@
 // stay locked while no camera is connected, and the in-memory marker must
 // never leak into the persisted path.
 #include <QCheckBox>
+#include <QCoreApplication>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSignalSpy>
@@ -37,6 +38,7 @@ private slots:
     void test_frame_count_locked_while_running();
     void test_in_memory_marker_never_becomes_the_path();
     void test_applied_reports_enable_and_bias();
+    void test_in_memory_placeholder_is_not_truncated();
 };
 
 void TestCalibrationDialog::test_acquire_emits_requested_frame_count()
@@ -149,6 +151,33 @@ void TestCalibrationDialog::test_applied_reports_enable_and_bias()
     QCOMPARE(spy.at(0).at(0).toBool(), true);
     QCOMPARE(spy.at(0).at(1).toString(), QString());
     QCOMPARE(spy.at(0).at(2).toInt(), 250);
+}
+
+// 「in-memory dark frame, N-frame average」是采完暗帧之后用户第一眼要读的
+// 一行，QLineEdit 一旦放不下就会截成「(in-memory dark frame, …」，而窗口宽度
+// 又跟着系统字体走，写死像素换个平台就对不上。这里按当前字体直接量：提示的
+// 宽度必须能整个放进输入框。
+void TestCalibrationDialog::test_in_memory_placeholder_is_not_truncated()
+{
+    CalibrationDialog dialog;
+
+    auto *path = dialog.findChild<QLineEdit *>();
+    QVERIFY(path);
+    auto *spin = frameCountSpinOf(&dialog);
+    QVERIFY(spin);
+
+    // 用上限去试：位数最多的那条提示才是最窄的窗口也要放得下的一条
+    dialog.setInMemoryDarkFrameUsed(true, spin->maximum());
+    dialog.show();
+    QCoreApplication::processEvents();
+
+    // 16 和 CalibrationDialog.cpp 里的 kPlaceholderSlack 是同一个数：
+    // 留给 QLineEdit 边框和左右内边距的宽度
+    const int available = path->width() - 16;
+    const int needed = path->fontMetrics().horizontalAdvance(path->placeholderText());
+    QVERIFY2(needed <= available,
+             qPrintable(QStringLiteral("提示被截断：需要 %1px，输入框只有 %2px（%3）")
+                            .arg(needed).arg(available).arg(path->placeholderText())));
 }
 
 QTEST_MAIN(TestCalibrationDialog)
