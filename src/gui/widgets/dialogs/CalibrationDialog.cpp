@@ -6,11 +6,6 @@
 #include "../../../gui/workers/FileLoaderWorker.h"
 
 namespace {
-// 帧数上限。placeholder 的宽度按这个上限预留，所以两处必须用同一个数。
-// 注意 MainWindow::onAcquireDarkFrameStartRequested 还会把请求值夹到 1000，
-// 对话框这里仍按自己的上限显示。
-constexpr int kMaxFrameCount = 10000;
-
 // 留给 QLineEdit 边框和左右内边距的宽度。QLineEdit 放不下 placeholder 时会直接
 // 截成省略号，而它自己的 sizeHint 不看这段文字，所以宽度得自己算。
 // test_calibration_dialog 里有一份同样的数，改这里要同步改那边。

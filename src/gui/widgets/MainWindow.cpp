@@ -672,9 +672,9 @@ void MainWindow::onAcquireDarkFrameStartRequested(int frameCount)
         showStatusMessage(tr("Dark-frame acquisition already in progress."), 2000);
         return;
     }
-    int n = frameCount;
-    if (n < 1) n = 1;
-    if (n > 1000) n = 1000;
+    // 对话框的输入范围就是 CalibrationDialog::kMaxFrameCount，这里再夹一次是
+    // 防止别的调用方（测试、快捷键）绕过它。真夹到了说明上游放进了超范围的数。
+    const int n = qBound(1, frameCount, CalibrationDialog::kMaxFrameCount);
 
     m_darkBurstTotal = n;
     m_darkBurstRemaining = n;

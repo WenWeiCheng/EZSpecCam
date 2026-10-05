@@ -14,6 +14,10 @@ class CalibrationDialog : public QDialog
     Q_OBJECT
 
 public:
+    //! 一次 burst 能采的帧数上限。对话框的输入范围和 MainWindow 的夹取都以
+    //! 它为准，两边各写一个数字早晚会对不上。
+    static constexpr int kMaxFrameCount = 1000;
+
     explicit CalibrationDialog(QWidget *parent = nullptr);
     ~CalibrationDialog() override;
 

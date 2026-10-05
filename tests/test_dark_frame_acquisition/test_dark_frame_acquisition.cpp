@@ -25,6 +25,7 @@
 #include <QMenuBar>
 #include <QPushButton>
 #include <QSignalSpy>
+#include <QStatusBar>
 
 #include "widgets/MainWindow.h"
 #include "widgets/dialogs/CalibrationDialog.h"
@@ -45,6 +46,7 @@ private slots:
     void test_burst_averages_pixels();
     void test_burst_handles_odd_and_even_widths();
     void test_acquire_moved_into_calibration_dialog();
+    void test_burst_request_above_the_limit_is_clamped();
     void test_acquired_dark_is_enabled_from_the_same_dialog();
 
 private:
@@ -178,6 +180,27 @@ void TestDarkFrameAcquisition::test_burst_handles_odd_and_even_widths()
                  qPrintable(QStringLiteral("no frame for width %1").arg(width)));
         QCOMPARE(shown.width(), width);
     }
+}
+
+// 请求一个远超上限的帧数，MainWindow 必须按 CalibrationDialog::kMaxFrameCount
+// 夹住，状态栏上写出来的就是夹取之后的帧数。
+//
+// 注意这条只锁住「行为」，锁不住「数字的出处」：曾把 MainWindow 里的常量换回
+// 字面量 1000 重跑，因为常量本身也是 1000，这条照样通过。真正防漂移的是两边
+// 共用同一个常量这一件事本身。
+void TestDarkFrameAcquisition::test_burst_request_above_the_limit_is_clamped()
+{
+    MainWindow window;
+    window.resize(1130, 870);
+    window.show();
+    QCoreApplication::processEvents();
+
+    QVERIFY(QMetaObject::invokeMethod(&window, "onAcquireDarkFrameStartRequested",
+                                      Qt::DirectConnection, Q_ARG(int, 999999)));
+
+    const QString message = window.statusBar()->currentMessage();
+    QVERIFY2(message.contains(QStringLiteral("/%1").arg(CalibrationDialog::kMaxFrameCount)),
+             qPrintable(QStringLiteral("状态栏没写夹取后的帧数：%1").arg(message)));
 }
 
 CalibrationDialog *TestDarkFrameAcquisition::openCalibrationDialog(MainWindow &window)

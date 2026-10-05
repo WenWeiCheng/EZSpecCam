@@ -151,7 +151,7 @@ private:
     QImage::Format m_darkAccumFormat = QImage::Format_Invalid;
     // Per-pixel (per-channel for RGB) running sum. quint64 keeps the accumulator
     // safe from wrap-around across the full range of supported frame counts
-    // (up to CalibrationDialog's frame-count spin box) and pixel depths (8/16-bit).
+    // (CalibrationDialog::kMaxFrameCount) and pixel depths (8/16-bit).
     QVector<quint64> m_darkAccumSum;
 
     // Discriminator: when true, onFrameLoaded stores result as m_darkFrame

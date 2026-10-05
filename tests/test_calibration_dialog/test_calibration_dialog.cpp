@@ -39,6 +39,7 @@ private slots:
     void test_in_memory_marker_never_becomes_the_path();
     void test_applied_reports_enable_and_bias();
     void test_in_memory_placeholder_is_not_truncated();
+    void test_frame_count_cannot_exceed_the_shared_limit();
 };
 
 void TestCalibrationDialog::test_acquire_emits_requested_frame_count()
@@ -178,6 +179,26 @@ void TestCalibrationDialog::test_in_memory_placeholder_is_not_truncated()
     QVERIFY2(needed <= available,
              qPrintable(QStringLiteral("提示被截断：需要 %1px，输入框只有 %2px（%3）")
                             .arg(needed).arg(available).arg(path->placeholderText())));
+}
+
+// MainWindow::onAcquireDarkFrameStartRequested 按 CalibrationDialog::kMaxFrameCount
+// 夹取请求值。对话框要是能吐出更大的数，用户填 5000、实际采 1000，界面上却
+// 一点提示都没有 —— 所以输入框的范围必须就是那个上限。
+void TestCalibrationDialog::test_frame_count_cannot_exceed_the_shared_limit()
+{
+    CalibrationDialog dialog;
+    auto *spin = frameCountSpinOf(&dialog);
+    QVERIFY(spin);
+
+    QCOMPARE(spin->minimum(), 1);
+    QCOMPARE(spin->maximum(), CalibrationDialog::kMaxFrameCount);
+
+    spin->setValue(999999);
+    QCOMPARE(spin->value(), CalibrationDialog::kMaxFrameCount);
+
+    spin->setValue(0);
+    QCOMPARE(spin->value(), 1);
+    QCOMPARE(dialog.frameCount(), 1);
 }
 
 QTEST_MAIN(TestCalibrationDialog)
