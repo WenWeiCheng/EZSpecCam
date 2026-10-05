@@ -25,6 +25,12 @@ public:
     CameraConfigDialogUi *getUi() const { return ui; }
     int getCaptureCount() const;
 
+    QString getCaptureMode() const;
+    void setCaptureMode(const QString &mode);
+
+signals:
+    void captureModeChanged(const QString &mode);
+
 protected:
     void showEvent(QShowEvent *event) override;
     bool eventFilter(QObject *obj, QEvent *event) override;

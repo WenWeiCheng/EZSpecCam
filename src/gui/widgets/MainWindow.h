@@ -85,6 +85,16 @@ private slots:
     void onAcquireDarkFrameStartRequested(int frameCount);
 
 private:
+    // L / S / B 选中的采集模式。这是常驻状态，挂在状态栏那条常驻带子上；
+    // 早先它走 QStatusBar::showMessage() 当 3 秒提示，而那条提示会把常驻
+    // widget 全藏起来，随后 setCrosshairInfo() 又无条件 setVisible(true)
+    // 把十字线读数拉回同一块矩形，两段文字就叠在了一起。
+    //
+    // 出处仍然是 Config 对话框里的「Capture Mode」下拉框：快捷键改的就是
+    // 那个下拉框，这里只是把它读回来显示。默认 Single，和下拉框的初始值一致，
+    // 所以对话框还没打开过时状态栏上也是有内容的。
+    enum class CaptureMode { None, Live, Single, Burst };
+
     void restoreTheme();
     void setThemeMode(Theme::Mode mode);
     void syncThemeMenu();
@@ -99,12 +109,9 @@ private:
     void requestStartCapture(int captureCount);
     void refreshCalibrationDialog();
     void updateStateLabel();
-
-    // L / S / B 选中的采集模式。这是常驻状态，挂在状态栏那条常驻带子上；
-    // 早先它走 QStatusBar::showMessage() 当 3 秒提示，而那条提示会把常驻
-    // widget 全藏起来，随后 setCrosshairInfo() 又无条件 setVisible(true)
-    // 把十字线读数拉回同一块矩形，两段文字就叠在了一起。
-    enum class CaptureMode { None, Live, Single, Burst };
+    void applyCaptureMode(CaptureMode mode);
+    int captureCountForMode(CaptureMode mode) const;
+    static QString captureModeName(CaptureMode mode);
 
     QElapsedTimer m_frameTimer;
     static constexpr int MIN_FRAME_INTERVAL_MS = 33;
@@ -136,7 +143,7 @@ private:
 
     // 状态栏那一格显示的东西：相机状态 + 当前采集模式
     QString m_cameraStateText;
-    CaptureMode m_captureMode = CaptureMode::None;
+    CaptureMode m_captureMode = CaptureMode::Single;
 
     QDateTime m_launchTimestamp;
     QString m_autoSaveDir;

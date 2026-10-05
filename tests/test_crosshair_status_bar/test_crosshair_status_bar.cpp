@@ -4,6 +4,10 @@
 // crosshair existed, so the status bar always reserved 150 px for a dash.
 // It is now hidden until a crosshair is actually placed, which is a behaviour
 // only observable on a real MainWindow.
+//
+// The capture-mode tests live here too: the mode moved out of
+// QStatusBar::showMessage() and into the state label, because the notice and
+// the readout were being painted into the same rectangle.
 #include <QApplication>
 #include <QImage>
 #include <QLabel>
@@ -12,7 +16,21 @@
 #include <QTimer>
 
 #include "widgets/MainWindow.h"
+#include "widgets/config/CameraConfigDialog.h"
+#include "widgets/config/CameraTab.h"
 #include "widgets/display/ImageViewWidget.h"
+#include "ui/CameraConfigDialogUi.h"
+
+// 状态栏里有好几个 QLabel，「State:」开头的那一格才是状态
+static QString stateLabelTextOf(MainWindow &window)
+{
+    for (QLabel *candidate : window.findChildren<QLabel *>()) {
+        if (candidate->text().startsWith(QStringLiteral("State:"))) {
+            return candidate->text();
+        }
+    }
+    return QString();
+}
 
 class TestCrosshairStatusBar : public QObject
 {
@@ -27,7 +45,8 @@ private slots:
     void test_hidden_again_after_clearing();
     void test_reappears_when_a_second_crosshair_is_added();
     void test_capture_mode_never_takes_over_the_crosshair_strip();
-    void test_capture_mode_is_shown_in_the_state_label();
+    void test_capture_mode_is_always_shown_in_the_state_label();
+    void test_capture_mode_shortcut_syncs_the_config_dialog();
 
 private:
     QTimer *m_modalDismiss = nullptr;
@@ -202,7 +221,10 @@ void TestCrosshairStatusBar::test_capture_mode_never_takes_over_the_crosshair_st
     }
 }
 
-void TestCrosshairStatusBar::test_capture_mode_is_shown_in_the_state_label()
+// Mode 是常驻状态，不是按了快捷键才出现：窗口刚起来、Config 对话框还没打开
+// 时它就该在那一格里，而且要跟着对话框里的下拉框走 —— 用户在对话框里改模式，
+// 不用再按一次快捷键。
+void TestCrosshairStatusBar::test_capture_mode_is_always_shown_in_the_state_label()
 {
     MainWindow window;
     window.resize(1130, 870);
@@ -218,19 +240,73 @@ void TestCrosshairStatusBar::test_capture_mode_is_shown_in_the_state_label()
         }
     }
     QVERIFY2(stateLabel, "状态栏里没有 'State:' 那一格");
-    QCOMPARE(stateLabel->text(), QString("State: Disconnected"));
 
+    // 默认就是 Single，和 Config 里下拉框的初始值一致
+    QCOMPARE(stateLabel->text(), QString("State: Disconnected · Mode: Single"));
+
+    struct { const char *slot; const char *expected; } cases[] = {
+        {"onBurstModeTriggered", "Mode: Burst"},
+        {"onLiveModeTriggered",  "Mode: Live"},
+        {"onSingleModeTriggered", "Mode: Single"},
+    };
+    for (const auto &c : cases) {
+        QVERIFY(QMetaObject::invokeMethod(&window, c.slot, Qt::DirectConnection));
+        QCoreApplication::processEvents();
+        QVERIFY2(stateLabel->text().endsWith(c.expected),
+                 qPrintable(QStringLiteral("%1 之后是「%2」，应以「%3」结尾")
+                                .arg(c.slot, stateLabel->text(), c.expected)));
+    }
+}
+
+// 快捷键改的就是 Config 对话框里那个下拉框，不是 MainWindow 自己的一份。
+// 帧数也跟着走对话框的设置：burst 不再写死 5。
+void TestCrosshairStatusBar::test_capture_mode_shortcut_syncs_the_config_dialog()
+{
+    MainWindow window;
+    window.resize(1130, 870);
+    window.show();
+    QCoreApplication::processEvents();
+
+    QVERIFY(QMetaObject::invokeMethod(&window, "on_actionConfig_triggered",
+                                      Qt::DirectConnection));
+    QCoreApplication::processEvents();
+
+    auto *config = window.findChild<CameraConfigDialog *>();
+    QVERIFY2(config, "Config 对话框没有创建出来");
+    auto *tab = config->getUi()->cameraTab;
+    QVERIFY(tab);
+    auto *countSpin = tab->ui->captureCountSpinBox;
+    QVERIFY(countSpin);
+
+    struct { const char *slot; const char *mode; } cases[] = {
+        {"onBurstModeTriggered",   "Burst"},
+        {"onLiveModeTriggered",    "Live"},
+        {"onSingleModeTriggered",  "Single"},
+    };
+    for (const auto &c : cases) {
+        QVERIFY(QMetaObject::invokeMethod(&window, c.slot, Qt::DirectConnection));
+        QCoreApplication::processEvents();
+        QVERIFY2(config->getCaptureMode() == QLatin1String(c.mode),
+                 qPrintable(QStringLiteral("%1 之后对话框里是「%2」，应为「%3」")
+                                .arg(c.slot, config->getCaptureMode(), c.mode)));
+    }
+
+    // 把 burst 帧数改成 7：按 B 之后 MainWindow 读到的必须是 7，不是写死的 5。
+    // 注意这条只锁住「读数取自对话框」这件事的前提 —— 真正发出去的那个 count
+    // 在没有相机时观察不到（AppController::startCapture 未连接就提前返回），
+    // 这一点没法在无硬件时断言。
+    countSpin->setValue(7);
     QVERIFY(QMetaObject::invokeMethod(&window, "onBurstModeTriggered",
                                       Qt::DirectConnection));
     QCoreApplication::processEvents();
-    QVERIFY2(stateLabel->text().endsWith(QString("Mode: Burst (5)")),
-             qPrintable(stateLabel->text()));
+    QCOMPARE(config->getCaptureMode(), QString("Burst"));
+    QCOMPARE(config->getCaptureCount(), 7);
 
-    QVERIFY(QMetaObject::invokeMethod(&window, "onLiveModeTriggered",
-                                      Qt::DirectConnection));
+    // 反过来：直接在对话框里改模式，状态栏要跟着变
+    tab->setCaptureMode(QStringLiteral("Live"));
     QCoreApplication::processEvents();
-    QVERIFY2(stateLabel->text().endsWith(QString("Mode: Live")),
-             qPrintable(stateLabel->text()));
+    QVERIFY2(stateLabelTextOf(window).endsWith("Mode: Live"),
+             qPrintable(stateLabelTextOf(window)));
 }
 
 QTEST_MAIN(TestCrosshairStatusBar)

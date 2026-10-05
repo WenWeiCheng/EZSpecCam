@@ -39,6 +39,12 @@ CameraConfigDialog::CameraConfigDialog(QWidget *parent)
 {
     ui->setupUi(this);
     qApp->installEventFilter(this);
+
+    // 转发出来给 MainWindow：它状态栏上的 Mode 要跟着这里一直走
+    if (ui->cameraTab) {
+        connect(ui->cameraTab, &CameraTab::captureModeChanged,
+                this, &CameraConfigDialog::captureModeChanged);
+    }
 }
 
 CameraConfigDialog::~CameraConfigDialog()
@@ -100,6 +106,21 @@ int CameraConfigDialog::getCaptureCount() const
         return ui->cameraTab->getCaptureCount();
     }
     return 0;
+}
+
+QString CameraConfigDialog::getCaptureMode() const
+{
+    if (ui && ui->cameraTab) {
+        return ui->cameraTab->getCaptureMode();
+    }
+    return QStringLiteral("Single");
+}
+
+void CameraConfigDialog::setCaptureMode(const QString &mode)
+{
+    if (ui && ui->cameraTab) {
+        ui->cameraTab->setCaptureMode(mode);
+    }
 }
 
 void CameraConfigDialog::on_buttonBox_accepted()

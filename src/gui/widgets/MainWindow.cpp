@@ -611,6 +611,19 @@ void MainWindow::on_actionConfig_triggered()
         connect(dataTab, &DataTab::autoSaveToggled,
                 ui->menuActionAutoSaveToggle, &QAction::setChecked);
     }
+    // 状态栏上的 Mode 要一直跟着对话框里那个下拉框走：用户在对话框里改了，
+    // 不用再按一次快捷键
+    connect(m_configDialog, &CameraConfigDialog::captureModeChanged,
+            this, [this](const QString &mode) {
+                if (mode == QStringLiteral("Live")) {
+                    m_captureMode = CaptureMode::Live;
+                } else if (mode == QStringLiteral("Single")) {
+                    m_captureMode = CaptureMode::Single;
+                } else if (mode == QStringLiteral("Burst")) {
+                    m_captureMode = CaptureMode::Burst;
+                }
+                updateStateLabel();
+            });
     m_configDialog->show();
 }
 void MainWindow::on_actionCalibration_triggered()
@@ -1216,46 +1229,79 @@ void MainWindow::on_histogram_triggered()
 void MainWindow::updateStateLabel()
 {
     QString text = tr("State: %1").arg(m_cameraStateText);
-    switch (m_captureMode) {
+    if (m_captureMode != CaptureMode::None) {
+        text += tr(" · Mode: %1").arg(captureModeName(m_captureMode));
+    }
+    ui->stateLabel->setText(text);
+}
+
+QString MainWindow::captureModeName(CaptureMode mode)
+{
+    switch (mode) {
     case CaptureMode::Live:
-        text += tr(" · Mode: Live");
-        break;
+        return tr("Live");
     case CaptureMode::Single:
-        text += tr(" · Mode: Single");
-        break;
+        return tr("Single");
     case CaptureMode::Burst:
-        text += tr(" · Mode: Burst (5)");
-        break;
+        return tr("Burst");
     case CaptureMode::None:
         break;
     }
-    ui->stateLabel->setText(text);
+    return QString();
+}
+
+int MainWindow::captureCountForMode(CaptureMode mode) const
+{
+    // 帧数一律取自 Config 对话框，和「Start」按钮走的是同一份设置。对话框
+    // 还没被打开过时没有可读的值，用 CameraTab 的初始值兜底（模式默认
+    // Single，帧数默认 5）
+    if (m_configDialog) {
+        return m_configDialog->getCaptureCount();
+    }
+    switch (mode) {
+    case CaptureMode::Live:
+        return 0;
+    case CaptureMode::Single:
+        return 1;
+    case CaptureMode::Burst:
+        return 5;
+    case CaptureMode::None:
+        break;
+    }
+    return 1;
+}
+
+void MainWindow::applyCaptureMode(CaptureMode mode)
+{
+    m_captureMode = mode;
+    updateStateLabel();
+
+    // 先把下拉框改过去再读帧数 —— getCaptureCount() 是按下拉框当前那一项
+    // 算出来的，顺序反了读到的就是上一个模式的帧数
+    if (m_configDialog) {
+        m_configDialog->setCaptureMode(captureModeName(mode));
+    }
+    requestStartCapture(captureCountForMode(mode));
 }
 
 void MainWindow::onLiveModeTriggered()
 {
     if (m_appController) {
-        m_captureMode = CaptureMode::Live;
-        updateStateLabel();
-        requestStartCapture(0);
+        applyCaptureMode(CaptureMode::Live);
     }
 }
 
 void MainWindow::onSingleModeTriggered()
 {
     if (m_appController) {
-        m_captureMode = CaptureMode::Single;
-        updateStateLabel();
-        requestStartCapture(1);
+        applyCaptureMode(CaptureMode::Single);
     }
 }
 
 void MainWindow::onBurstModeTriggered()
 {
     if (m_appController) {
-        m_captureMode = CaptureMode::Burst;
-        updateStateLabel();
-        requestStartCapture(5);
+        applyCaptureMode(CaptureMode::Burst);
     }
 }
 

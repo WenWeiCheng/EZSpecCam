@@ -8,6 +8,7 @@
 #include <QIcon>
 #include <QActionGroup>
 #include <QApplication>
+#include <qnamespace.h>
 
 MainWindowUi::MainWindowUi(QObject *parent)
     : m_parent(parent)
@@ -197,30 +198,44 @@ void MainWindowUi::createToolBar(QMainWindow *mainWindow)
     toolBar->addAction(actionStop);
 }
 
+static QFrame* createMarginFrame(QWidget *parent, int width)
+{
+    QFrame *frame = new QFrame(parent);
+    frame->setFixedWidth(width);
+    return frame;
+}
+
 void MainWindowUi::createStatusBar(QMainWindow *mainWindow)
 {
     QStatusBar *statusBar = mainWindow->statusBar();
 
     stateLabel = new QLabel("State: Disconnected", statusBar);
     stateLabel->setObjectName(QStringLiteral("stateLabel"));
-    stateLabel->setMinimumWidth(150);
     statusBar->addWidget(stateLabel);
+    statusBar->addPermanentWidget(createMarginFrame(statusBar, 10));
 
     coordLabel = new QLabel(QString(), statusBar);
     coordLabel->setObjectName(QStringLiteral("coordLabel"));
-    coordLabel->setMinimumWidth(150);
-    statusBar->addWidget(coordLabel);
-    // 还没有十字线时不占位：隐藏会让布局把它的 150 像素一并收回去，
-    // 而不是留下一个空标签。初始状态也走 setCrosshairInfo，可见性只有
-    // 这一处说了算
+    statusBar->addPermanentWidget(createMarginFrame(statusBar, 10));
+    statusBar->addPermanentWidget(coordLabel);
+    statusBar->addPermanentWidget(createMarginFrame(statusBar, 10));
+
+    // 还没有十字线时不占位：隐藏会让布局把它的宽度一并收回去，而不是留下
+    // 一个空标签。初始状态也走 setCrosshairInfo，可见性只有这一处说了算。
+    //
+    // 用 addPermanentWidget 而不是 addWidget：showMessage() 这类临时提示会把
+    // addWidget 加进去的 widget 全藏起来、在它们原来的矩形上画提示文字，读数
+    // 若被 setCrosshairInfo() 里的 setVisible(true) 拉回来，两段文字就会
+    // 叠在同一块矩形上。常驻 widget 不受 showMessage() 影响。
     setCrosshairInfo(QString());
 
     fpsLabel = new QLabel("FPS: 0", statusBar);
-    fpsLabel->setMinimumWidth(80);
+    statusBar->addPermanentWidget(createMarginFrame(statusBar, 10));
     statusBar->addPermanentWidget(fpsLabel);
+    statusBar->addPermanentWidget(createMarginFrame(statusBar, 10));
 
     frameCountLabel = new QLabel("Frames: 0", statusBar);
-    frameCountLabel->setAlignment(Qt::AlignRight);
+    statusBar->addPermanentWidget(createMarginFrame(statusBar, 10));
     statusBar->addPermanentWidget(frameCountLabel);
 }
 

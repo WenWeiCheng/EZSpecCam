@@ -36,7 +36,15 @@ public:
 
     int getCaptureCount() const;
 
+    // 「Capture Mode」下拉框是采集模式的唯一出处：L / S / B 快捷键改的就是它，
+    // MainWindow 状态栏上显示的 Mode 也是从它来的
+    QString getCaptureMode() const;
+    void setCaptureMode(const QString &mode);
+
     CameraTabUi *ui = nullptr;
+
+signals:
+    void captureModeChanged(const QString &mode);
 
 protected slots:
     void onScanButtonClicked();

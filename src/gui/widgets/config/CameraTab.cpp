@@ -188,6 +188,32 @@ void CameraTab::onCaptureModeChanged(int index)
         ui->formLayout->setRowVisible(ui->m_countRow, isBurst);
 #endif
     }
+    emit captureModeChanged(getCaptureMode());
+}
+
+QString CameraTab::getCaptureMode() const
+{
+    if (!ui->captureModeComboBox) {
+        return QStringLiteral("Single");
+    }
+    return ui->captureModeComboBox->currentText();
+}
+
+void CameraTab::setCaptureMode(const QString &mode)
+{
+    if (!ui->captureModeComboBox) {
+        return;
+    }
+    const int index = ui->captureModeComboBox->findText(mode);
+    if (index < 0) {
+        return;
+    }
+    // 已经是这一项就别再动，setCurrentIndex 相同值虽不复发信号，但这里
+    // 保持「改了什么就发什么」的语义更清楚
+    if (ui->captureModeComboBox->currentIndex() == index) {
+        return;
+    }
+    ui->captureModeComboBox->setCurrentIndex(index);
 }
 
 void CameraTab::applyCaptureMode()
@@ -214,7 +240,7 @@ int CameraTab::getCaptureCount() const
     if (!ui->captureModeComboBox) {
         return 0;
     }
-    QString mode = ui->captureModeComboBox->currentText();
+    const QString mode = getCaptureMode();
     if (mode == QStringLiteral("Live")) {
         return 0;
     }
