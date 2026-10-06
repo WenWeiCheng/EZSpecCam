@@ -16,6 +16,11 @@ constexpr double kLogRangeLower = 1.0;
 // 框选缩放后至少保留几个箱。再小的话横坐标的刻度间距会掉到 1 以下，
 // 刻度位置就成了 12.1、12.2 这种，分数标签和重复标签一起冒出来
 constexpr int kMinZoomBins = 4;
+// 柱子的不透明度。不给满是为了让密集的柱子不糊成一块死板的色带，
+// 留一点透能看到相邻箱之间的台阶；但也别调太低 —— 太透时柱子比网格线
+// 还弱，矮箱子就直接看不见了。190 是 0-255 的绝对 alpha 值，
+// 除以 255 约合 0.745，也就是「约四分之三不透明度」
+constexpr int kBarAlpha = 190;
 } // namespace
 
 HistogramViewWidget::HistogramViewWidget(QWidget *parent)
@@ -51,6 +56,7 @@ void HistogramViewWidget::setupPlot()
     // 相邻箱子共用边线，不描边才不会在密的时候显出一条条竖线
     m_bars->setPen(Qt::NoPen);
     m_bars->setBaseValue(0.0);
+    m_bars->setAntialiased(false);
 
     m_plot->axisRect()->setupFullAxesBox(true);
     m_plot->xAxis->setLabel(m_xAxisLabel);
@@ -72,7 +78,11 @@ void HistogramViewWidget::applyTheme()
 {
     const Theme::PlotColors &c = Theme::instance()->plotColors();
     Theme::instance()->applyToPlot(m_plot);
-    m_bars->setBrush(QBrush(c.curve));
+    // 透明度只调柱子自己：曲线色是全不透明的，alpha 只在构造副本上改，
+    // 不能就地改 c.curve —— 那是 Theme 里的共享色，动了会波及别的控件
+    QColor barColor = c.curve;
+    barColor.setAlpha(kBarAlpha);
+    m_bars->setBrush(QBrush(barColor));
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
