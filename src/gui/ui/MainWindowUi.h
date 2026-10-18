@@ -58,6 +58,8 @@ public:
     QAction *menuActionPostProcess;
     QAction *menuActionVerticalBinning;
     QAction *menuActionRowRange;
+    QAction *menuActionDespike;
+    QAction *menuActionDespikeSettings;
     QAction *menuActionCalibration;
 
     QLabel *stateLabel;

@@ -31,9 +31,11 @@ gui/
     │   ├── HistogramViewWidget  # Bar-chart plot (histogram only)
     │   ├── HistogramWindow      # Histogram + overexposure statistics
     │   └── StatisticsDialog     # Frame statistics
+    ├── PostProcess.cpp/h        # Algorithms: vertical binning, dark calibration, despike
     └── dialogs/                 # Utility dialogs
         ├── CustomRangeDialog    # Custom spectrum range input
-        └── RowRangeDialog       # Row binning range input
+        ├── RowRangeDialog       # Row binning range input
+        └── DespikeDialog        # Spectrum despike parameters (3 params only)
 ```
 
 ## WHERE TO LOOK
@@ -45,6 +47,7 @@ gui/
 | Frame rendering | `widgets/display/ImageViewWidget.cpp` |
 | Spectrum display | `widgets/display/SpectrumViewWidget.cpp` |
 | Histogram + overexposure count | `widgets/display/HistogramWindow.cpp` |
+| Spectrum despike (algorithm + params window) | `widgets/PostProcess.cpp`, `widgets/dialogs/DespikeDialog.cpp` |
 | Dynamic parameter widgets | `widgets/config/ParameterWidgetFactory.cpp` |
 | Colours (GUI chrome + plots) | `Theme.cpp` |
 
@@ -62,6 +65,10 @@ gui/
   is `-inf`, which destroys the bar geometry. `HistogramViewWidget` therefore
   moves the bar base up to the axis lower bound while the log scale is on
   (`kLogBase`), which also makes zero-count bins draw as nothing
+- Despike is display-only and only wired into the main spectrum view: the toggle
+  lives in `SpectrumViewWidget` (raw data cached in `m_rawYData`), so toggling it
+  or changing its parameters re-processes the cached spectrum instead of
+  accumulating. The Process menu entries are enabled only in spectrumView
 - Frame delivery via `frameReady(const ImageData &)` signal (not polling)
 - Functions defined with slots in `AppController` must be invoked via `QMetaObject::invokeMethod()`.
 

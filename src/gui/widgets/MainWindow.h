@@ -23,6 +23,7 @@ class HistogramWindow;
 class ScaleControlDialog;
 class DisplayStyleDialog;
 class CalibrationDialog;
+class DespikeDialog;
 class FileSaverWorker;
 struct ImageData;
 
@@ -62,6 +63,8 @@ private slots:
     void on_rowRange_triggered();
     void on_profile_triggered();
     void on_histogram_triggered();
+    void on_despike_toggled(bool checked);
+    void on_despikeSettings_triggered();
 
     void onCameraStateChanged(CameraState newState);
     void onCameraFrameReady(const ImageData &frame);
@@ -132,6 +135,7 @@ private:
     CameraConfigDialog *m_configDialog = nullptr;
     ProfileWindow *m_profileWindow = nullptr;
     HistogramWindow *m_histogramWindow = nullptr;
+    DespikeDialog *m_despikeDialog = nullptr;
     ScaleControlDialog *m_scaleDialog = nullptr;
     DisplayStyleDialog *m_displayStyleDialog = nullptr;
     CalibrationDialog *m_calibrationDialog = nullptr;
@@ -140,6 +144,10 @@ private:
     int m_autoSaveFrameCounter = 0;
     //! 当前是否停在 imageView。直方图入口只在这个模式下可点
     bool m_imageViewActive = false;
+    //! switchView 是否已经跑过至少一次。首帧之前两种视图都还没有数据，光靠
+    //! m_imageViewActive 的初值分不清「还没定过」和「确定停在 spectrumView」，
+    //! 首帧就是光谱时菜单项会永远等不到启用它的那一次
+    bool m_viewModeKnown = false;
 
     // 状态栏那一格显示的东西：相机状态 + 当前采集模式
     QString m_cameraStateText;

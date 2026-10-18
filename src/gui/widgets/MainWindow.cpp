@@ -11,6 +11,7 @@
 #include "display/HistogramWindow.h"
 #include "dialogs/RowRangeDialog.h"
 #include "dialogs/CalibrationDialog.h"
+#include "dialogs/DespikeDialog.h"
 #include "dialogs/ScaleControlDialog.h"
 #include "dialogs/DisplayStyleDialog.h"
 #include "config/CameraConfigDialog.h"
@@ -286,6 +287,11 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->menuActionHistogram, &QAction::triggered,
             this, &MainWindow::on_histogram_triggered);
+
+    connect(ui->menuActionDespike, &QAction::toggled,
+            this, &MainWindow::on_despike_toggled);
+    connect(ui->menuActionDespikeSettings, &QAction::triggered,
+            this, &MainWindow::on_despikeSettings_triggered);
 
     connect(ui->menuActionScale, &QAction::triggered,
             this, &MainWindow::on_scale_triggered);
@@ -1228,6 +1234,68 @@ void MainWindow::on_histogram_triggered()
     m_histogramWindow->show();
 }
 
+void MainWindow::on_despike_toggled(bool checked)
+{
+    if (!m_spectrumViewWidget) {
+        return;
+    }
+
+    m_spectrumViewWidget->setDespikeEnabled(checked);
+
+    if (!checked) {
+        showStatusMessage(tr("Despike disabled."), 2000);
+        return;
+    }
+
+    // 还没收到谱线时没有点数可报，别显示「0 of 0」
+    if (m_spectrumViewWidget->despikeSampleCount() <= 0) {
+        showStatusMessage(tr("Despike on (display only)."), 2000);
+        return;
+    }
+
+    // 只在打开时报一次处理点数：live 模式下每帧都会重算，逐帧刷状态栏反而没信息量。
+    // 括号里说明只改显示：存盘/自动保存走的还是原始谱线，看到的不等于存下的
+    showStatusMessage(tr("Despike on: %1 of %2 spectral points replaced (display only).")
+                          .arg(m_spectrumViewWidget->despikedPointCount())
+                          .arg(m_spectrumViewWidget->despikeSampleCount()),
+                      4000);
+}
+
+void MainWindow::on_despikeSettings_triggered()
+{
+    if (!m_spectrumViewWidget) {
+        return;
+    }
+
+    if (!m_despikeDialog) {
+        m_despikeDialog = new DespikeDialog(this);
+        // 窗口上显示的就是实际生效的那一组：窗口还没打开过时，控件里的默认值
+        // 和 SpectrumViewWidget 里的默认值本来就一样，这一步只是把这一点写明
+        m_spectrumViewWidget->setDespikeParams(m_despikeDialog->despikeParams());
+
+        connect(m_despikeDialog, &DespikeDialog::paramsChanged,
+                this, [this](double, double, int) {
+                    m_spectrumViewWidget->setDespikeParams(m_despikeDialog->despikeParams());
+
+                    // 调参数就是想看效果；去尖峰还没开的话顺手打开，否则改完
+                    // 谱线一点变化都没有，看着像窗口没生效。菜单项被禁用说明
+                    // 当前在图像视图，那里没有谱线可处理，别在背后改状态
+                    if (ui->menuActionDespike->isEnabled()
+                        && !m_spectrumViewWidget->despikeEnabled()) {
+                        ui->menuActionDespike->blockSignals(true);
+                        ui->menuActionDespike->setChecked(true);
+                        ui->menuActionDespike->blockSignals(false);
+                        m_spectrumViewWidget->setDespikeEnabled(true);
+                        showStatusMessage(tr("Despike enabled."), 2000);
+                    }
+                });
+    }
+
+    m_despikeDialog->show();
+    m_despikeDialog->raise();
+    m_despikeDialog->activateWindow();
+}
+
 void MainWindow::updateStateLabel()
 {
     QString text = tr("State: %1").arg(m_cameraStateText);
@@ -1389,13 +1457,17 @@ void MainWindow::switchView(int height)
         QCoreApplication::processEvents();
     }
 
-    // 直方图统计的是图像，spectrumView 下没有可统计的对象，所以只在
-    // imageView 模式下放开菜单项。只在模式真的变了时才动，switchView
-    // 是每帧都调的，没必要每帧都去碰一遍 QAction
+    // 直方图统计的是图像、去尖峰处理的是谱线：两者各自只在对应的视图下
+    // 放开菜单项。只在模式真的变了时才动，switchView 是每帧都调的，
+    // 没必要每帧都去碰一遍 QAction。首帧必须走一次，两个菜单项的初始状态
+    // 都是禁用的（见 MainWindowUi），否则一直等不到启用它们的那一次
     const bool imageViewActive = (height != 1);
-    if (imageViewActive != m_imageViewActive) {
+    if (!m_viewModeKnown || imageViewActive != m_imageViewActive) {
+        m_viewModeKnown = true;
         m_imageViewActive = imageViewActive;
         ui->menuActionHistogram->setEnabled(imageViewActive);
+        ui->menuActionDespike->setEnabled(!imageViewActive);
+        ui->menuActionDespikeSettings->setEnabled(!imageViewActive);
     }
 }
 

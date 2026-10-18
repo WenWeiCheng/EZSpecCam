@@ -37,6 +37,8 @@ MainWindowUi::MainWindowUi(QObject *parent)
     , menuActionPostProcess(nullptr)
     , menuActionVerticalBinning(nullptr)
     , menuActionRowRange(nullptr)
+    , menuActionDespike(nullptr)
+    , menuActionDespikeSettings(nullptr)
     , menuActionCalibration(nullptr)
     , menuActionSaveFrameAs(nullptr)
     , menuActionAutoSaveToggle(nullptr)
@@ -157,6 +159,9 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     menuActionThemeSystem->setChecked(true);
 
     QMenu *menuProcess = menuBar->addMenu("&Process");
+    // 菜单里的 QAction 默认不显示 tooltip，要 QMenu 显式打开
+    menuProcess->setToolTipsVisible(true);
+
     menuActionVerticalBinning = new QAction("Software Vertical Binning", mainWindow);
     menuActionVerticalBinning->setShortcut(QKeySequence(Qt::Key_V));
     menuActionVerticalBinning->setShortcutContext(Qt::ApplicationShortcut);
@@ -165,6 +170,22 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
 
     menuActionRowRange = new QAction("Row Range...", mainWindow);
     menuProcess->addAction(menuActionRowRange);
+
+    menuProcess->addSeparator();
+    // 去尖峰只对 spectrumView 有意义：图像模式下没有可处理的谱线。两个菜单项
+    // 先关着，等第一帧确定视图模式后由 MainWindow::switchView 放开
+    menuActionDespike = new QAction("&Despike", mainWindow);
+    menuActionDespike->setShortcut(QKeySequence(Qt::Key_D));
+    menuActionDespike->setShortcutContext(Qt::ApplicationShortcut);
+    menuActionDespike->setCheckable(true);
+    menuActionDespike->setEnabled(false);
+    menuActionDespike->setToolTip("Replace cosmic-ray spikes in the displayed spectrum "
+                                  "(display only; saved data is unchanged)");
+    menuProcess->addAction(menuActionDespike);
+
+    menuActionDespikeSettings = new QAction("Despike Settings...", mainWindow);
+    menuActionDespikeSettings->setEnabled(false);
+    menuProcess->addAction(menuActionDespikeSettings);
 
     menuProcess->addSeparator();
     menuActionCalibration = new QAction("Calibration...", mainWindow);

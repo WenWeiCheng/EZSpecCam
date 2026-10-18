@@ -46,6 +46,8 @@ EZSpecCam 是一个基于 Qt 6.8、C++17 的相机控制应用程序，负责相
 | `CameraTab` | 控件 | `src/gui/widgets/config/CameraTab.h` | 相机参数配置标签页 |
 | `ImageViewWidget` | 控件 | `src/gui/widgets/display/ImageViewWidget.h` | 基于 QCustomPlot 的图像渲染 |
 | `SpectrumViewWidget` | 控件 | `src/gui/widgets/display/SpectrumViewWidget.h` | 光谱图控件 |
+| `PostProcess::despike` | 函数 | `src/gui/widgets/PostProcess.cpp` | 光谱去尖峰（差分修正 Z 分数 + 形状/次阈值判据） |
+| `DespikeDialog` | 窗口 | `src/gui/widgets/dialogs/DespikeDialog.h` | 去尖峰参数（主阈值、次阈值、均值窗口半宽） |
 | `MockCameraDriver` | 插件 | `src/plugins/mock/MockCameraDriver.cpp` | 用于测试的模拟相机 |
 | `QHYCCDDriver` | 插件 | `src/plugins/qhyccd/QHYCCDDriver.cpp` | QHYCCD 真实硬件驱动 |
 | `Hk16011Driver` | 插件 | `src/plugins/hk16011/Hk16011Driver.cpp` | HK16011 CCD 光谱相机驱动（Linux）→ 详见 `src/plugins/hk16011/AGENTS.md` |

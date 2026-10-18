@@ -5,6 +5,7 @@
 #include <QElapsedTimer>
 #include <QDebug>
 #include <QVector>
+#include <cmath>
 
 #include "CameraTypes.h"
 #include "PostProcess.h"
@@ -44,6 +45,16 @@ private slots:
                                  6000, 4000, QImage::Format_Grayscale16, 1, 4000);
     }
 
+    void test_despike_6000_points()
+    {
+        benchmarkDespike("PostProcess::despike 6000 points", 6000);
+    }
+
+    void test_despike_2000_points()
+    {
+        benchmarkDespike("PostProcess::despike 2000 points", 2000);
+    }
+
     void printStats(const QString &name, const QList<qint64> &timings)
     {
         if (timings.isEmpty()) return;
@@ -65,6 +76,57 @@ private slots:
         qDebug() << "  Min:" << min << "ms";
         qDebug() << "  Max:" << max << "ms";
         qDebug() << "  All times:" << timings;
+    }
+
+    void benchmarkDespike(const QString &name, int size)
+    {
+        // 内容固定：一条宽谱带 + 两个尖峰，保证每轮走的是同一条路径
+        QVector<double> spectrum(size);
+        unsigned state = 12345u;
+        for (int i = 0; i < size; ++i) {
+            state = state * 1664525u + 1013904223u;
+            const double unit = static_cast<double>(state >> 8) / 16777216.0;
+            spectrum[i] = 1000.0 + (unit - 0.5) * 40.0;
+        }
+        const double width = qMax(1.0, size / 40.0);
+        for (int i = 0; i < size; ++i) {
+            const double t = (i - size / 2.0) / width;
+            spectrum[i] += 300.0 * std::exp(-0.5 * t * t);
+        }
+        spectrum[size / 6] += 5000.0;
+        spectrum[size * 2 / 3] += 5000.0;
+
+        // 单次调用在 Release 下不到 2 ms，逐次计时会被时钟精度吃掉，这里按微秒记
+        const int runs = 20;
+        QList<qint64> timingsUs;
+        PostProcess::DespikeParams params;
+
+        for (int i = 0; i < runs; ++i) {
+            QElapsedTimer timer;
+            timer.start();
+            const PostProcess::DespikeResult result = PostProcess::despike(spectrum, params);
+            timingsUs.append(timer.nsecsElapsed() / 1000);
+
+            QCOMPARE(result.markedCount, 2);
+            QVERIFY(result.marked[size / 6]);
+            QVERIFY(result.marked[size * 2 / 3]);
+        }
+
+        qint64 sum = 0;
+        qint64 min = timingsUs[0];
+        qint64 max = timingsUs[0];
+        for (const qint64 t : timingsUs) {
+            sum += t;
+            min = qMin(min, t);
+            max = qMax(max, t);
+        }
+
+        qDebug() << "==========================================";
+        qDebug() << "Results for:" << name;
+        qDebug() << "  Runs:" << timingsUs.size();
+        qDebug() << "  Average:" << (sum / static_cast<double>(timingsUs.size())) << "us";
+        qDebug() << "  Min:" << min << "us";
+        qDebug() << "  Max:" << max << "us";
     }
 
     void benchmarkVerticalBinning(const QString &name,

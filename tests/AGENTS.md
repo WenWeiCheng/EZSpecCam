@@ -15,7 +15,9 @@ tests/
 ├── test_mock_driver/               # MockCameraDriver tests (~820 lines)
 ├── test_plugin_loading/            # Plugin discovery + loading tests
 ├── test_profile_demo/              # Profile/stats widget tests
-├── test_qhyccd_driver/             # QHYCCD driver tests 
+├── test_qhyccd_driver/             # QHYCCD driver tests
+├── test_despike/                   # PostProcess::despike algorithm tests
+├── test_despike_dialog/            # DespikeDialog params + SpectrumViewWidget wiring
 └── test_view_widgets_perf/         # View widget performance tests
 ```
 
@@ -25,6 +27,8 @@ tests/
 | Adding a new test | Copy existing test dir → new CMakeLists.txt → add to `tests/CMakeLists.txt` |
 | Mock driver integration test | `test_mock_driver/test_mock_driver.cpp` |
 | Plugin loading test | `test_plugin_loading/` |
+| Spectrum despike algorithm | `test_despike/test_despike.cpp` |
+| Despike parameters dialog | `test_despike_dialog/test_despike_dialog.cpp` |
 | Performance benchmarks | `test_view_widgets_perf/` |
 
 ## CONVENTIONS

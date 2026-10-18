@@ -174,6 +174,8 @@ set(EZSPECCAM_GUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/CalibrationDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/ScaleControlDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/ScaleControlDialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/DespikeDialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/DespikeDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/DisplayStyleDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/DisplayStyleDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/workers/FileSaverWorker.h

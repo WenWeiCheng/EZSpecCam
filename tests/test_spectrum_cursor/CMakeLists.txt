@@ -6,6 +6,7 @@ target_sources(test_spectrum_cursor PRIVATE
     ${CMAKE_SOURCE_DIR}/src/gui/Theme.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/qcustomplot.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/SpectrumViewWidget.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/widgets/PostProcess.cpp
 )
 target_link_libraries(test_spectrum_cursor PRIVATE
     ezspeccam_core
