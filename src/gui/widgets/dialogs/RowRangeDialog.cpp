@@ -13,15 +13,19 @@ RowRangeDialog::RowRangeDialog(QWidget *parent)
 
     QFormLayout *formLayout = new QFormLayout(this);
 
+    // 行号用 0-based，和图像像素索引一致：Profile 窗口标题里的 "Row Y=439"
+    // 就是这个值，直接填进来就能得到同一行的谱线
     m_startSpinBox = new QSpinBox(this);
-    m_startSpinBox->setMinimum(1);
-    m_startSpinBox->setValue(1);
-    formLayout->addRow("Start Row:", m_startSpinBox);
+    m_startSpinBox->setMinimum(0);
+    m_startSpinBox->setValue(0);
+    m_startSpinBox->setToolTip("Row index as shown in the Profile window (0-based)");
+    formLayout->addRow("Start Row (0-based):", m_startSpinBox);
 
     m_endSpinBox = new QSpinBox(this);
-    m_endSpinBox->setMinimum(1);
-    m_endSpinBox->setValue(1);
-    formLayout->addRow("End Row:", m_endSpinBox);
+    m_endSpinBox->setMinimum(0);
+    m_endSpinBox->setValue(0);
+    m_endSpinBox->setToolTip("Row index as shown in the Profile window (0-based)");
+    formLayout->addRow("End Row (0-based):", m_endSpinBox);
 
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     m_okButton = new QPushButton("OK", this);
@@ -66,14 +70,12 @@ void RowRangeDialog::setImageHeight(int height)
     m_okButton->setEnabled(true);
     m_applyButton->setEnabled(true);
 
-    m_startSpinBox->setMinimum(1);
-    m_startSpinBox->setMaximum(height);
-    m_endSpinBox->setMinimum(1);
-    m_endSpinBox->setMaximum(height);
-
-    if (height > 0) {
-        m_endSpinBox->setValue(height);
-    }
+    // 0-based 闭区间：合法行号是 [0, height - 1]
+    m_startSpinBox->setMinimum(0);
+    m_startSpinBox->setMaximum(height - 1);
+    m_endSpinBox->setMinimum(0);
+    m_endSpinBox->setMaximum(height - 1);
+    m_endSpinBox->setValue(height - 1);
 }
 
 void RowRangeDialog::setRange(int start, int end)
@@ -81,8 +83,8 @@ void RowRangeDialog::setRange(int start, int end)
     if (m_imageHeight <= 0) {
         return;
     }
-    m_startSpinBox->setValue(qBound(1, start + 1, m_imageHeight));
-    m_endSpinBox->setValue(qBound(1, end + 1, m_imageHeight));
+    m_startSpinBox->setValue(qBound(0, start, m_imageHeight - 1));
+    m_endSpinBox->setValue(qBound(0, end, m_imageHeight - 1));
 }
 
 int RowRangeDialog::startRow() const
@@ -116,7 +118,9 @@ void RowRangeDialog::onApplyClicked()
 
 void RowRangeDialog::onHeightChanged(int height)
 {
+    // 这个槽接的是 Start Row 的 valueChanged，参数是新的起始行（不是图像高度）。
+    // 起点超过终点时把终点顶到起点，避免 OK/Apply 直接被判非法
     if (height > 0 && m_endSpinBox->value() < m_startSpinBox->value()) {
-        m_endSpinBox->setValue(height - 1);
+        m_endSpinBox->setValue(height);
     }
 }

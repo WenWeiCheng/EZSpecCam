@@ -148,8 +148,9 @@ QVector<quint64> TestSpectrumAutoRecovery::expectedSpectrum(const QImage &img, i
 }
 
 // 模拟 MainWindow::onFrameLoaded 中的自动恢复判定与执行
-// 注意：metadata 中的 vBinStartRow/vBinEndRow 是 1-based（与 RowRangeDialog 一致），
-//      PostProcess::verticalBinning 内部会 -1 转换为 0-based 索引。
+// 注意：metadata 中的 vBinStartRow/vBinEndRow 是 1-based 闭区间（与
+//      PostProcess::verticalBinning 一致，后者内部会 -1 转换为 0-based 索引）。
+//      RowRangeDialog 是 0-based，MainWindow 在边界处 +1
 static bool tryAutoRecover(LoadResult &res, int &outStart1Based, int &outEnd1Based)
 {
     const QImage &img = res.frame.image;

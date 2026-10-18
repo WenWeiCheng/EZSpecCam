@@ -29,6 +29,7 @@ private slots:
     void test_setImageHeight_after_zero_set_to_normal_recovers();
     void test_loaded_2d_image_has_valid_dimensions_for_row_range();
     void test_spectrum_view_with_original_allows_row_range_dialog();
+    void test_dialog_range_selects_the_profiled_row();
 
 private:
     QImage makeImage(int w, int h) const;
@@ -98,8 +99,8 @@ void TestRowRangeDialogEdgeCases::test_setImageHeight_one_works()
     RowRangeDialog dialog;
     dialog.setImageHeight(1);
     dialog.setRange(0, 0);
-    QCOMPARE(dialog.startRow(), 1);
-    QCOMPARE(dialog.endRow(), 1);
+    QCOMPARE(dialog.startRow(), 0);
+    QCOMPARE(dialog.endRow(), 0);
 }
 
 void TestRowRangeDialogEdgeCases::test_setImageHeight_normal_works()
@@ -107,8 +108,8 @@ void TestRowRangeDialogEdgeCases::test_setImageHeight_normal_works()
     RowRangeDialog dialog;
     dialog.setImageHeight(1024);
     dialog.setRange(1020, 1023);
-    QCOMPARE(dialog.startRow(), 1021);
-    QCOMPARE(dialog.endRow(), 1024);
+    QCOMPARE(dialog.startRow(), 1020);
+    QCOMPARE(dialog.endRow(), 1023);
 }
 
 void TestRowRangeDialogEdgeCases::test_setImageHeight_after_zero_set_to_normal_recovers()
@@ -117,8 +118,8 @@ void TestRowRangeDialogEdgeCases::test_setImageHeight_after_zero_set_to_normal_r
     dialog.setImageHeight(0);
     dialog.setImageHeight(1024);
     dialog.setRange(1020, 1023);
-    QCOMPARE(dialog.startRow(), 1021);
-    QCOMPARE(dialog.endRow(), 1024);
+    QCOMPARE(dialog.startRow(), 1020);
+    QCOMPARE(dialog.endRow(), 1023);
 }
 
 void TestRowRangeDialogEdgeCases::test_loaded_2d_image_has_valid_dimensions_for_row_range()
@@ -147,8 +148,8 @@ void TestRowRangeDialogEdgeCases::test_loaded_2d_image_has_valid_dimensions_for_
     RowRangeDialog dialog;
     dialog.setImageHeight(res.frame.image.height());
     dialog.setRange(1020, 1023);
-    QCOMPARE(dialog.startRow(), 1021);
-    QCOMPARE(dialog.endRow(), 1024);
+    QCOMPARE(dialog.startRow(), 1020);
+    QCOMPARE(dialog.endRow(), 1023);
 }
 
 void TestRowRangeDialogEdgeCases::test_spectrum_view_with_original_allows_row_range_dialog()
@@ -186,14 +187,41 @@ void TestRowRangeDialogEdgeCases::test_spectrum_view_with_original_allows_row_ra
 
     RowRangeDialog dialog;
     dialog.setImageHeight(dialogHeight);
-    // 验证 spinbox 上限确实是 1024（而不是 1）
-    QCOMPARE(dialog.startRow(), 1);
-    QCOMPARE(dialog.endRow(), 1024);
+    // 0-based 闭区间，默认覆盖整图：最后一行是 height - 1
+    QCOMPARE(dialog.startRow(), 0);
+    QCOMPARE(dialog.endRow(), 1023);
 
-    // 可以设置任意子范围
+    // 可以设置任意子范围（行号与 Profile 窗口显示的一致）
     dialog.setRange(100, 200);
-    QCOMPARE(dialog.startRow(), 101);
-    QCOMPARE(dialog.endRow(), 201);
+    QCOMPARE(dialog.startRow(), 100);
+    QCOMPARE(dialog.endRow(), 200);
+}
+
+void TestRowRangeDialogEdgeCases::test_dialog_range_selects_the_profiled_row()
+{
+    // Profile 标题里的 "Row Y=439" 是 0-based 行索引，对话框也按 0-based 输入；
+    // MainWindow 把它 +1 交给 PostProcess::verticalBinning（1-based）。
+    // 这里验证这条链路取到的正是第 439 行，而不是差一行的第 438 行。
+    const int row = 439;
+    QImage img = make2DImage(64, 512);
+
+    RowRangeDialog dialog;
+    dialog.setImageHeight(img.height());
+    dialog.setRange(row, row);
+    QCOMPARE(dialog.startRow(), row);
+    QCOMPARE(dialog.endRow(), row);
+
+    ImageData frame;
+    frame.image = img;
+    PostProcess::verticalBinning(frame,
+                                 RowRangeDialog::toBinningRow(dialog.startRow()),
+                                 RowRangeDialog::toBinningRow(dialog.endRow()));
+
+    const ushort *rowData = reinterpret_cast<const ushort *>(img.constScanLine(row));
+    QCOMPARE(frame.spectrum.size(), 64);
+    for (int x = 0; x < 64; ++x) {
+        QCOMPARE(frame.spectrum[x], static_cast<quint64>(rowData[x]));
+    }
 }
 
 QTEST_MAIN(TestRowRangeDialogEdgeCases)

@@ -342,11 +342,15 @@ void MainWindow::saveFrameToFile(const QString &filePath)
     // 新格式：始终保存 original 2D 图 + metadata。
     // softwareSettings 仅在 vbin 范围是图像行数的真子集时写入
     // （加载时据此自动重算 spectrum）；无效范围直接不写。
-    const int h = request.frame.image.height();
+    // vBinStartRow / vBinEndRow 是 1-based 闭区间，和 verticalBinning 的解释一致。
+    // 行范围是相对原始 2D 图的：enabled 时 image 已经是 1 行，得看 originalImage
+    const int h = request.frame.hasOriginal()
+        ? request.frame.originalImage.height()
+        : request.frame.image.height();
     if (h > 0) {
-        const int effEnd = (m_vBinEndRow < 0) ? (h - 1) : m_vBinEndRow;
+        const int effEnd = (m_vBinEndRow < 0) ? h : m_vBinEndRow;
         const bool meaningfulRange = m_vBinEnabled
-            && (m_vBinStartRow > 0 || effEnd < h - 1);
+            && !(m_vBinStartRow <= 1 && effEnd >= h);
         if (meaningfulRange) {
             request.frame.softwareSettings["softwareVerticalBinning"] = true;
             request.frame.softwareSettings["vBinStartRow"] = m_vBinStartRow;
@@ -544,11 +548,12 @@ void MainWindow::onFrameLoaded(const LoadResult &result, const QString &filePath
     const int imgHeight = img.height();
     const QVariantMap &sw = m_currentFrame.softwareSettings;
 
-    // 自动恢复 spectrum：仅当 metadata 含 vbin 范围，且该范围是图像行数的真子集时
+    // 自动恢复 spectrum：仅当 metadata 含 vbin 范围，且该范围是图像行数的真子集时。
+    // metadata 里的 vBinStartRow / vBinEndRow 是 1-based 闭区间
     const int savedStart = sw.value("vBinStartRow", -1).toInt();
     const int savedEnd = sw.value("vBinEndRow", -1).toInt();
     const bool hasRange = (savedStart >= 0) && (savedEnd >= 0);
-    const bool fullRange = hasRange && (savedStart == 0) && (savedEnd >= imgHeight - 1);
+    const bool fullRange = hasRange && (savedStart <= 1) && (savedEnd >= imgHeight);
 
     const bool shouldRecover = result.hasMetadata
         && hasRange
@@ -556,23 +561,16 @@ void MainWindow::onFrameLoaded(const LoadResult &result, const QString &filePath
         && imgHeight > 1;
 
     if (shouldRecover) {
-        m_vBinStartRow = qBound(0, savedStart, imgHeight - 1);
-        m_vBinEndRow = qBound(m_vBinStartRow, savedEnd, imgHeight - 1);
+        m_vBinStartRow = qBound(1, savedStart, imgHeight);
+        m_vBinEndRow = qBound(m_vBinStartRow, savedEnd, imgHeight);
         m_vBinEnabled = true;
 
         PostProcess::verticalBinning(m_currentFrame, m_vBinStartRow, m_vBinEndRow);
     } else {
         // 缺 metadata / 无 vbin 范围 / 范围覆盖整图 → 直接显示 2D 图
         m_vBinEnabled = false;
-        if (hasRange) {
-            m_vBinStartRow = qBound(0, savedStart, qMax(0, imgHeight - 1));
-            m_vBinEndRow = (savedEnd < 0)
-                ? qMax(0, imgHeight - 1)
-                : qBound(m_vBinStartRow, savedEnd, qMax(0, imgHeight - 1));
-        } else {
-            m_vBinStartRow = 0;
-            m_vBinEndRow = (imgHeight > 0) ? (imgHeight - 1) : -1;
-        }
+        m_vBinStartRow = 1;
+        m_vBinEndRow = (imgHeight > 0) ? imgHeight : -1;
     }
 
     ui->menuActionVerticalBinning->blockSignals(true);
@@ -890,12 +888,16 @@ void MainWindow::on_rowRange_triggered()
     RowRangeDialog *dialog = new RowRangeDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setImageHeight(imageHeight);
-    dialog->setRange(m_vBinStartRow - 1, (m_vBinEndRow < 0 ? imageHeight : m_vBinEndRow) - 1);
+    // 对话框是 0-based（和 Profile 行号一致），成员/meta 是 1-based
+    dialog->setRange(RowRangeDialog::fromBinningRow(m_vBinStartRow),
+                     RowRangeDialog::fromBinningRow(
+                         m_vBinEndRow < 0 ? imageHeight : m_vBinEndRow));
     dialog->show();
 
     connect(dialog, &RowRangeDialog::applyClicked, this, [this](int startRow, int endRow) {
-        m_vBinStartRow = startRow;
-        m_vBinEndRow = endRow;
+        // 对话框给的是 0-based 行索引，转成 verticalBinning/metadata 用的 1-based
+        m_vBinStartRow = RowRangeDialog::toBinningRow(startRow);
+        m_vBinEndRow = RowRangeDialog::toBinningRow(endRow);
 
         if (m_currentFrame.isValid()) {
             ImageData frame = m_currentFrame;
