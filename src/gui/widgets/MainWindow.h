@@ -13,6 +13,7 @@
 #include "../Theme.h"
 #include "../workers/FileLoaderWorker.h"
 #include "Calibration.h"
+#include "PostProcess.h"
 
 class MainWindowUi;
 class CameraTab;
@@ -91,6 +92,10 @@ private slots:
     void onVffRemoveRequested(int index);
     void onVffClearRequested();
 
+    //! 组装 SaveRequest 并交给 FileSaverWorker。做成槽是为了让集成测试能
+    //! 直接保存到临时路径，验证去尖峰结果确实进了文件
+    void saveFrameToFile(const QString &filePath);
+
 private:
     // L / S / B 选中的采集模式。这是常驻状态，挂在状态栏那条常驻带子上；
     // 早先它走 QStatusBar::showMessage() 当 3 秒提示，而那条提示会把常驻
@@ -106,12 +111,15 @@ private:
     void setThemeMode(Theme::Mode mode);
     void syncThemeMenu();
     void updateToolbarState();
-    void updateDisplay(const ImageData &frame);
+    void updateDisplay(const ImageData &frame, bool force = false);
+    //! 从去尖峰之前的帧重建当前帧：去尖峰 → 软件垂直合并 → 更新显示
+    void rebuildDespikeAndBinning(bool forceDisplay = false);
+    //! 去尖峰真正生效的 1-based 闭区间；endRow 为 -1 表示到最后一行
+    void effectiveDespikeRows(int height, int *startRow, int *endRow) const;
     void switchView(int height);
     void updateFpsDisplay();
     void onFpsTimerTimeout();
     void showStatusMessage(const QString &message, int timeoutMs = 3000);
-    void saveFrameToFile(const QString &filePath);
     void startReferenceAcquisition(Calibration::ReferenceKind kind, int frameCount,
                                    double exposure);
     void cancelReferenceAcquisition(const QString &reason);
@@ -135,6 +143,16 @@ private:
     int m_fpsValue = 0;
 
     ImageData m_currentFrame;
+    //! 校正之后、去尖峰和垂直合并之前的帧。切换去尖峰、参数或行范围时
+    //! 都从这份数据重新算，避免在已经处理过的结果上叠加
+    ImageData m_preDespikeFrame;
+    //! 当前 m_currentFrame 是否是校准参考帧（参考帧不参与去尖峰）
+    bool m_currentFrameIsReference = false;
+    //! m_currentFrame.originalImage 是否已经去过尖峰。部分行范围 + vbin 时
+    //! 管线只处理 ROI，originalImage 保持原样，保存时再补一次
+    bool m_originalImageIsDespiked = false;
+    PostProcess::DespikeParams m_despikeParams;
+    PostProcess::ImageDespikeResult m_lastDespikeResult;
 
     MainWindowUi *ui;
     AppController *m_appController;

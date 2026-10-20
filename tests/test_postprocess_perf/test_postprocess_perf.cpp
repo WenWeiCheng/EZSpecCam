@@ -45,14 +45,36 @@ private slots:
                                  6000, 4000, QImage::Format_Grayscale16, 1, 4000);
     }
 
-    void test_despike_6000_points()
+    void test_despike_image_6000x4000_Grayscale16()
     {
-        benchmarkDespike("PostProcess::despike 6000 points", 6000);
+        benchmarkImageDespike("PostProcess::despikeImage 6000x4000 Grayscale16 (full image)",
+                              6000, 4000, QImage::Format_Grayscale16, 0, -1);
     }
 
-    void test_despike_2000_points()
+    void test_despike_image_6000x4000_Grayscale8()
     {
-        benchmarkDespike("PostProcess::despike 2000 points", 2000);
+        benchmarkImageDespike("PostProcess::despikeImage 6000x4000 Grayscale8 (full image)",
+                              6000, 4000, QImage::Format_Grayscale8, 0, -1);
+    }
+
+    void test_despike_image_6000x4000_row_range_100()
+    {
+        // 典型光谱带：6000x4000 里只处理 100 行，其余行原样复制
+        benchmarkImageDespike("PostProcess::despikeImage 6000x4000 Grayscale16 (100 rows)",
+                              6000, 4000, QImage::Format_Grayscale16, 2000, 2099);
+    }
+
+    void test_despike_image_1920x1080_Grayscale16()
+    {
+        benchmarkImageDespike("PostProcess::despikeImage 1920x1080 Grayscale16 (full image)",
+                              1920, 1080, QImage::Format_Grayscale16, 0, -1);
+    }
+
+    void test_despike_vbin_roi_6000x4000_100_rows()
+    {
+        // MainWindow 在 vbin + 部分行范围时走的就是这条路：只复制 ROI（带上下
+        // 各一行 halo）去尖峰，然后只对 ROI 做垂直合并
+        benchmarkDespikeRoi("despike + vbin ROI 6000x4000 (100 rows)", 6000, 4000, 100);
     }
 
     void printStats(const QString &name, const QList<qint64> &timings)
@@ -78,55 +100,170 @@ private slots:
         qDebug() << "  All times:" << timings;
     }
 
-    void benchmarkDespike(const QString &name, int size)
+    // 图像去尖峰：噪声背景 + 按固定网格铺开的孤立尖峰。网格间距远大于 3×3。
+    // 行范围以外的尖峰必须保持原样，范围内的必须全部摘掉，处理点数也是确定值
+    void benchmarkImageDespike(const QString &name, int width, int height,
+                               QImage::Format format, int firstRow, int lastRow)
     {
-        // 内容固定：一条宽谱带 + 两个尖峰，保证每轮走的是同一条路径
-        QVector<double> spectrum(size);
-        unsigned state = 12345u;
-        for (int i = 0; i < size; ++i) {
+        constexpr int kSpikeSpacing = 337;
+        constexpr int kSpikeMargin = 37;
+
+        if (lastRow < 0) {
+            lastRow = height - 1;
+        }
+
+        QImage image(width, height, format);
+        unsigned state = 987654321u;
+        auto nextNoise = [&state]() {
             state = state * 1664525u + 1013904223u;
-            const double unit = static_cast<double>(state >> 8) / 16777216.0;
-            spectrum[i] = 1000.0 + (unit - 0.5) * 40.0;
-        }
-        const double width = qMax(1.0, size / 40.0);
-        for (int i = 0; i < size; ++i) {
-            const double t = (i - size / 2.0) / width;
-            spectrum[i] += 300.0 * std::exp(-0.5 * t * t);
-        }
-        spectrum[size / 6] += 5000.0;
-        spectrum[size * 2 / 3] += 5000.0;
+            return static_cast<double>(state >> 8) / 16777216.0 - 0.5;
+        };
 
-        // 单次调用在 Release 下不到 2 ms，逐次计时会被时钟精度吃掉，这里按微秒记
-        const int runs = 20;
-        QList<qint64> timingsUs;
-        PostProcess::DespikeParams params;
+        if (format == QImage::Format_Grayscale16) {
+            for (int y = 0; y < height; ++y) {
+                quint16 *line = reinterpret_cast<quint16 *>(image.scanLine(y));
+                for (int x = 0; x < width; ++x) {
+                    line[x] = static_cast<quint16>(1000.0 + nextNoise() * 20.0);
+                }
+            }
+        } else {
+            for (int y = 0; y < height; ++y) {
+                uchar *line = image.scanLine(y);
+                for (int x = 0; x < width; ++x) {
+                    line[x] = static_cast<uchar>(100.0 + nextNoise() * 20.0);
+                }
+            }
+        }
 
+        int plantedInside = 0;
+        for (int y = kSpikeMargin; y + kSpikeMargin < height; y += kSpikeSpacing) {
+            for (int x = kSpikeMargin; x + kSpikeMargin < width; x += kSpikeSpacing) {
+                if (format == QImage::Format_Grayscale16) {
+                    quint16 *line = reinterpret_cast<quint16 *>(image.scanLine(y));
+                    line[x] = static_cast<quint16>(line[x] + 20000);
+                } else {
+                    image.scanLine(y)[x] = 250;
+                }
+                if (y >= firstRow && y <= lastRow && y > 0 && y < height - 1) {
+                    ++plantedInside;
+                }
+            }
+        }
+
+        const int runs = 5;
+        QList<qint64> timingsMs;
         for (int i = 0; i < runs; ++i) {
+            PostProcess::ImageDespikeResult result;
             QElapsedTimer timer;
             timer.start();
-            const PostProcess::DespikeResult result = PostProcess::despike(spectrum, params);
-            timingsUs.append(timer.nsecsElapsed() / 1000);
+            const QImage output = PostProcess::despikeImage(image,
+                                                            PostProcess::DespikeParams(),
+                                                            &result,
+                                                            firstRow, lastRow);
+            timingsMs.append(timer.nsecsElapsed() / 1000000);
 
-            QCOMPARE(result.markedCount, 2);
-            QVERIFY(result.marked[size / 6]);
-            QVERIFY(result.marked[size * 2 / 3]);
+            QVERIFY(!output.isNull());
+            QCOMPARE(output.size(), image.size());
+            QCOMPARE(result.markedCount, plantedInside);
         }
 
         qint64 sum = 0;
-        qint64 min = timingsUs[0];
-        qint64 max = timingsUs[0];
-        for (const qint64 t : timingsUs) {
+        qint64 min = timingsMs[0];
+        qint64 max = timingsMs[0];
+        for (const qint64 t : timingsMs) {
             sum += t;
             min = qMin(min, t);
             max = qMax(max, t);
         }
+        const double avg = sum / static_cast<double>(timingsMs.size());
 
-        qDebug() << "==========================================";
-        qDebug() << "Results for:" << name;
-        qDebug() << "  Runs:" << timingsUs.size();
-        qDebug() << "  Average:" << (sum / static_cast<double>(timingsUs.size())) << "us";
-        qDebug() << "  Min:" << min << "us";
-        qDebug() << "  Max:" << max << "us";
+        // 用 qInfo 而不是 qDebug：Release 构建定义了 QT_NO_DEBUG_OUTPUT，
+        // 性能数字写在 qDebug 里会被编译掉，基准测试就白跑了
+        qInfo() << "==========================================";
+        qInfo() << "Results for:" << name;
+        qInfo() << "  Runs:" << timingsMs.size();
+        qInfo() << "  Average:" << avg << "ms";
+        qInfo() << "  Min:" << min << "ms";
+        qInfo() << "  Max:" << max << "ms";
+        qInfo() << "  FPS (avg):" << (avg > 0.0 ? 1000.0 / avg : 0.0);
+        qInfo() << "  FPS (best):" << (min > 0 ? 1000.0 / static_cast<double>(min) : 0.0);
+    }
+
+    void benchmarkDespikeRoi(const QString &name, int width, int height, int rows)
+    {
+        const int firstRow = 2000;
+        const int lastRow = firstRow + rows - 1;
+        const int haloFirst = qMax(0, firstRow - 1);
+        const int haloLast = qMin(height - 1, lastRow + 1);
+        const int roiFirstInRoi = firstRow - haloFirst;
+        const int roiLastInRoi = lastRow - haloFirst;
+
+        QImage image(width, height, QImage::Format_Grayscale16);
+        unsigned state = 13579u;
+        for (int y = 0; y < height; ++y) {
+            quint16 *line = reinterpret_cast<quint16 *>(image.scanLine(y));
+            for (int x = 0; x < width; ++x) {
+                state = state * 1664525u + 1013904223u;
+                const double unit = static_cast<double>(state >> 8) / 16777216.0;
+                line[x] = static_cast<quint16>(1000.0 + (unit - 0.5) * 20.0);
+            }
+        }
+
+        const int runs = 5;
+        QList<qint64> timingsMs;
+        qint64 copyUs = 0;
+        qint64 despikeUs = 0;
+        qint64 binUs = 0;
+        for (int i = 0; i < runs; ++i) {
+            PostProcess::ImageDespikeResult result;
+            QElapsedTimer timer;
+            QElapsedTimer total;
+            total.start();
+
+            timer.start();
+            const QImage roi = image.copy(0, haloFirst, width, haloLast - haloFirst + 1);
+            copyUs += timer.nsecsElapsed() / 1000;
+
+            timer.restart();
+            const QImage processed = PostProcess::despikeImage(roi, PostProcess::DespikeParams(),
+                                                               &result,
+                                                               roiFirstInRoi, roiLastInRoi);
+            despikeUs += timer.nsecsElapsed() / 1000;
+
+            timer.restart();
+            ImageData frame;
+            frame.image = processed;
+            PostProcess::verticalBinning(frame, roiFirstInRoi + 1, roiLastInRoi + 1);
+            binUs += timer.nsecsElapsed() / 1000;
+
+            timingsMs.append(total.nsecsElapsed() / 1000000);
+
+            QCOMPARE(result.sampleCount, (width - 2) * rows);
+            QCOMPARE(frame.image.height(), 1);
+            QCOMPARE(frame.spectrum.size(), width);
+        }
+
+        qint64 sum = 0;
+        qint64 min = timingsMs[0];
+        qint64 max = timingsMs[0];
+        for (const qint64 t : timingsMs) {
+            sum += t;
+            min = qMin(min, t);
+            max = qMax(max, t);
+        }
+        const double avg = sum / static_cast<double>(timingsMs.size());
+
+        qInfo() << "==========================================";
+        qInfo() << "Results for:" << name;
+        qInfo() << "  Runs:" << timingsMs.size();
+        qInfo() << "  Average:" << avg << "ms";
+        qInfo() << "  Min:" << min << "ms";
+        qInfo() << "  Max:" << max << "ms";
+        qInfo() << "  FPS (avg):" << (avg > 0.0 ? 1000.0 / avg : 0.0);
+        qInfo() << "  FPS (best):" << (min > 0 ? 1000.0 / static_cast<double>(min) : 0.0);
+        qInfo() << "  ROI copy:" << (copyUs / 1000.0 / runs) << "ms"
+                << " despike:" << (despikeUs / 1000.0 / runs) << "ms"
+                << " vbin:" << (binUs / 1000.0 / runs) << "ms";
     }
 
     void benchmarkVerticalBinning(const QString &name,

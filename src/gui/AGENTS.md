@@ -31,12 +31,12 @@ gui/
     │   ├── HistogramViewWidget  # Bar-chart plot (histogram only)
     │   ├── HistogramWindow      # Histogram + overexposure statistics
     │   └── StatisticsDialog     # Frame statistics
-    ├── PostProcess.cpp/h        # Algorithms: vertical binning, legacy dark calibration, despike
+    ├── PostProcess.cpp/h        # Algorithms: vertical binning, legacy dark calibration, image despike
     └── dialogs/                 # Utility dialogs
         ├── CustomRangeDialog    # Custom spectrum range input
-        ├── RowRangeDialog       # Row binning range input
+        ├── RowRangeDialog       # Row range shared by binning and despike
         ├── CalibrationDialog    # Dark/Flat tabs: acquire or load references; flat reuses the dark model
-        └── DespikeDialog        # Spectrum despike parameters (3 params only)
+        └── DespikeDialog        # Despike primary threshold (single parameter)
 ```
 
 ## WHERE TO LOOK
@@ -48,7 +48,7 @@ gui/
 | Frame rendering | `widgets/display/ImageViewWidget.cpp` |
 | Spectrum display | `widgets/display/SpectrumViewWidget.cpp` |
 | Histogram + overexposure count | `widgets/display/HistogramWindow.cpp` |
-| Spectrum despike (algorithm + params window) | `widgets/PostProcess.cpp`, `widgets/dialogs/DespikeDialog.cpp` |
+| Despike (algorithm + pipeline + params window) | `widgets/PostProcess.cpp`, `widgets/MainWindow.cpp` (`rebuildDespikeAndBinning`), `widgets/dialogs/DespikeDialog.cpp` |
 | Dynamic parameter widgets | `widgets/config/ParameterWidgetFactory.cpp` |
 | Colours (GUI chrome + plots) | `Theme.cpp` |
 
@@ -66,10 +66,37 @@ gui/
   is `-inf`, which destroys the bar geometry. `HistogramViewWidget` therefore
   moves the bar base up to the axis lower bound while the log scale is on
   (`kLogBase`), which also makes zero-count bins draw as nothing
-- Despike is display-only and only wired into the main spectrum view: the toggle
-  lives in `SpectrumViewWidget` (raw data cached in `m_rawYData`), so toggling it
-  or changing its parameters re-processes the cached spectrum instead of
-  accumulating. The Process menu entries are enabled only in spectrumView
+- Despike is part of the acquisition pipeline, not the display widgets:
+  `MainWindow::rebuildDespikeAndBinning()` takes `m_preDespikeFrame` (the frame
+  after calibration), runs `PostProcess::despikeImage()`, then optional
+  `verticalBinning()`, and stores the result in `m_currentFrame`. The spectrum
+  view therefore sees a spectrum binned from despiked data, and saving/
+  auto-save writes the same processed frame. Toggling despike, changing the
+  threshold or changing the row range rebuilds from `m_preDespikeFrame`
+- Both views share one Process menu toggle. The row range is `m_vBinStartRow` /
+  `m_vBinEndRow` (1-based, `-1` = last row), independent of whether vbin is on;
+  rows outside it are copied unchanged and never despiked
+- With vbin + a partial row range, the live pipeline only despikes the ROI and
+  leaves `m_currentFrame.originalImage` as the raw 2D frame. `saveFrameToFile()`
+  rebuilds the full despiked 2D with the same row range before handing the
+  request to `FileSaverWorker`, so saved files always contain the despike result.
+  This is covered by `test_despike_pipeline`'s save case
+- `DespikeParams` has a single field, `primaryThreshold`. `despikeImage()`
+  removes pixels strictly higher than all 8 neighbours by more than that many
+  per-row noise sigmas, replacing them with the median of the 4 direct
+  neighbours. There is no longer a 1D spectrum variant
+- `despikeImage()` allocates the output and writes every pixel in the same
+  OpenMP pass (it does not `QImage::copy()` first). That halves the memory
+  traffic; the two-pass per-row max keeps the hot loop branch-free and
+  vectorizable. On an i5-12500H (16 threads) in Release, 6000×4000 Grayscale16
+  measures ~60–70 ms (~15–17 fps) for the full image. With vbin + a 100-row
+  range the pipeline copies only the ROI (plus one halo row each side) and bins
+  that, so it runs in ~20–30 ms (~35–50 fps) and defers the full 2D output to
+  save time
+- `verticalBinning()` reads the source with `constBits()`/`constScanLine()`.
+  It must not call the non-const `bits()`: `image` and `originalImage` usually
+  share the same buffer, and detaching would copy the whole frame (~50 ms at
+  6000×4000) just to read it
 - Frame delivery via `frameReady(const ImageData &)` signal (not polling)
 - Functions defined with slots in `AppController` must be invoked via `QMetaObject::invokeMethod()`.
 

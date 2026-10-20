@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <limits>
+#include <cstring>
 #include <vector>
 #include <omp.h>
 
@@ -15,277 +15,316 @@ namespace PostProcess
 namespace
 {
 
-// 闭运算的结构元素：索引差不超过 3（中间最多隔 2 个亚阈点）的候选并成一段
-constexpr int kBridgeGap = 3;
+// ---------------------------------------------------------------------------
+// 图像去尖峰的辅助函数
+// ---------------------------------------------------------------------------
 
-constexpr double kNaN = std::numeric_limits<double>::quiet_NaN();
+// 一行里最多取这么多相邻差分来估计噪声。6000 点宽时步长约 11，中位数估计
+// 仍然足够稳；取满一行会让每行多花几倍时间，而图像每帧都要跑一遍
+constexpr int kNoiseSamplesPerRow = 512;
 
-// despike 的中间结果都放这里复用。谱线每帧要过两遍，而 QVector 的下标访问
-// 在 Debug 构建里带边界断言，热路径上改用 std::vector 后，6000 点谱线在
-// Debug 下实测从约 18 ms 降到约 4 ms（Release 约 1.5 ms）
-struct Scratch
+// 标准差为 σ 的高斯白噪声，一次差分的标准差是 σ√2；而 |N(0,1)| 的中位数是
+// 0.6745。于是 median(|相邻差分|) / (0.6745·√2) 就是单像素噪声尺度
+constexpr double kMedianAbsNormal = 0.6744897501960817;
+constexpr double kDiffToPixelSigma = 1.4142135623730951;
+
+template <typename T>
+inline T max8(T a, T b, T c, T d, T e, T f, T g, T h)
 {
-    std::vector<double> diff;
-    std::vector<double> medianBuf;
-    std::vector<double> z;
-    std::vector<unsigned char> candidate;
-    std::vector<unsigned char> replacement;
-    std::vector<int> span;
-    std::vector<double> prefixSum;
-    std::vector<double> prefixCount;
-};
+    return std::max(std::max(std::max(a, b), std::max(c, d)),
+                    std::max(std::max(e, f), std::max(g, h)));
+}
 
-// 求已装好样本的 scratch 的中位数。nth_element 只保证第 mid 位就位，比排序便宜
-double medianOfScratch(std::vector<double> &scratch)
+// 4 个数的中位数。判据已经保证 8 个邻居全都比中心低，取这 4 个直接邻居的
+// 中值就够了，比再求一次 9 数中值便宜一半
+inline int median4(int a, int b, int c, int d)
+{
+    const int lo = std::min(std::min(a, b), std::min(c, d));
+    const int hi = std::max(std::max(a, b), std::max(c, d));
+    return (a + b + c + d - lo - hi + 1) / 2;
+}
+
+// 只要上中位数，不必为偶数个样本再跑一次 nth_element。噪声尺度是估计值，
+// 两个中位数之间的差别远小于阈值本身的余量
+double upperMedianOfScratch(std::vector<double> &scratch)
 {
     if (scratch.empty()) {
         return 0.0;
     }
+    const std::size_t mid = scratch.size() / 2;
+    std::nth_element(scratch.begin(), scratch.begin() + static_cast<std::ptrdiff_t>(mid),
+                     scratch.end());
+    return scratch[mid];
+}
 
-    const int n = static_cast<int>(scratch.size());
-    const int mid = n / 2;
-    std::nth_element(scratch.begin(), scratch.begin() + mid, scratch.end());
-    const double upper = scratch[mid];
-    if (n % 2 != 0) {
-        return upper;
+// 用一行的相邻差分中位数估计这一行的噪声尺度。stride 是通道间距：
+// 灰度图取 1，RGB888 取 3（只采样绿通道，三个通道噪声水平本来就接近）
+template <typename Pixel>
+double estimateRowSigma(const Pixel *row, int width, int stride, std::vector<double> &buf)
+{
+    buf.clear();
+    if (width < 2) {
+        return 0.0;
     }
 
-    std::nth_element(scratch.begin(), scratch.begin() + mid - 1, scratch.begin() + mid);
-    return 0.5 * (scratch[mid - 1] + upper);
-}
-
-// 中位数。值复制进 medianBuf 再重排，入参不受打乱影响；medianBuf 由调用方
-// 复用，避免每次求中位数都新申请一块 6000 点的内存
-double medianOf(const double *src, int n, std::vector<double> &medianBuf)
-{
-    medianBuf.assign(src, src + n);
-    return medianOfScratch(medianBuf);
-}
-
-// |src| 的中位数。不另建一份绝对值数组，边复制边取绝对值
-double medianOfAbs(const double *src, int n, std::vector<double> &medianBuf)
-{
-    medianBuf.resize(static_cast<std::size_t>(n));
-    for (int i = 0; i < n; ++i) {
-        medianBuf[static_cast<std::size_t>(i)] = std::abs(src[i]);
+    const int step = std::max(1, width / kNoiseSamplesPerRow);
+    buf.reserve(static_cast<std::size_t>((width - 1) / step + 1));
+    for (int x = 0; x + 1 < width; x += step) {
+        buf.push_back(std::abs(static_cast<double>(row[(x + 1) * stride])
+                               - static_cast<double>(row[x * stride])));
     }
-    return medianOfScratch(medianBuf);
+
+    if (buf.empty()) {
+        return 0.0;
+    }
+    return upperMedianOfScratch(buf) / (kMedianAbsNormal * kDiffToPixelSigma);
 }
 
-// 一次差分的修正 Z 分数写进 s.z，第 0 个点没有差分项，记 NaN：与任何阈值
-// 比较都是 false，它既不会成为候选，也不会进闭运算的游程。
+// 中心像素严格高于全部 8 个邻居、且高出量超过阈值时，把它替换成直接邻居的中值。
+// 阈值已经预先取整成像素值，热路径上不再做 double 比较
+template <typename Pixel>
+bool replaceIsolatedPixel(const Pixel *prev, const Pixel *cur, const Pixel *next,
+                          int index, int stride, Pixel *out, int threshold)
+{
+    const int center = static_cast<int>(cur[index]);
+    const int highestNeighbour = max8(
+        static_cast<int>(prev[index - stride]), static_cast<int>(prev[index]),
+        static_cast<int>(prev[index + stride]),
+        static_cast<int>(cur[index - stride]), static_cast<int>(cur[index + stride]),
+        static_cast<int>(next[index - stride]), static_cast<int>(next[index]),
+        static_cast<int>(next[index + stride]));
+
+    const int gap = center - highestNeighbour;
+    if (gap <= 0 || gap < threshold) {
+        return false;
+    }
+
+    out[index] = static_cast<Pixel>(median4(static_cast<int>(cur[index - stride]),
+                                            static_cast<int>(cur[index + stride]),
+                                            static_cast<int>(prev[index]),
+                                            static_cast<int>(next[index])));
+    return true;
+}
+
+// 把 primaryThreshold·sigma 换成整数门限。gap 是整数，floor+1 之后
+// 「gap >= 门限」与「gap > 实数门限」完全等价（例如实数门限 40.0 要的是 41）；
+// sigma 为 0 时门限为 1，任何严格大于 0 的跳变都算离群
+inline int thresholdFromSigma(const DespikeParams &params, double sigma)
+{
+    const double threshold = params.primaryThreshold * sigma;
+    if (!(threshold > 0.0)) {
+        return 1;
+    }
+    return static_cast<int>(std::floor(threshold)) + 1;
+}
+
+// 整幅图都写一遍（没改动的像素照抄原值），而不是先 copy() 一份再改几个点。
+// QImage::copy() 在 6000x4000 上要 50 ms 以上，而复制和检测是两次完整的内存
+// 往返；直接分配目标图、一遍写完把两次往返合成一次，实测总耗时约减半。
 //
-// MAD 为 0 表示一半以上的差分恰好相等（平坦基线、常量或严格线性的谱），
-// 此时没有可用的尺度估计。按参考实现的语义把非零差分记作 ±inf、零差分记作
-// NaN：即「任何非零跳变都算离群」，平坦基线上的单点尖峰因此仍能被抓到，
-// 常量谱也仍然一个点都不标记
-void computeModifiedZ(const QVector<double> &y, Scratch &s)
+// firstRow / lastRow 是已经夹紧过的 0-based 闭区间。范围外的行只做整行复制，
+// 不参与检测，也不补做去尖峰。
+template <typename Pixel>
+int despikeGrayImage(const QImage &source, QImage &target, const DespikeParams &params,
+                     int firstRow, int lastRow)
 {
-    const int n = y.size();
-    s.z.assign(static_cast<std::size_t>(n), kNaN);
-    if (n < 2) {
-        return;
-    }
+    const int width = source.width();
+    const int height = source.height();
+    const int rowBytes = width * static_cast<int>(sizeof(Pixel));
+    // QImage 的行可能带尾部填充。只写 width 个像素会留下未初始化的填充字节，
+    // 所以行尾也照抄一份（通常 0 或 2 字节，代价可以忽略）
+    const int bytesPerLine = source.bytesPerLine();
+    int marked = 0;
 
-    const double *values = y.constData();
-    const int m = n - 1;
-    s.diff.resize(static_cast<std::size_t>(m));
-    for (int i = 0; i < m; ++i) {
-        s.diff[static_cast<std::size_t>(i)] = values[i + 1] - values[i];
-    }
+    #pragma omp parallel
+    {
+        std::vector<double> noiseBuf;
+        noiseBuf.reserve(static_cast<std::size_t>(kNoiseSamplesPerRow + 1));
+        // 每行的 8 邻居最大值。分成两遍：第一遍没有分支，编译器能向量化，
+        // 第二遍只做整数的比较与少量替换
+        std::vector<Pixel> neighbourMax(static_cast<std::size_t>(width));
 
-    const double offset = medianOf(s.diff.data(), m, s.medianBuf);
-    for (int i = 0; i < m; ++i) {
-        s.diff[static_cast<std::size_t>(i)] -= offset;
-    }
+        #pragma omp for schedule(static) reduction(+:marked)
+        for (int y = 0; y < height; ++y) {
+            const Pixel *cur = reinterpret_cast<const Pixel *>(source.constScanLine(y));
+            Pixel *out = reinterpret_cast<Pixel *>(target.scanLine(y));
 
-    // MAD 是「减掉中位数之后取绝对值」的中位数，少一步 std::abs 的话
-    // mad 会算成有符号中位数（≈0）
-    const double mad = medianOfAbs(s.diff.data(), m, s.medianBuf);
-    if (mad > 0.0) {
-        const double scale = 0.6745 / mad;
-        for (int i = 0; i < m; ++i) {
-            s.z[static_cast<std::size_t>(i + 1)] = s.diff[static_cast<std::size_t>(i)] * scale;
-        }
-        return;
-    }
-
-    const double inf = std::numeric_limits<double>::infinity();
-    for (int i = 0; i < m; ++i) {
-        const double d = s.diff[static_cast<std::size_t>(i)];
-        s.z[static_cast<std::size_t>(i + 1)] = (d == 0.0) ? kNaN : std::copysign(inf, d);
-    }
-}
-
-// 一维闭运算（先膨胀再腐蚀）后每个位置所在那一段的跨度。索引差不超过
-// kBridgeGap 的候选并成一段，跨度取段内最左与最右候选的索引差加 1；
-// 非候选处为 0。
-//
-// 取跨度而不是候选个数：单像素尖峰 0 +A -A 0 的两个差分本来就相邻，跨度必为 2；
-// 两像素宽的亮斑 0 +A +a 0 跨度已经是 3，按候选个数算会和尖峰混成同一个值。
-//
-// 不按符号切开：「多宽」和「往哪边」是两件事，按符号切会让一个 +- 脉冲变成
-// 两段各长 1，而下面带符号的判据正好把这两段说成一个跨度 2 的脉冲
-void computeRunSpans(const std::vector<unsigned char> &candidate, std::vector<int> &span)
-{
-    const int n = static_cast<int>(candidate.size());
-    span.assign(static_cast<std::size_t>(n), 0);
-
-    int runStart = -1;
-    int lastCandidate = -1;
-    auto closeRun = [&span](int start, int end) {
-        const int runSpan = end - start + 1;
-        for (int p = start; p <= end; ++p) {
-            span[static_cast<std::size_t>(p)] = runSpan;
-        }
-    };
-
-    for (int i = 0; i < n; ++i) {
-        if (candidate[static_cast<std::size_t>(i)] == 0) {
-            continue;
-        }
-        if (runStart < 0) {
-            runStart = i;
-        } else if (i - lastCandidate > kBridgeGap) {
-            closeRun(runStart, lastCandidate);
-            runStart = i;
-        }
-        lastCandidate = i;
-    }
-    if (runStart >= 0) {
-        closeRun(runStart, lastCandidate);
-    }
-}
-
-// 求待替换的尖峰掩膜，返回置位的个数。差分形状：尖峰的差分必须是
-// 0, +A, -A, 0，也就是两个相邻的超阈差分，一正一负，且所在游程的跨度恰好为 2。
-//
-// 次阈值判据要求尖峰外侧的两个差分 z[p-1] 和 z[p+2] 都不超过它：尖峰占掉
-// z[p] 和 z[p+1] 这一对差分，剩下的这两个才是它左右的背景；真宇宙线的邻居
-// 就是背景，差分很小，谱带被主阈值削剩的肩部却仍留在邻居里
-int computeReplacement(const std::vector<double> &z, const DespikeParams &params, Scratch &s)
-{
-    const int n = static_cast<int>(z.size());
-    s.candidate.assign(static_cast<std::size_t>(n), 0);
-    for (int i = 0; i < n; ++i) {
-        s.candidate[static_cast<std::size_t>(i)] =
-            (std::abs(z[static_cast<std::size_t>(i)]) > params.primaryThreshold) ? 1 : 0;
-    }
-
-    computeRunSpans(s.candidate, s.span);
-
-    const bool useSecondary = params.secondaryThreshold > 0.0;
-    s.replacement.assign(static_cast<std::size_t>(n), 0);
-
-    int count = 0;
-    // 末位没有后继差分，形状判据天然不会命中它
-    for (int p = 0; p + 1 < n; ++p) {
-        // 跨度 2 且先正后负，等价于原来「带符号跨度 sw[p]==2 且 sw[p+1]==-2」
-        if (s.span[static_cast<std::size_t>(p)] != 2
-            || s.span[static_cast<std::size_t>(p + 1)] != 2) {
-            continue;
-        }
-        if (z[static_cast<std::size_t>(p)] <= 0.0
-            || z[static_cast<std::size_t>(p + 1)] >= 0.0) {
-            continue;
-        }
-        if (useSecondary) {
-            const bool leftHot = (p >= 1)
-                && std::abs(z[static_cast<std::size_t>(p - 1)]) > params.secondaryThreshold;
-            const bool rightHot = (p + 2 < n)
-                && std::abs(z[static_cast<std::size_t>(p + 2)]) > params.secondaryThreshold;
-            if (leftHot || rightHot) {
+            // 行范围外，以及图像上下边界（没有完整的 3×3 邻域），整行照抄
+            if (y < firstRow || y > lastRow || y == 0 || y == height - 1) {
+                std::memcpy(out, cur, static_cast<std::size_t>(bytesPerLine));
                 continue;
             }
+
+            // 范围的首尾行照样使用范围外的相邻行做邻域，边界上的孤立点不会漏
+            const Pixel *prev = reinterpret_cast<const Pixel *>(source.constScanLine(y - 1));
+            const Pixel *next = reinterpret_cast<const Pixel *>(source.constScanLine(y + 1));
+
+            for (int x = 1; x < width - 1; ++x) {
+                neighbourMax[static_cast<std::size_t>(x)] = static_cast<Pixel>(
+                    max8(static_cast<int>(prev[x - 1]), static_cast<int>(prev[x]),
+                         static_cast<int>(prev[x + 1]),
+                         static_cast<int>(cur[x - 1]), static_cast<int>(cur[x + 1]),
+                         static_cast<int>(next[x - 1]), static_cast<int>(next[x]),
+                         static_cast<int>(next[x + 1])));
+            }
+
+            const int threshold = thresholdFromSigma(params, estimateRowSigma(cur, width, 1, noiseBuf));
+
+            out[0] = cur[0];
+            out[width - 1] = cur[width - 1];
+            for (int x = 1; x < width - 1; ++x) {
+                const int gap = static_cast<int>(cur[x])
+                              - static_cast<int>(neighbourMax[static_cast<std::size_t>(x)]);
+                // thresholdFromSigma() 保证门限至少是 1，所以 gap >= threshold
+                // 已经蕴含「严格高于全部邻居」
+                if (gap >= threshold) {
+                    out[x] = static_cast<Pixel>(median4(static_cast<int>(cur[x - 1]),
+                                                        static_cast<int>(cur[x + 1]),
+                                                        static_cast<int>(prev[x]),
+                                                        static_cast<int>(next[x])));
+                    ++marked;
+                } else {
+                    out[x] = cur[x];
+                }
+            }
+
+            if (bytesPerLine > rowBytes) {
+                std::memcpy(reinterpret_cast<uchar *>(out) + rowBytes,
+                            reinterpret_cast<const uchar *>(cur) + rowBytes,
+                            static_cast<std::size_t>(bytesPerLine - rowBytes));
+            }
         }
-        s.replacement[static_cast<std::size_t>(p)] = 1;
-        ++count;
     }
-    return count;
+    return marked;
+}
+
+int despikeRgbImage(const QImage &source, QImage &target, const DespikeParams &params,
+                    int firstRow, int lastRow)
+{
+    const int width = source.width();
+    const int height = source.height();
+    const int rowBytes = width * 3;
+    const int bytesPerLine = source.bytesPerLine();
+    int marked = 0;
+
+    #pragma omp parallel
+    {
+        std::vector<double> noiseBuf;
+        noiseBuf.reserve(static_cast<std::size_t>(kNoiseSamplesPerRow + 1));
+
+        #pragma omp for schedule(static) reduction(+:marked)
+        for (int y = 0; y < height; ++y) {
+            const uchar *cur = source.constScanLine(y);
+            uchar *out = target.scanLine(y);
+
+            // 行范围外，以及图像上下边界，整行照抄
+            if (y < firstRow || y > lastRow || y == 0 || y == height - 1) {
+                std::memcpy(out, cur, static_cast<std::size_t>(bytesPerLine));
+                continue;
+            }
+
+            const uchar *prev = source.constScanLine(y - 1);
+            const uchar *next = source.constScanLine(y + 1);
+
+            // 三个通道的噪声水平相近，用绿通道估计一次就够
+            const int threshold = thresholdFromSigma(
+                params, estimateRowSigma(cur + 1, width, 3, noiseBuf));
+
+            out[0] = cur[0];
+            out[1] = cur[1];
+            out[2] = cur[2];
+            out[rowBytes - 3] = cur[rowBytes - 3];
+            out[rowBytes - 2] = cur[rowBytes - 2];
+            out[rowBytes - 1] = cur[rowBytes - 1];
+
+            for (int x = 1; x < width - 1; ++x) {
+                bool replaced = false;
+                for (int channel = 0; channel < 3; ++channel) {
+                    const int index = x * 3 + channel;
+                    if (replaceIsolatedPixel(prev, cur, next, index, 3, out, threshold)) {
+                        replaced = true;
+                    } else {
+                        out[index] = cur[index];
+                    }
+                }
+                if (replaced) {
+                    ++marked;
+                }
+            }
+
+            if (bytesPerLine > rowBytes) {
+                std::memcpy(out + rowBytes, cur + rowBytes,
+                            static_cast<std::size_t>(bytesPerLine - rowBytes));
+            }
+        }
+    }
+    return marked;
 }
 
 } // namespace
 
-DespikeResult despike(const QVector<double> &y, const DespikeParams &paramsIn)
+QImage despikeImage(const QImage &image, const DespikeParams &params, ImageDespikeResult *result,
+                    int firstRow, int lastRow)
 {
-    DespikeParams params = paramsIn;
-    if (params.windowHalfWidth < 1) {
-        params.windowHalfWidth = 1;
-    }
-    if (params.passes < 1) {
-        params.passes = 1;
+    ImageDespikeResult summary;
+    if (result != nullptr) {
+        *result = summary;
     }
 
-    DespikeResult result;
-    result.values = y;
-    result.marked.fill(false, y.size());
-
-    const int n = y.size();
-    Scratch s;
-    computeModifiedZ(y, s);
-
-    // 第一遍用的就是输入数据的 Z 分数，顺手作为结果交出去，不用再算一遍
-    result.zScores.resize(n);
-    for (int i = 0; i < n; ++i) {
-        result.zScores[i] = s.z[static_cast<std::size_t>(i)];
+    if (image.isNull() || image.width() < 3 || image.height() < 3) {
+        return image;
     }
 
-    // 少于 3 个点凑不出「一正一负」的差分对，形状判据不可能命中
-    if (n < 3) {
-        return result;
+    const int height = image.height();
+
+    // 夹紧到有效行，再把没有完整 3×3 邻域的上下边界排除掉。范围首尾之外的行
+    // 原样保留，sampleCount 只统计真正参与检测的像素。
+    firstRow = std::max(0, std::min(firstRow, height - 1));
+    lastRow = (lastRow < 0) ? height - 1 : std::max(0, std::min(lastRow, height - 1));
+    const int firstProcessed = std::max(firstRow, 1);
+    const int lastProcessed = std::min(lastRow, height - 2);
+    if (firstProcessed > lastProcessed) {
+        return image;
     }
 
-    const int m = params.windowHalfWidth;
-    s.prefixSum.resize(static_cast<std::size_t>(n) + 1);
-    s.prefixCount.resize(static_cast<std::size_t>(n) + 1);
+    summary.sampleCount = (image.width() - 2) * (lastProcessed - firstProcessed + 1);
 
-    for (int pass = 0; pass < params.passes; ++pass) {
-        if (pass > 0) {
-            computeModifiedZ(result.values, s);
+    // 不调用 QImage::copy()：目标图的每个像素都会在下面的循环里写一遍（范围外
+    // 的行整行复制），复制一份再改几个点等于多走一遍 48 MB 的读 + 写
+    QImage target(image.width(), height, image.format());
+    if (target.isNull()) {
+        summary.sampleCount = 0;
+        if (result != nullptr) {
+            *result = summary;
         }
+        return image;
+    }
 
-        if (computeReplacement(s.z, params, s) == 0) {
+    switch (image.format()) {
+        case QImage::Format_Grayscale16:
+            summary.markedCount = despikeGrayImage<ushort>(image, target, params,
+                                                           firstRow, lastRow);
             break;
-        }
-
-        // 均值窗口里未标记点的和与个数。前缀和在写入之前整条算完，替换值一律
-        // 基于这一遍开始时的数据，所以结果和扫描顺序无关
-        s.prefixSum[0] = 0.0;
-        s.prefixCount[0] = 0.0;
-        for (int i = 0; i < n; ++i) {
-            const bool replace = s.replacement[static_cast<std::size_t>(i)] != 0;
-            const double keep = replace ? 0.0 : 1.0;
-            s.prefixSum[static_cast<std::size_t>(i + 1)] =
-                s.prefixSum[static_cast<std::size_t>(i)] + result.values[i] * keep;
-            s.prefixCount[static_cast<std::size_t>(i + 1)] =
-                s.prefixCount[static_cast<std::size_t>(i)] + keep;
-        }
-
-        for (int i = 0; i < n; ++i) {
-            if (s.replacement[static_cast<std::size_t>(i)] == 0) {
-                continue;
+        case QImage::Format_Grayscale8:
+            summary.markedCount = despikeGrayImage<uchar>(image, target, params,
+                                                          firstRow, lastRow);
+            break;
+        case QImage::Format_RGB888:
+            summary.markedCount = despikeRgbImage(image, target, params, firstRow, lastRow);
+            break;
+        default:
+            // 不认识的格式原样返回，也不声称处理过任何像素
+            summary.sampleCount = 0;
+            if (result != nullptr) {
+                *result = summary;
             }
-            const int lo = std::max(0, i - m);
-            const int hi = std::min(n - 1, i + m);
-            const double den = s.prefixCount[static_cast<std::size_t>(hi + 1)]
-                             - s.prefixCount[static_cast<std::size_t>(lo)];
-            if (den <= 0.0) {
-                ++result.emptyWindowCount;
-                continue;
-            }
-            const double num = s.prefixSum[static_cast<std::size_t>(hi + 1)]
-                             - s.prefixSum[static_cast<std::size_t>(lo)];
-            result.values[i] = num / den;
-            result.marked[i] = true;
-        }
+            return image;
     }
 
-    for (const bool marked : result.marked) {
-        if (marked) {
-            ++result.markedCount;
-        }
+    if (result != nullptr) {
+        *result = summary;
     }
-    return result;
+    return target;
 }
 
 void verticalBinning(ImageData &frame, int startRow, int endRow)
@@ -304,8 +343,10 @@ void verticalBinning(ImageData &frame, int startRow, int endRow)
 
     QImage binnedImage(width, 1, frame.image.format());
 
+    // 只读源图，用 constBits()：originalImage 已经和 image 共享同一份数据，
+    // 调非 const 的 bits() 会触发 detach，把整幅图再复制一遍（6000x4000 约 50 ms）
     if (frame.image.format() == QImage::Format_Grayscale16) {
-        const ushort *srcData = reinterpret_cast<const ushort *>(frame.image.bits());
+        const ushort *srcData = reinterpret_cast<const ushort *>(frame.image.constBits());
         ushort *dstData = reinterpret_cast<ushort *>(binnedImage.bits());
         frame.spectrum.resize(width);
 
@@ -335,7 +376,7 @@ void verticalBinning(ImageData &frame, int startRow, int endRow)
             }
         }
     } else if (frame.image.format() == QImage::Format_Grayscale8) {
-        const uchar *srcData = frame.image.bits();
+        const uchar *srcData = frame.image.constBits();
         uchar *dstData = binnedImage.bits();
         frame.spectrum.resize(width);
 
@@ -365,7 +406,7 @@ void verticalBinning(ImageData &frame, int startRow, int endRow)
             }
         }
     } else if (frame.image.format() == QImage::Format_RGB888) {
-        const uchar *srcData = frame.image.bits();
+        const uchar *srcData = frame.image.constBits();
         uchar *dstData = binnedImage.bits();
         const int rowStride = width * 3;
         frame.spectrum.resize(width * 3);

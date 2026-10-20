@@ -48,8 +48,9 @@ EZSpecCam 是一个基于 Qt 6.8、C++17 的相机控制应用程序，负责相
 | `SpectrumViewWidget` | 控件 | `src/gui/widgets/display/SpectrumViewWidget.h` | 光谱图控件 |
 | `Calibration::apply` | 函数 | `src/core/Calibration.cpp` | 暗场两种方法（同曝光相减 / 偏置+暗电流线性缩放）与平场两种方法（复用暗场模型后做均值归一化 / 可变曝光拟合）的统一入口 |
 | `CalibrationDialog` | 窗口 | `src/gui/widgets/dialogs/CalibrationDialog.h` | Dark/Flat 两个标签页；参考帧可 Acquire 到内存或从文件加载，曝光时间手动输入 |
-| `PostProcess::despike` | 函数 | `src/gui/widgets/PostProcess.cpp` | 光谱去尖峰（差分修正 Z 分数 + 形状/次阈值判据） |
-| `DespikeDialog` | 窗口 | `src/gui/widgets/dialogs/DespikeDialog.h` | 去尖峰参数（主阈值、次阈值、均值窗口半宽） |
+| `PostProcess::despikeImage` | 函数 | `src/gui/widgets/PostProcess.cpp` | 图像去尖峰（按行估计噪声 + 3×3 孤立像素判据 + 行范围，OpenMP 并行） |
+| `MainWindow::rebuildDespikeAndBinning` | 方法 | `src/gui/widgets/MainWindow.cpp` | 去尖峰 → 垂直合并 → 显示/保存；开关、阈值、行范围变化时从校正后原图重建 |
+| `DespikeDialog` | 窗口 | `src/gui/widgets/dialogs/DespikeDialog.h` | 去尖峰参数（只剩主阈值） |
 | `MockCameraDriver` | 插件 | `src/plugins/mock/MockCameraDriver.cpp` | 用于测试的模拟相机 |
 | `QHYCCDDriver` | 插件 | `src/plugins/qhyccd/QHYCCDDriver.cpp` | QHYCCD 真实硬件驱动 |
 | `Hk16011Driver` | 插件 | `src/plugins/hk16011/Hk16011Driver.cpp` | HK16011 CCD 光谱相机驱动（Linux）→ 详见 `src/plugins/hk16011/AGENTS.md` |

@@ -127,30 +127,18 @@ void SpectrumViewWidget::setData(const QVector<double> &x, const QVector<double>
     }
 
     m_xData = x;
-    m_rawYData = y;
+    m_yData = y;
     m_dataValid = true;
 
     refreshGraphData();
 }
 
-// 显示用的数据都从这里出去：去尖峰开着就拿原始谱算出修补后的一条，
-// 关着就直接用原始谱。光标读数、纵轴范围读的都是 m_yData，所以它们和图上
-// 画出来的始终是同一份数据
+// 光标读数、纵轴范围读的都是 m_yData，和图上画出来的始终是同一份数据
 void SpectrumViewWidget::refreshGraphData()
 {
     if (!m_dataValid || m_xData.isEmpty()) {
         return;
     }
-
-    if (m_despikeEnabled) {
-        const PostProcess::DespikeResult result = PostProcess::despike(m_rawYData, m_despikeParams);
-        m_yData = result.values;
-        m_despikedPointCount = result.markedCount;
-    } else {
-        m_yData = m_rawYData;
-        m_despikedPointCount = 0;
-    }
-    m_despikeSampleCount = m_yData.size();
 
     m_graph->setData(m_xData, m_yData);
 
@@ -171,26 +159,6 @@ void SpectrumViewWidget::refreshGraphData()
 
     if (refreshReadout) {
         emit cursorPosition(m_lastCursorX, readoutY);
-    }
-}
-
-void SpectrumViewWidget::setDespikeEnabled(bool enabled)
-{
-    if (m_despikeEnabled == enabled) {
-        return;
-    }
-
-    m_despikeEnabled = enabled;
-    refreshGraphData();
-}
-
-void SpectrumViewWidget::setDespikeParams(const PostProcess::DespikeParams &params)
-{
-    m_despikeParams = params;
-
-    // 关着的时候图上本来就是原始谱，重算一次不会有任何变化
-    if (m_despikeEnabled) {
-        refreshGraphData();
     }
 }
 
@@ -255,10 +223,7 @@ void SpectrumViewWidget::clearData()
 {
     m_xData.clear();
     m_yData.clear();
-    m_rawYData.clear();
     m_dataValid = false;
-    m_despikedPointCount = 0;
-    m_despikeSampleCount = 0;
     // 数据都清了，光标也就没有可读的值了，别让新数据进来时又冒出来
     m_cursorActive = false;
 

@@ -19,8 +19,9 @@ tests/
 ├── test_dark_calibration/          # Legacy PostProcess dark-subtraction tests
 ├── test_flat_calibration/          # Calibration math: dark (both methods) + flat (both methods, dark-model reuse)
 ├── test_calibration_perf/          # Calibration apply/build benchmarks (prints timings, no thresholds)
-├── test_despike/                   # PostProcess::despike algorithm tests
-├── test_despike_dialog/            # DespikeDialog params + SpectrumViewWidget wiring
+├── test_despike/                   # PostProcess::despikeImage algorithm + row-range tests
+├── test_despike_dialog/            # DespikeDialog single-parameter behaviour
+├── test_despike_pipeline/          # MainWindow despike → vbin → display pipeline + row range
 └── test_view_widgets_perf/         # View widget performance tests
 ```
 
@@ -30,8 +31,10 @@ tests/
 | Adding a new test | Copy existing test dir → new CMakeLists.txt → add to `tests/CMakeLists.txt` |
 | Mock driver integration test | `test_mock_driver/test_mock_driver.cpp` |
 | Plugin loading test | `test_plugin_loading/` |
-| Spectrum despike algorithm | `test_despike/test_despike.cpp` |
+| Image despike algorithm + row range | `test_despike/test_despike.cpp` |
 | Despike parameters dialog | `test_despike_dialog/test_despike_dialog.cpp` |
+| Despike pipeline (spectrum from despiked data, row range, save state) | `test_despike_pipeline/test_despike_pipeline.cpp` |
+| Despike benchmarks (6000×4000 full image / 100 rows, prints FPS) | `test_postprocess_perf/test_postprocess_perf.cpp` |
 | Performance benchmarks | `test_view_widgets_perf/` |
 
 ## CONVENTIONS

@@ -10,7 +10,6 @@
 #include <QRubberBand>
 
 #include "../../qcustomplot.h"
-#include "../PostProcess.h"
 
 class QCPGraph;
 class QCPItemLine;
@@ -62,18 +61,6 @@ public:
     IntensityScaleType intensityScaleType() const { return m_intensityScaleType; }
     void setIntensityScaleType(IntensityScaleType type);
 
-    //! 去尖峰只作用在这个控件显示的谱线上，不动调用方传进来的数据
-    bool despikeEnabled() const { return m_despikeEnabled; }
-    void setDespikeEnabled(bool enabled);
-
-    PostProcess::DespikeParams despikeParams() const { return m_despikeParams; }
-    void setDespikeParams(const PostProcess::DespikeParams &params);
-
-    //! 最近一次处理被改写的点数；去尖峰关闭时为 0
-    int despikedPointCount() const { return m_despikedPointCount; }
-    //! 最近一次处理参与的样本点数
-    int despikeSampleCount() const { return m_despikeSampleCount; }
-
     AxisRangeMode xAxisRangeMode() const { return m_xAxisRangeMode; }
     void setXAxisRangeMode(AxisRangeMode mode);
 
@@ -119,7 +106,7 @@ private:
     double widgetToDataX(int widgetX) const;
     QVector<double> extractRowData(const QImage &image) const;
     void applyAxisRange();
-    //! 用缓存下来的原始谱重建显示数据（去尖峰开关/参数变化后也要走这里）
+    //! 把 m_xData / m_yData 交给曲线并刷新坐标范围与光标读数
     void refreshGraphData();
 
     QCustomPlot *m_plot;
@@ -128,13 +115,6 @@ private:
     QCPItemText *m_cursorLabel;
     QVector<double> m_xData;
     QVector<double> m_yData;
-    //! 未经去尖峰的原始谱。开关或参数一变就要在这份数据上重算，
-    //! 不能在已经处理过的 m_yData 上再处理一遍
-    QVector<double> m_rawYData;
-    bool m_despikeEnabled = false;
-    PostProcess::DespikeParams m_despikeParams;
-    int m_despikedPointCount = 0;
-    int m_despikeSampleCount = 0;
     bool m_dataValid;
     QString m_xAxisLabel;
     QString m_yAxisLabel;

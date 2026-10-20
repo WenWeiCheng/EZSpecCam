@@ -1,4 +1,7 @@
-# Performance tests for PostProcess functions (verticalBinning)
+# Performance tests for PostProcess functions (verticalBinning, despike)
+# 图像去尖峰在 GUI 里是 OpenMP 并行的，基准测试也要开着 OpenMP 才量到真实性能
+find_package(OpenMP REQUIRED)
+
 add_executable(test_postprocess_perf)
 target_sources(test_postprocess_perf PRIVATE
     test_postprocess_perf.cpp
@@ -7,6 +10,7 @@ target_sources(test_postprocess_perf PRIVATE
 target_link_libraries(test_postprocess_perf PRIVATE
     ezspeccam_core
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test
+    OpenMP::OpenMP_CXX
 )
 target_include_directories(test_postprocess_perf PRIVATE
     ${CMAKE_SOURCE_DIR}/src

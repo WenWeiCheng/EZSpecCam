@@ -11,35 +11,39 @@ namespace PostProcess
 void verticalBinning(ImageData &frame, int startRow, int endRow);
 void applyDarkCalibration(ImageData &frame, const QImage *darkFrame, int customBias);
 
-//! 去尖峰（despike）的参数。只有光谱线用得到，图像不经过这条路
-//!
-//! 判据只看一次差分的形状，因此只识别「先升后降」的正向单点脉冲：向下的
-//! 凹陷与两像素以上的宽特征都不会被改写。谱线一半以上的差分恰好相等时
-//! （平坦基线）MAD 退化，此时任何非零差分都算离群，单点尖峰仍会被替换
+//! 去尖峰（despike）的参数。谱线和图像现在走同一个二维算法，只剩主阈值
 struct DespikeParams
 {
-    //! 主阈值：一次差分修正 Z 分数的门限，超过它才算尖峰候选
+    //! 主阈值：像素比周围 8 个邻居中的最大值高出多少个噪声尺度才算尖峰
     double primaryThreshold = 3.5;
-    //! 次阈值：尖峰外侧两个差分的上限；<= 0 表示关闭这条判据
-    double secondaryThreshold = 2.5;
-    //! 均值窗口半宽：替换值取 [i-m, i+m] 内未标记点的均值
-    int windowHalfWidth = 5;
-    //! 迭代遍数：每遍都在修补后的数据上重算差分
-    int passes = 2;
 };
 
-//! 去尖峰的结果。只有被标记的点被改写，其余点与输入逐位相同，不做任何平滑
-struct DespikeResult
+//! 图像去尖峰的结果
+struct ImageDespikeResult
 {
-    QVector<double> values;
-    QVector<bool> marked;
-    //! 输入数据一次差分的修正 Z 分数，第 0 个点没有差分项，记为 NaN；
-    //! MAD 退化为 0 时非零差分记作 ±inf
-    QVector<double> zScores;
+    //! 被改写的像素个数（RGB888 下同一像素多个通道被改写也只算一次）
     int markedCount = 0;
-    //! 邻域内全是标记点、取不到均值的次数
-    int emptyWindowCount = 0;
+    //! 参与检测的像素个数，不含边界一圈；格式不支持、图太小或行范围为空时为 0
+    int sampleCount = 0;
 };
 
-DespikeResult despike(const QVector<double> &y, const DespikeParams &params = DespikeParams());
+//! 3×3 孤立像素去尖峰，返回处理后的副本，入参不动。
+//!
+//! 判据：一个像素比周围 8 个邻居全都高出 primaryThreshold 个噪声尺度才算尖峰，
+//! 替换值取上下左右 4 个邻居的中值。要求「比 8 个邻居都高」是为了只摘掉真正
+//! 孤立的单像素脉冲：竖直/水平/斜向的一像素宽亮线、两像素宽的亮斑、成片的
+//! 亮区都不会被改写。
+//!
+//! 噪声尺度按行估计（相邻像素差分绝对值的中位数），因此亮谱带里被散粒噪声
+//! 抬高的行会用自己的尺度，不会被暗背景的尺度误判。
+//!
+//! firstRow / lastRow 是 0-based 闭区间的行范围，只有范围内的行参与检测与改写；
+//! lastRow < 0 表示最后一行。范围以外的行原样复制，不补做去尖峰，也不参与
+//! sampleCount。范围的首尾行仍然使用范围外的相邻行做 3×3 邻域，所以边界上的
+//! 孤立点不会被漏掉。图像上下边界（第 0 行和最后一行）没有完整邻域，始终不改写。
+//!
+//! 支持 Grayscale8 / Grayscale16 / RGB888，其余格式原样返回。
+QImage despikeImage(const QImage &image, const DespikeParams &params = DespikeParams(),
+                    ImageDespikeResult *result = nullptr,
+                    int firstRow = 0, int lastRow = -1);
 } // namespace PostProcess

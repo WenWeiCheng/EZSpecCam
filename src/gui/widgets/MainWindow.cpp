@@ -370,6 +370,37 @@ void MainWindow::saveFrameToFile(const QString &filePath)
         } else {
             request.frame.softwareSettings["softwareVerticalBinning"] = false;
         }
+
+        // 保存的 m_currentFrame 已经是去尖峰（+ 可选 vbin）之后的帧，这里只把
+        // 参数写进 metadata 供以后追溯；参考帧不做去尖峰，也不能声称处理过
+        const bool despikeApplied = ui->menuActionDespike->isChecked()
+            && !m_currentFrameIsReference
+            && m_lastDespikeResult.sampleCount > 0;
+        request.frame.softwareSettings["despikeApplied"] = despikeApplied;
+        if (despikeApplied) {
+            int startRow = 1;
+            int endRow = -1;
+            effectiveDespikeRows(h, &startRow, &endRow);
+            request.frame.softwareSettings["despikePrimaryThreshold"] =
+                m_despikeParams.primaryThreshold;
+            request.frame.softwareSettings["despikeStartRow"] = startRow;
+            request.frame.softwareSettings["despikeEndRow"] = (endRow < 0) ? h : endRow;
+        }
+
+        // vbin + 部分行范围时，实时管线只处理了 ROI，originalImage 还是原始
+        // 二维图；保存的必须包含去尖峰结果，所以在这里按同一行范围补做一次。
+        // 全范围 / 未开 vbin 的情况下 originalImage 已经是处理后的（或为空）
+        if (ui->menuActionDespike->isChecked() && !m_currentFrameIsReference
+            && request.frame.hasOriginal() && !m_originalImageIsDespiked) {
+            int startRow = 1;
+            int endRow = -1;
+            effectiveDespikeRows(h, &startRow, &endRow);
+            PostProcess::ImageDespikeResult saveResult;
+            request.frame.originalImage =
+                PostProcess::despikeImage(request.frame.originalImage, m_despikeParams,
+                                          &saveResult, startRow - 1,
+                                          endRow < 0 ? -1 : endRow - 1);
+        }
     }
 
     request.filePath = filePath;
@@ -570,6 +601,9 @@ void MainWindow::onFrameLoaded(const LoadResult &result, const QString &filePath
     // Loaded frames go through the same calibration pipeline as live frames.
     // The manual signal exposure in the dialog is what the dark scaling uses.
     applyCalibration(m_currentFrame);
+    m_currentFrameIsReference = false;
+    m_preDespikeFrame = m_currentFrame;
+    m_preDespikeFrame.originalImage = QImage();
 
     const QImage &img = m_currentFrame.image;
     const int imgHeight = img.height();
@@ -587,24 +621,38 @@ void MainWindow::onFrameLoaded(const LoadResult &result, const QString &filePath
         && !fullRange
         && imgHeight > 1;
 
+    // 去尖峰和 vbin 共用行范围。vbin 关闭时 metadata 里没有 vBinStartRow，
+    // 但可能带着去尖峰实际用过的范围，加载后要沿用，否则再开去尖峰会去处理
+    // 当初刻意保留的范围外数据
+    const bool savedDespikeApplied = sw.value("despikeApplied", false).toBool();
+    const int savedDespikeStart = sw.value("despikeStartRow", -1).toInt();
+    const int savedDespikeEnd = sw.value("despikeEndRow", -1).toInt();
+    const bool hasDespikeRange = savedDespikeApplied
+        && savedDespikeStart >= 1
+        && savedDespikeEnd >= savedDespikeStart;
+
     if (shouldRecover) {
         m_vBinStartRow = qBound(1, savedStart, imgHeight);
         m_vBinEndRow = qBound(m_vBinStartRow, savedEnd, imgHeight);
         m_vBinEnabled = true;
-
-        PostProcess::verticalBinning(m_currentFrame, m_vBinStartRow, m_vBinEndRow);
     } else {
         // 缺 metadata / 无 vbin 范围 / 范围覆盖整图 → 直接显示 2D 图
         m_vBinEnabled = false;
-        m_vBinStartRow = 1;
-        m_vBinEndRow = (imgHeight > 0) ? imgHeight : -1;
+        if (hasDespikeRange && imgHeight > 0) {
+            m_vBinStartRow = qBound(1, savedDespikeStart, imgHeight);
+            m_vBinEndRow = qBound(m_vBinStartRow, savedDespikeEnd, imgHeight);
+        } else {
+            m_vBinStartRow = 1;
+            m_vBinEndRow = (imgHeight > 0) ? imgHeight : -1;
+        }
     }
 
     ui->menuActionVerticalBinning->blockSignals(true);
     ui->menuActionVerticalBinning->setChecked(m_vBinEnabled);
     ui->menuActionVerticalBinning->blockSignals(false);
 
-    updateDisplay(m_currentFrame);
+    // 去尖峰和 vbin 都从校正后的原图重新算，行范围沿用 metadata 里恢复出来的值
+    rebuildDespikeAndBinning(true);
 
     QString msg = tr("Loaded %1").arg(QFileInfo(filePath).fileName());
     QStringList parts;
@@ -1090,21 +1138,8 @@ void MainWindow::on_verticalBinning_triggered()
 {
     m_vBinEnabled = ui->menuActionVerticalBinning->isChecked();
 
-    if (!m_currentFrame.isValid()) {
-        return;
-    }
-
-    ImageData frame = m_currentFrame;
-    if (m_vBinEnabled && frame.hasOriginal()) {
-        frame.image = frame.originalImage;
-        PostProcess::verticalBinning(frame, m_vBinStartRow, m_vBinEndRow);
-    } else if (m_vBinEnabled) {
-        PostProcess::verticalBinning(frame, m_vBinStartRow, m_vBinEndRow);
-    } else if (frame.hasOriginal()) {
-        frame.image = frame.originalImage;
-    }
-    m_currentFrame = frame;
-    updateDisplay(frame);
+    // vbin 的行范围同时也决定去尖峰的范围，所以两者一起重建
+    rebuildDespikeAndBinning(true);
 }
 
 void MainWindow::on_rowRange_triggered()
@@ -1140,19 +1175,13 @@ void MainWindow::on_rowRange_triggered()
         m_vBinStartRow = RowRangeDialog::toBinningRow(startRow);
         m_vBinEndRow = RowRangeDialog::toBinningRow(endRow);
 
-        if (m_currentFrame.isValid()) {
-            ImageData frame = m_currentFrame;
-            if (frame.hasOriginal()) {
-                frame.image = frame.originalImage;
-            }
-            PostProcess::verticalBinning(frame, m_vBinStartRow, m_vBinEndRow);
-            m_currentFrame = frame;
-            m_vBinEnabled = true;
-            ui->menuActionVerticalBinning->blockSignals(true);
-            ui->menuActionVerticalBinning->setChecked(true);
-            ui->menuActionVerticalBinning->blockSignals(false);
-            updateDisplay(frame);
-        }
+        m_vBinEnabled = true;
+        ui->menuActionVerticalBinning->blockSignals(true);
+        ui->menuActionVerticalBinning->setChecked(true);
+        ui->menuActionVerticalBinning->blockSignals(false);
+
+        // 行范围变了，去尖峰的范围跟着变，从原始帧重算一遍
+        rebuildDespikeAndBinning(true);
     });
 }
 
@@ -1222,6 +1251,9 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
     //    During a burst calibration is suppressed (we are building a reference,
     //    not correcting a signal frame).
     if (m_acquiringReference) {
+        // 参考帧是校准用的原始数据，不参与去尖峰；保存时也不能声称处理过
+        m_currentFrameIsReference = true;
+
         const QImage &img = m_currentFrame.image;
         if (!img.isNull()) {
             const int width = img.width();
@@ -1329,6 +1361,8 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
             }
 
             m_currentFrame.image = result;
+            m_currentFrame.originalImage = QImage();
+            m_preDespikeFrame = m_currentFrame;
 
             showStatusMessage(tr("Acquiring %1 (%2/%3)...")
                 .arg(referenceName(m_acquiringKind))
@@ -1374,15 +1408,13 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
 
     // 2. Dark subtraction + flat multiplication + output offset
     applyCalibration(m_currentFrame);
+    m_currentFrameIsReference = false;
 
-    // 3. vbin (pre-calibration processing, applies to display only)
-    if (m_vBinEnabled) {
-        ImageData processed = m_currentFrame;
-        PostProcess::verticalBinning(processed, m_vBinStartRow, m_vBinEndRow);
-        m_currentFrame = processed;
-    }
-
-    updateDisplay(m_currentFrame);
+    // 3. 去尖峰 → vbin → 显示。两者都只在 m_preDespikeFrame 上做一次，
+    // 所以开关/参数/行范围变化时可以随时从这份校正后的原图重算
+    m_preDespikeFrame = m_currentFrame;
+    m_preDespikeFrame.originalImage = QImage();
+    rebuildDespikeAndBinning();
     updateToolbarState();
 
     QSettings settings2;
@@ -1608,59 +1640,54 @@ void MainWindow::on_histogram_triggered()
 
 void MainWindow::on_despike_toggled(bool checked)
 {
-    if (!m_spectrumViewWidget) {
-        return;
-    }
-
-    m_spectrumViewWidget->setDespikeEnabled(checked);
+    // 去尖峰现在在采集管线里，显示和保存用的是同一份结果；改开关后从
+    // 校正后的原图重算一遍当前帧
+    rebuildDespikeAndBinning(true);
 
     if (!checked) {
         showStatusMessage(tr("Despike disabled."), 2000);
         return;
     }
 
-    // 还没收到谱线时没有点数可报，别显示「0 of 0」
-    if (m_spectrumViewWidget->despikeSampleCount() <= 0) {
-        showStatusMessage(tr("Despike on (display only)."), 2000);
+    if (m_lastDespikeResult.sampleCount <= 0) {
+        showStatusMessage(tr("Despike on (no rows in the selected row range)."), 3000);
         return;
     }
 
-    // 只在打开时报一次处理点数：live 模式下每帧都会重算，逐帧刷状态栏反而没信息量。
-    // 括号里说明只改显示：存盘/自动保存走的还是原始谱线，看到的不等于存下的
-    showStatusMessage(tr("Despike on: %1 of %2 spectral points replaced (display only).")
-                          .arg(m_spectrumViewWidget->despikedPointCount())
-                          .arg(m_spectrumViewWidget->despikeSampleCount()),
+    showStatusMessage(tr("Despike on: %1 of %2 pixels replaced (shown and saved).")
+                          .arg(m_lastDespikeResult.markedCount)
+                          .arg(m_lastDespikeResult.sampleCount),
                       4000);
 }
 
 void MainWindow::on_despikeSettings_triggered()
 {
-    if (!m_spectrumViewWidget) {
-        return;
-    }
-
     if (!m_despikeDialog) {
         m_despikeDialog = new DespikeDialog(this);
-        // 窗口上显示的就是实际生效的那一组：窗口还没打开过时，控件里的默认值
-        // 和 SpectrumViewWidget 里的默认值本来就一样，这一步只是把这一点写明
-        m_spectrumViewWidget->setDespikeParams(m_despikeDialog->despikeParams());
+        m_despikeDialog->setDespikeParams(m_despikeParams);
 
-        connect(m_despikeDialog, &DespikeDialog::paramsChanged,
-                this, [this](double, double, int) {
-                    m_spectrumViewWidget->setDespikeParams(m_despikeDialog->despikeParams());
+        connect(m_despikeDialog, &DespikeDialog::paramsChanged, this, [this]() {
+            m_despikeParams = m_despikeDialog->despikeParams();
 
-                    // 调参数就是想看效果；去尖峰还没开的话顺手打开，否则改完
-                    // 谱线一点变化都没有，看着像窗口没生效。菜单项被禁用说明
-                    // 当前在图像视图，那里没有谱线可处理，别在背后改状态
-                    if (ui->menuActionDespike->isEnabled()
-                        && !m_spectrumViewWidget->despikeEnabled()) {
-                        ui->menuActionDespike->blockSignals(true);
-                        ui->menuActionDespike->setChecked(true);
-                        ui->menuActionDespike->blockSignals(false);
-                        m_spectrumViewWidget->setDespikeEnabled(true);
-                        showStatusMessage(tr("Despike enabled."), 2000);
-                    }
-                });
+            // 调参数就是想看效果；去尖峰还没开的话顺手打开，否则改完
+            // 画面一点变化都没有，看着像窗口没生效
+            if (ui->menuActionDespike->isEnabled() && !ui->menuActionDespike->isChecked()) {
+                ui->menuActionDespike->blockSignals(true);
+                ui->menuActionDespike->setChecked(true);
+                ui->menuActionDespike->blockSignals(false);
+            }
+
+            rebuildDespikeAndBinning(true);
+
+            if (m_lastDespikeResult.sampleCount > 0) {
+                showStatusMessage(tr("Despike: %1 of %2 pixels replaced.")
+                                      .arg(m_lastDespikeResult.markedCount)
+                                      .arg(m_lastDespikeResult.sampleCount),
+                                  2000);
+            }
+        });
+    } else {
+        m_despikeDialog->setDespikeParams(m_despikeParams);
     }
 
     m_despikeDialog->show();
@@ -1773,13 +1800,101 @@ void MainWindow::updateToolbarState()
 
 
 
-void MainWindow::updateDisplay(const ImageData &frame)
+void MainWindow::effectiveDespikeRows(int height, int *startRow, int *endRow) const
+{
+    if (height <= 0) {
+        *startRow = 1;
+        *endRow = -1;
+        return;
+    }
+
+    *startRow = qBound(1, m_vBinStartRow, height);
+    *endRow = (m_vBinEndRow < 0) ? height : qBound(1, m_vBinEndRow, height);
+}
+
+void MainWindow::rebuildDespikeAndBinning(bool forceDisplay)
+{
+    if (!m_preDespikeFrame.isValid()) {
+        return;
+    }
+
+    ImageData frame = m_preDespikeFrame;
+    frame.originalImage = QImage();
+    m_originalImageIsDespiked = false;
+    m_lastDespikeResult = PostProcess::ImageDespikeResult();
+
+    const bool despikeEnabled = ui->menuActionDespike->isChecked()
+        && !m_currentFrameIsReference;
+    bool roiBinned = false;
+
+    if (despikeEnabled && frame.image.height() > 1) {
+        const int height = frame.image.height();
+        int startRow = 1;
+        int endRow = -1;
+        effectiveDespikeRows(height, &startRow, &endRow);
+
+        const bool fullRange = (startRow <= 1 && endRow >= height);
+        const bool partialRange = (startRow <= endRow) && !fullRange;
+
+        if (m_vBinEnabled && partialRange) {
+            // vbin 只看谱带那几行：只把 ROI（前后各多带一行做邻域）复制出来
+            // 去尖峰，再对 ROI 做合并。这样每帧不用为了显示复制整幅 48 MB，
+            // 完整二维图留给保存时再补
+            const int roiFirst = startRow - 1;
+            const int roiLast = endRow - 1;
+            const int haloFirst = std::max(0, roiFirst - 1);
+            const int haloLast = std::min(height - 1, roiLast + 1);
+
+            const QImage roi = frame.image.copy(0, haloFirst, frame.image.width(),
+                                                haloLast - haloFirst + 1);
+            if (!roi.isNull()) {
+                const int roiFirstInRoi = roiFirst - haloFirst;
+                const int roiLastInRoi = roiLast - haloFirst;
+
+                const QImage processed = PostProcess::despikeImage(roi, m_despikeParams,
+                                                                   &m_lastDespikeResult,
+                                                                   roiFirstInRoi, roiLastInRoi);
+
+                ImageData binned = frame;
+                binned.image = processed;
+                binned.originalImage = QImage();
+                PostProcess::verticalBinning(binned, roiFirstInRoi + 1, roiLastInRoi + 1);
+
+                frame.image = binned.image;
+                frame.spectrum = binned.spectrum;
+                // originalImage 留原始二维图；saveFrameToFile() 会在保存时按同一
+                // 行范围补做去尖峰，范围内的数据不会漏掉
+                frame.originalImage = m_preDespikeFrame.image;
+                roiBinned = true;
+            }
+        }
+
+        if (!roiBinned) {
+            frame.image = PostProcess::despikeImage(frame.image, m_despikeParams,
+                                                    &m_lastDespikeResult,
+                                                    startRow - 1,
+                                                    endRow < 0 ? -1 : endRow - 1);
+        }
+    }
+
+    if (m_vBinEnabled && !roiBinned) {
+        // 保存/加载都以 originalImage 为主图，这里必须是去尖峰之后的 2D 图
+        m_originalImageIsDespiked = despikeEnabled && frame.image.height() > 1;
+        frame.originalImage = frame.image;
+        PostProcess::verticalBinning(frame, m_vBinStartRow, m_vBinEndRow);
+    }
+
+    m_currentFrame = frame;
+    updateDisplay(m_currentFrame, forceDisplay);
+}
+
+void MainWindow::updateDisplay(const ImageData &frame, bool force)
 {
     if (!frame.isValid()) {
         return;
     }
 
-    if (!m_frameTimer.hasExpired(MIN_FRAME_INTERVAL_MS)) {
+    if (!force && !m_frameTimer.hasExpired(MIN_FRAME_INTERVAL_MS)) {
         return;
     }
 
@@ -1811,7 +1926,9 @@ void MainWindow::updateDisplay(const ImageData &frame)
         }
 
         if (m_histogramWindow && m_histogramWindow->isVisible()) {
-            m_histogramWindow->setImage(frame.image);
+            // 和图像视图保持同一份数据：去尖峰开着时统计的也是修补后的图，
+            // 否则右侧看到的和直方图对不上
+            m_histogramWindow->setImage(m_imageViewWidget->image());
         }
     }
 }
@@ -1831,17 +1948,22 @@ void MainWindow::switchView(int height)
         QCoreApplication::processEvents();
     }
 
-    // 直方图统计的是图像、去尖峰处理的是谱线：两者各自只在对应的视图下
-    // 放开菜单项。只在模式真的变了时才动，switchView 是每帧都调的，
-    // 没必要每帧都去碰一遍 QAction。首帧必须走一次，两个菜单项的初始状态
-    // 都是禁用的（见 MainWindowUi），否则一直等不到启用它们的那一次
+    // 直方图只统计图像，去尖峰两种视图都有：直方图菜单项跟着视图走，
+    // 去尖峰的两个菜单项在第一帧确定视图后就可以一直放开。只在模式真的变了
+    // 时才动，switchView 是每帧都调的，没必要每帧都去碰一遍 QAction。
+    // 首帧必须走一次，菜单项的初始状态都是禁用的（见 MainWindowUi）
     const bool imageViewActive = (height != 1);
-    if (!m_viewModeKnown || imageViewActive != m_imageViewActive) {
+    if (!m_viewModeKnown) {
         m_viewModeKnown = true;
         m_imageViewActive = imageViewActive;
+        ui->menuActionDespike->setEnabled(true);
+        ui->menuActionDespikeSettings->setEnabled(true);
         ui->menuActionHistogram->setEnabled(imageViewActive);
-        ui->menuActionDespike->setEnabled(!imageViewActive);
-        ui->menuActionDespikeSettings->setEnabled(!imageViewActive);
+        return;
+    }
+    if (imageViewActive != m_imageViewActive) {
+        m_imageViewActive = imageViewActive;
+        ui->menuActionHistogram->setEnabled(imageViewActive);
     }
 }
 

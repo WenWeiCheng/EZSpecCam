@@ -6,12 +6,12 @@
 #include "../PostProcess.h"
 
 class QDoubleSpinBox;
-class QSpinBox;
 
-//! 光谱去尖峰的参数窗口。
+//! 去尖峰的参数窗口。
 //!
-//! 只暴露三个参数：主阈值、次阈值、均值窗口半宽。改动即时生效，窗口上没有
-//! OK/Cancel —— 去尖峰看的是谱线形状，调参数时得一边调一边看效果
+//! 现在只有一个参数：主阈值。改动即时生效，窗口上没有 OK/Cancel —— 去尖峰
+//! 看的是画面，调参数时得一边调一边看效果。生效的行范围跟着 Process →
+//! Row Range 走，不在这里重复设置。
 class DespikeDialog : public QDialog
 {
     Q_OBJECT
@@ -25,19 +25,14 @@ public:
     void setDespikeParams(const PostProcess::DespikeParams &params);
 
     double primaryThreshold() const;
-    double secondaryThreshold() const;
-    int windowHalfWidth() const;
 
 signals:
-    //! 三个参数一起发，外层只需重算一次，不会出现「阈值已改、窗口还是旧的」的中间态
-    void paramsChanged(double primaryThreshold, double secondaryThreshold, int windowHalfWidth);
+    void paramsChanged();
 
 private:
     void setupUi();
 
     QDoubleSpinBox *m_primarySpin = nullptr;
-    QDoubleSpinBox *m_secondarySpin = nullptr;
-    QSpinBox *m_windowSpin = nullptr;
 };
 
 #endif // DESPIKEDIALOG_H

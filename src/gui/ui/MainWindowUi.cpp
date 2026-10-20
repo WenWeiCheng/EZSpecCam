@@ -172,15 +172,15 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     menuProcess->addAction(menuActionRowRange);
 
     menuProcess->addSeparator();
-    // 去尖峰只对 spectrumView 有意义：图像模式下没有可处理的谱线。两个菜单项
-    // 先关着，等第一帧确定视图模式后由 MainWindow::switchView 放开
+    // 去尖峰在采集管线里执行，谱线和图像看到的是同一份结果。两个菜单项先关着，
+    // 等第一帧确定视图模式后由 MainWindow::switchView 放开
     menuActionDespike = new QAction("&Despike", mainWindow);
     menuActionDespike->setShortcut(QKeySequence(Qt::Key_D));
     menuActionDespike->setShortcutContext(Qt::ApplicationShortcut);
     menuActionDespike->setCheckable(true);
     menuActionDespike->setEnabled(false);
-    menuActionDespike->setToolTip("Replace cosmic-ray spikes in the displayed spectrum "
-                                  "(display only; saved data is unchanged)");
+    menuActionDespike->setToolTip("Replace cosmic-ray spikes before vertical binning, display "
+                                  "and save (only rows inside the current row range)");
     menuProcess->addAction(menuActionDespike);
 
     menuActionDespikeSettings = new QAction("Despike Settings...", mainWindow);
