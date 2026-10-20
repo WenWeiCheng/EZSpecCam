@@ -31,10 +31,11 @@ gui/
     │   ├── HistogramViewWidget  # Bar-chart plot (histogram only)
     │   ├── HistogramWindow      # Histogram + overexposure statistics
     │   └── StatisticsDialog     # Frame statistics
-    ├── PostProcess.cpp/h        # Algorithms: vertical binning, dark calibration, despike
+    ├── PostProcess.cpp/h        # Algorithms: vertical binning, legacy dark calibration, despike
     └── dialogs/                 # Utility dialogs
         ├── CustomRangeDialog    # Custom spectrum range input
         ├── RowRangeDialog       # Row binning range input
+        ├── CalibrationDialog    # Dark/Flat tabs: acquire or load references; flat reuses the dark model
         └── DespikeDialog        # Spectrum despike parameters (3 params only)
 ```
 

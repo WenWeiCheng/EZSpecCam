@@ -10,7 +10,7 @@ EZSpecCam 是一个基于 Qt 6.8、C++17 的相机控制应用程序，负责相
 ## 目录结构
 ```
 ├── src/
-│   ├── core/           # 相机驱动接口 + 类型定义 → 详见 src/core/ICameraDriver.md
+│   ├── core/           # 相机驱动接口、类型定义、暗场/平场校正 → 详见 src/core/ICameraDriver.md
 │   ├── formats/        # 图像格式处理器（TIFF、CSV、SaveTypes、FrameWriter）→ CLI 与 GUI 共用
 │   ├── cli/            # CLI 程序（QCoreApplication）→ 详见 src/cli/README.md
 │   ├── gui/            # Qt GUI 程序 → 详见 src/gui/AGENTS.md
@@ -46,6 +46,8 @@ EZSpecCam 是一个基于 Qt 6.8、C++17 的相机控制应用程序，负责相
 | `CameraTab` | 控件 | `src/gui/widgets/config/CameraTab.h` | 相机参数配置标签页 |
 | `ImageViewWidget` | 控件 | `src/gui/widgets/display/ImageViewWidget.h` | 基于 QCustomPlot 的图像渲染 |
 | `SpectrumViewWidget` | 控件 | `src/gui/widgets/display/SpectrumViewWidget.h` | 光谱图控件 |
+| `Calibration::apply` | 函数 | `src/core/Calibration.cpp` | 暗场两种方法（同曝光相减 / 偏置+暗电流线性缩放）与平场两种方法（复用暗场模型后做均值归一化 / 可变曝光拟合）的统一入口 |
+| `CalibrationDialog` | 窗口 | `src/gui/widgets/dialogs/CalibrationDialog.h` | Dark/Flat 两个标签页；参考帧可 Acquire 到内存或从文件加载，曝光时间手动输入 |
 | `PostProcess::despike` | 函数 | `src/gui/widgets/PostProcess.cpp` | 光谱去尖峰（差分修正 Z 分数 + 形状/次阈值判据） |
 | `DespikeDialog` | 窗口 | `src/gui/widgets/dialogs/DespikeDialog.h` | 去尖峰参数（主阈值、次阈值、均值窗口半宽） |
 | `MockCameraDriver` | 插件 | `src/plugins/mock/MockCameraDriver.cpp` | 用于测试的模拟相机 |

@@ -5,11 +5,15 @@
 // stay locked while no camera is connected, and the in-memory marker must
 // never leak into the persisted path.
 #include <QCheckBox>
+#include <QComboBox>
 #include <QCoreApplication>
+#include <QDoubleSpinBox>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSignalSpy>
 #include <QSpinBox>
+#include <QStackedWidget>
 #include <QTest>
 
 #include "widgets/dialogs/CalibrationDialog.h"
@@ -22,6 +26,19 @@ static QPushButton *acquireButtonOf(CalibrationDialog *dialog)
 static QSpinBox *frameCountSpinOf(CalibrationDialog *dialog)
 {
     return dialog->findChild<QSpinBox *>(QStringLiteral("frameCountSpinBox"));
+}
+
+// The dialog now contains several QLineEdit widgets (and spin boxes also own an
+// internal line edit), so the tests address the dark path by object name rather
+// than relying on child order.
+static QLineEdit *darkPathOf(CalibrationDialog *dialog)
+{
+    return dialog->findChild<QLineEdit *>(QStringLiteral("matchedDarkPathEdit"));
+}
+
+static QCheckBox *darkEnableOf(CalibrationDialog *dialog)
+{
+    return dialog->findChild<QCheckBox *>(QStringLiteral("darkEnableCheckBox"));
 }
 
 class TestCalibrationDialog : public QObject
@@ -40,6 +57,10 @@ private slots:
     void test_applied_reports_enable_and_bias();
     void test_in_memory_placeholder_is_not_truncated();
     void test_frame_count_cannot_exceed_the_shared_limit();
+    void test_acquire_reports_kind_and_manual_exposure();
+    void test_method_selection_switches_the_visible_page();
+    void test_apply_reports_but_keeps_dialog_open();
+    void test_flat_status_only_appears_on_error();
 };
 
 void TestCalibrationDialog::test_acquire_emits_requested_frame_count()
@@ -119,7 +140,7 @@ void TestCalibrationDialog::test_frame_count_locked_while_running()
 void TestCalibrationDialog::test_in_memory_marker_never_becomes_the_path()
 {
     CalibrationDialog dialog;
-    auto *path = dialog.findChild<QLineEdit *>();
+    auto *path = darkPathOf(&dialog);
     QVERIFY(path);
 
     dialog.setInMemoryDarkFrameUsed(true, 10);
@@ -137,7 +158,7 @@ void TestCalibrationDialog::test_in_memory_marker_never_becomes_the_path()
 void TestCalibrationDialog::test_applied_reports_enable_and_bias()
 {
     CalibrationDialog dialog;
-    auto *enable = dialog.findChild<QCheckBox *>();
+    auto *enable = darkEnableOf(&dialog);
     QVERIFY(enable);
     auto *ok = dialog.findChild<QPushButton *>(QStringLiteral("okButton"));
     QVERIFY(ok);
@@ -162,7 +183,7 @@ void TestCalibrationDialog::test_in_memory_placeholder_is_not_truncated()
 {
     CalibrationDialog dialog;
 
-    auto *path = dialog.findChild<QLineEdit *>();
+    auto *path = darkPathOf(&dialog);
     QVERIFY(path);
     auto *spin = frameCountSpinOf(&dialog);
     QVERIFY(spin);
@@ -199,6 +220,115 @@ void TestCalibrationDialog::test_frame_count_cannot_exceed_the_shared_limit()
     spin->setValue(0);
     QCOMPARE(spin->value(), 1);
     QCOMPARE(dialog.frameCount(), 1);
+}
+
+// Acquire is no longer a single dark-only button: each reference slot has one,
+// and MainWindow decides where the result goes from acquisitionKind(). The
+// manual exposure shown in the slot must travel with the request.
+void TestCalibrationDialog::test_acquire_reports_kind_and_manual_exposure()
+{
+    CalibrationDialog dialog;
+
+    auto *flatAcquire = dialog.findChild<QPushButton *>(QStringLiteral("flatAcquireButton"));
+    auto *flatExposure = dialog.findChild<QDoubleSpinBox *>(QStringLiteral("flatExposureSpin"));
+    QVERIFY2(flatAcquire, "平场没有 Acquire 按钮");
+    QVERIFY(flatExposure);
+
+    flatExposure->setValue(2.5);
+    QSignalSpy spy(&dialog, &CalibrationDialog::acquireRequested);
+    flatAcquire->click();
+
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(spy.at(0).at(0).toInt(), dialog.frameCount());
+    QCOMPARE(static_cast<int>(dialog.acquisitionKind()),
+             static_cast<int>(CalibrationDialog::AcquireKind::Flat));
+    QCOMPARE(dialog.acquisitionExposure(), 2.5);
+
+    // 平场在采的时候，暗帧的 Acquire 也必须锁上，避免两个 burst 叠在一起
+    auto *darkAcquire = acquireButtonOf(&dialog);
+    QVERIFY(darkAcquire);
+    QVERIFY(!darkAcquire->isEnabled());
+}
+
+void TestCalibrationDialog::test_flat_status_only_appears_on_error()
+{
+    CalibrationDialog dialog;
+    auto *status = dialog.findChild<QLabel *>(QStringLiteral("flatStatusLabel"));
+    auto *enable = dialog.findChild<QCheckBox *>(QStringLiteral("flatEnableCheckBox"));
+    QVERIFY(status);
+    QVERIFY(enable);
+    QVERIFY(status->isHidden());
+
+    // "disabled" and "ready" are already conveyed by the checkbox; the row is
+    // reserved for the case the checkbox cannot express: enabled but not built.
+    dialog.setFlatFieldStatus(QStringLiteral("Flat-field calibration disabled."), true);
+    QVERIFY(status->isHidden());
+    dialog.setFlatFieldStatus(QStringLiteral("Ready: mean signal 100 ADU."), true);
+    QVERIFY(status->isHidden());
+
+    dialog.setFlatFieldStatus(QStringLiteral("Not ready: missing flat frame."), false);
+    QVERIFY(!status->isHidden());
+    QCOMPARE(status->text(), QStringLiteral("Not ready: missing flat frame."));
+    QVERIFY2(enable->toolTip().isEmpty(), qPrintable(enable->toolTip()));
+
+    dialog.setFlatFieldStatus(QStringLiteral("Ready: mean signal 100 ADU."), true);
+    QVERIFY(status->isHidden());
+}
+
+void TestCalibrationDialog::test_method_selection_switches_the_visible_page()
+{
+    CalibrationDialog dialog;
+
+    auto *darkMethod = dialog.findChild<QComboBox *>(QStringLiteral("darkMethodCombo"));
+    auto *darkStack = dialog.findChild<QStackedWidget *>(QStringLiteral("darkMethodStack"));
+    auto *flatMethod = dialog.findChild<QComboBox *>(QStringLiteral("flatMethodCombo"));
+    auto *flatStack = dialog.findChild<QStackedWidget *>(QStringLiteral("flatMethodStack"));
+    QVERIFY(darkMethod);
+    QVERIFY(darkStack);
+    QVERIFY(flatMethod);
+    QVERIFY(flatStack);
+
+    dialog.setDarkMethod(Calibration::DarkMethod::BiasScaled);
+    QCOMPARE(darkMethod->currentIndex(), 1);
+    QCOMPARE(darkStack->currentIndex(), 1);
+    QCOMPARE(dialog.darkMethod(), Calibration::DarkMethod::BiasScaled);
+
+    dialog.setFlatMethod(Calibration::FlatMethod::VariableExposure);
+    QCOMPARE(flatMethod->currentIndex(), 1);
+    QCOMPARE(flatStack->currentIndex(), 1);
+    QCOMPARE(dialog.flatMethod(), Calibration::FlatMethod::VariableExposure);
+}
+
+// Apply must push the settings to MainWindow but keep the window open; OK is
+// still the only button that accepts and closes the dialog.
+void TestCalibrationDialog::test_apply_reports_but_keeps_dialog_open()
+{
+    CalibrationDialog dialog;
+    dialog.show();
+    QCoreApplication::processEvents();
+
+    auto *enable = darkEnableOf(&dialog);
+    auto *apply = dialog.findChild<QPushButton *>(QStringLiteral("applyButton"));
+    auto *ok = dialog.findChild<QPushButton *>(QStringLiteral("okButton"));
+    QVERIFY(enable);
+    QVERIFY2(apply, "对话框里没有 Apply 按钮");
+    QVERIFY(ok);
+
+    enable->setChecked(true);
+    dialog.setCustomBias(321);
+
+    QSignalSpy spy(&dialog, &CalibrationDialog::applied);
+    apply->click();
+
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(spy.at(0).at(0).toBool(), true);
+    QCOMPARE(spy.at(0).at(2).toInt(), 321);
+    QVERIFY2(dialog.isVisible(), "Apply 不应关闭窗口");
+
+    // 同一个窗口里还能继续按 OK，再应用一次并退出
+    ok->click();
+    QCOMPARE(spy.count(), 2);
+    QVERIFY(!dialog.isVisible());
 }
 
 QTEST_MAIN(TestCalibrationDialog)

@@ -12,6 +12,8 @@ target_include_directories(ezspeccam_core
 target_sources(ezspeccam_core PRIVATE
     ICameraDriver.h
     CameraTypes.h
+    Calibration.h
+    Calibration.cpp
     PluginLoader.h
     PluginLoader.cpp
 )

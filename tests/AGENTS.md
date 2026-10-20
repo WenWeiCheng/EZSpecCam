@@ -16,6 +16,9 @@ tests/
 ├── test_plugin_loading/            # Plugin discovery + loading tests
 ├── test_profile_demo/              # Profile/stats widget tests
 ├── test_qhyccd_driver/             # QHYCCD driver tests
+├── test_dark_calibration/          # Legacy PostProcess dark-subtraction tests
+├── test_flat_calibration/          # Calibration math: dark (both methods) + flat (both methods, dark-model reuse)
+├── test_calibration_perf/          # Calibration apply/build benchmarks (prints timings, no thresholds)
 ├── test_despike/                   # PostProcess::despike algorithm tests
 ├── test_despike_dialog/            # DespikeDialog params + SpectrumViewWidget wiring
 └── test_view_widgets_perf/         # View widget performance tests

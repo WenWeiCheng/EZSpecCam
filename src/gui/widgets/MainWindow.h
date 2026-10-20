@@ -12,6 +12,7 @@
 #include "../AppController.h"
 #include "../Theme.h"
 #include "../workers/FileLoaderWorker.h"
+#include "Calibration.h"
 
 class MainWindowUi;
 class CameraTab;
@@ -86,6 +87,9 @@ private slots:
     void on_actionCalibration_triggered();
     void onCalibrationApplied(bool enabled, const QString &path, int bias);
     void onAcquireDarkFrameStartRequested(int frameCount);
+    void onReferenceFileSelected(int kind, const QString &path);
+    void onVffRemoveRequested(int index);
+    void onVffClearRequested();
 
 private:
     // L / S / B 选中的采集模式。这是常驻状态，挂在状态栏那条常驻带子上；
@@ -108,9 +112,16 @@ private:
     void onFpsTimerTimeout();
     void showStatusMessage(const QString &message, int timeoutMs = 3000);
     void saveFrameToFile(const QString &filePath);
-    void cancelDarkAcquisition(const QString &reason);
+    void startReferenceAcquisition(Calibration::ReferenceKind kind, int frameCount,
+                                   double exposure);
+    void cancelReferenceAcquisition(const QString &reason);
+    void storeReferenceFrame(Calibration::ReferenceKind kind,
+                             const Calibration::ReferenceFrame &reference);
+    void rebuildFlatField(bool showWarnings);
+    void applyCalibration(ImageData &frame);
+    QString referenceName(Calibration::ReferenceKind kind) const;
     void requestStartCapture(int captureCount);
-    void refreshCalibrationDialog();
+    void refreshCalibrationDialog(bool reloadConfig = false);
     void updateStateLabel();
     void applyCaptureMode(CaptureMode mode);
     int captureCountForMode(CaptureMode mode) const;
@@ -165,28 +176,38 @@ private:
     //! -1 表示「到最后一行」
     int m_vBinEndRow = -1;
 
-    // Dark-frame calibration state
-    bool    m_darkEnabled  = false;
-    QString m_darkPath;
-    int     m_darkBias     = 1000;
-    QImage  m_darkFrame;
-    bool    m_darkFrameValid = false;
+    // ----- Calibration state -------------------------------------------
+    // The applied configuration is authoritative here; the dialog is only an
+    // editor. Reference planes stay in memory until the application exits.
+    Calibration::DarkSettings m_darkSettings;
+    Calibration::FlatSettings m_flatSettings;
+    Calibration::FlatField m_flatField;
+    bool m_flatFieldValid = false;
+    QString m_flatFieldError;
+    quint64 m_lastCalibrationWarnMs = 0;
 
-    // Dark-frame acquisition state machine
-    bool    m_acquiringDark  = false;
-    int     m_darkBurstTotal     = 10;
-    int     m_darkBurstRemaining = 0;
-    bool    m_darkAccumInit     = false;
-    quint64 m_darkAccumFrames   = 0;
-    quint64 m_lastDarkSizeWarnMs = 0;
-    QImage::Format m_darkAccumFormat = QImage::Format_Invalid;
+    // ----- Reference acquisition state machine -------------------------
+    bool m_acquiringReference = false;
+    Calibration::ReferenceKind m_acquiringKind = Calibration::ReferenceKind::MatchedDark;
+    double m_acquiringExposure = 0.0;
+    int m_referenceBurstTotal = 10;
+    int m_referenceBurstRemaining = 0;
+    bool m_referenceAccumInit = false;
+    quint64 m_referenceAccumFrames = 0;
+    int m_referenceAccumWidth = 0;
+    int m_referenceAccumHeight = 0;
+    QImage::Format m_referenceAccumFormat = QImage::Format_Invalid;
     // Per-pixel (per-channel for RGB) running sum. quint64 keeps the accumulator
     // safe from wrap-around across the full range of supported frame counts
     // (CalibrationDialog::kMaxFrameCount) and pixel depths (8/16-bit).
-    QVector<quint64> m_darkAccumSum;
+    QVector<quint64> m_referenceAccumSum;
 
-    // Discriminator: when true, onFrameLoaded stores result as m_darkFrame
-    bool    m_loadingFrameIsDark = false;
+    // When a reference image is being loaded from disk, onFrameLoaded stores it
+    // into this slot instead of displaying it as the current frame.
+    bool m_loadingReference = false;
+    Calibration::ReferenceKind m_loadingReferenceKind = Calibration::ReferenceKind::MatchedDark;
+    double m_loadingReferenceExposure = 0.0;
+    QString m_loadingReferencePath;
 
     QShortcut *shortcutLive = nullptr;
     QShortcut *shortcutSingle = nullptr;

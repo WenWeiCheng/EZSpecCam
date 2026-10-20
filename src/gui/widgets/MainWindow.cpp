@@ -40,6 +40,9 @@
 #include <QFileInfo>
 #include <qobject.h>
 
+#include <algorithm>
+#include <cmath>
+
 Q_LOGGING_CATEGORY(parameterCategory, "Parameter")
 Q_LOGGING_CATEGORY(cameraCategory, "Camera")
 Q_LOGGING_CATEGORY(configCategory, "Config")
@@ -56,6 +59,9 @@ MainWindow::MainWindow(QWidget *parent)
     , m_fpsTimer(new QTimer(this))
     , m_launchTimestamp(QDateTime::currentDateTime())
 {
+    // 和旧实现保持同一个默认输出偏置，用户不必每次重新输入
+    m_darkSettings.outputOffset = 1000;
+
     // 必须在 setupUi 之前：绘图控件是在那里创建的，创建时就会按当前主题取色
     restoreTheme();
 
@@ -524,15 +530,26 @@ void MainWindow::onFrameLoaded(const LoadResult &result, const QString &filePath
             tr("Failed to load frame: %1").arg(result.errorMessage));
         return;
     }
-    if (m_loadingFrameIsDark) {
-        m_loadingFrameIsDark = false;
-        m_darkFrame = result.frame.hasOriginal()
-            ? result.frame.originalImage
-            : result.frame.image;
-        m_darkFrameValid = !m_darkFrame.isNull();
-        showStatusMessage(m_darkFrameValid
-            ? tr("Dark frame loaded.")
-            : tr("Failed to load dark frame: empty image."), 5000);
+    if (m_loadingReference) {
+        m_loadingReference = false;
+
+        Calibration::ReferenceFrame reference;
+        reference.exposure = m_loadingReferenceExposure;
+        reference.frameCount = 1;
+        reference.source = m_loadingReferencePath;
+        QString planeError;
+        reference.plane = Calibration::planeFromImage(result.frame.image, &planeError);
+        if (reference.isNull()) {
+            showStatusMessage(tr("Failed to load calibration reference: %1").arg(planeError),
+                              5000);
+            return;
+        }
+
+        storeReferenceFrame(m_loadingReferenceKind, reference);
+        refreshCalibrationDialog();
+        showStatusMessage(tr("Calibration reference loaded: %1")
+                              .arg(QFileInfo(m_loadingReferencePath).fileName()),
+                          5000);
         return;
     }
 
@@ -549,6 +566,10 @@ void MainWindow::onFrameLoaded(const LoadResult &result, const QString &filePath
     }
 
     m_currentFrame = result.frame;
+
+    // Loaded frames go through the same calibration pipeline as live frames.
+    // The manual signal exposure in the dialog is what the dark scaling uses.
+    applyCalibration(m_currentFrame);
 
     const QImage &img = m_currentFrame.image;
     const int imgHeight = img.height();
@@ -595,6 +616,13 @@ void MainWindow::onFrameLoaded(const LoadResult &result, const QString &filePath
 
 void MainWindow::onFrameLoadFailed(const QString &error, const QString &filePath)
 {
+    if (m_loadingReference) {
+        m_loadingReference = false;
+        showStatusMessage(tr("Failed to load calibration reference %1: %2")
+                              .arg(QFileInfo(filePath).fileName(), error),
+                          5000);
+        return;
+    }
     QMessageBox::warning(this, tr("Open Frame"),
         tr("Failed to load %1: %2").arg(QFileInfo(filePath).fileName(), error));
 }
@@ -637,82 +665,289 @@ void MainWindow::on_actionCalibration_triggered()
         connect(m_calibrationDialog, &CalibrationDialog::applied,
                 this, &MainWindow::onCalibrationApplied);
         connect(m_calibrationDialog, &CalibrationDialog::acquireRequested,
-                this, &MainWindow::onAcquireDarkFrameStartRequested);
+                this, [this](int frameCount) {
+                    if (!m_calibrationDialog) {
+                        return;
+                    }
+                    const auto kind = static_cast<Calibration::ReferenceKind>(
+                        m_calibrationDialog->acquisitionKind());
+                    startReferenceAcquisition(kind, frameCount,
+                                              m_calibrationDialog->acquisitionExposure());
+                });
+        connect(m_calibrationDialog, &CalibrationDialog::referenceFileSelected,
+                this, &MainWindow::onReferenceFileSelected);
+        connect(m_calibrationDialog, &CalibrationDialog::vffRemoveRequested,
+                this, &MainWindow::onVffRemoveRequested);
+        connect(m_calibrationDialog, &CalibrationDialog::vffClearRequested,
+                this, &MainWindow::onVffClearRequested);
     }
 
-    refreshCalibrationDialog();
+    refreshCalibrationDialog(true);
     m_calibrationDialog->show();
     m_calibrationDialog->raise();
     m_calibrationDialog->activateWindow();
 }
 
-// 窗口开着的时候状态也得跟着变：采完暗帧当场把「已经采到 N 帧平均」显示出来，
+// 窗口开着的时候状态也得跟着变：采完参考帧当场把「已经采到 N 帧平均」显示出来，
 // 用户不用关掉再打开就能勾 Enable。
-void MainWindow::refreshCalibrationDialog()
+void MainWindow::refreshCalibrationDialog(bool reloadConfig)
 {
     if (!m_calibrationDialog) {
         return;
     }
 
-    m_calibrationDialog->setDarkFrameEnabled(m_darkEnabled);
-    m_calibrationDialog->setDarkFramePath(m_darkPath);
-    // If no file is selected but an acquired dark frame is already in memory,
-    // surface that in the dialog so the user sees what is actually in use.
-    // The path field stays empty (placeholder only), so darkFramePath() keeps
-    // returning "" and we never write the indicator into m_darkPath.
-    m_calibrationDialog->setInMemoryDarkFrameUsed(
-        m_darkPath.isEmpty() && m_darkFrameValid, m_darkBurstTotal);
-    m_calibrationDialog->setCustomBias(m_darkBias);
-    m_calibrationDialog->setFrameCount(m_darkBurstTotal);
-    m_calibrationDialog->setAcquireInProgress(m_acquiringDark);
+    // 重新打开窗口时把已应用的配置读回控件；采完参考帧后的刷新只更新状态，
+    // 不能把用户正在输入的方法、曝光时间覆盖成上一次 OK 时的值。
+    if (reloadConfig) {
+        m_calibrationDialog->setDarkFrameEnabled(m_darkSettings.enabled);
+        m_calibrationDialog->setDarkMethod(m_darkSettings.method);
+        m_calibrationDialog->setMatchedDarkExposure(m_darkSettings.matchedExposure);
+        m_calibrationDialog->setLongDarkExposure(m_darkSettings.longDarkExposure);
+        m_calibrationDialog->setTargetExposure(m_darkSettings.targetExposure);
+        m_calibrationDialog->setCustomBias(m_darkSettings.outputOffset);
+
+        m_calibrationDialog->setFlatEnabled(m_flatSettings.enabled);
+        m_calibrationDialog->setFlatMethod(m_flatSettings.method);
+        m_calibrationDialog->setFlatExposure(m_flatSettings.flatExposure);
+        m_calibrationDialog->setVffExposure(m_flatSettings.vffEntries.isEmpty()
+                                                ? 0.0
+                                                : m_flatSettings.vffEntries.last().exposure);
+    }
+
+    const auto setStatus = [this](Calibration::ReferenceKind kind,
+                                  const Calibration::ReferenceFrame &reference) {
+        m_calibrationDialog->setReferenceStatus(kind, reference.isValid(),
+                                                reference.isInMemory(),
+                                                reference.frameCount, reference.source);
+    };
+    setStatus(Calibration::ReferenceKind::MatchedDark, m_darkSettings.matchedDark);
+    setStatus(Calibration::ReferenceKind::Bias, m_darkSettings.bias);
+    setStatus(Calibration::ReferenceKind::LongDark, m_darkSettings.longDark);
+    setStatus(Calibration::ReferenceKind::Flat, m_flatSettings.flat);
+    m_calibrationDialog->setVffEntries(m_flatSettings.vffEntries);
+
+    if (!m_flatSettings.enabled) {
+        m_calibrationDialog->setFlatFieldStatus(tr("Flat-field calibration disabled."), true);
+    } else if (m_flatFieldValid) {
+        const int samples = m_flatField.width * m_flatField.height * m_flatField.channels;
+        const double excludedPct = samples > 0
+            ? 100.0 * m_flatField.excludedSamples / samples
+            : 0.0;
+        const bool vff = m_flatSettings.method == Calibration::FlatMethod::VariableExposure;
+        m_calibrationDialog->setFlatFieldStatus(
+            vff
+                ? tr("Ready: mean slope %1 ADU/s, gain %2..%3, %4% of samples left uncorrected.")
+                      .arg(m_flatField.meanSignal, 0, 'f', 1)
+                      .arg(m_flatField.minGain, 0, 'f', 4)
+                      .arg(m_flatField.maxGain, 0, 'f', 4)
+                      .arg(excludedPct, 0, 'f', 2)
+                : tr("Ready: mean signal %1 ADU, gain %2..%3, %4% of samples left uncorrected.")
+                      .arg(m_flatField.meanSignal, 0, 'f', 1)
+                      .arg(m_flatField.minGain, 0, 'f', 4)
+                      .arg(m_flatField.maxGain, 0, 'f', 4)
+                      .arg(excludedPct, 0, 'f', 2),
+            true);
+    } else {
+        m_calibrationDialog->setFlatFieldStatus(
+            m_flatFieldError.isEmpty()
+                ? tr("Not ready: add the required flat reference frame(s) and press OK.")
+                : tr("Not ready: %1").arg(m_flatFieldError),
+            false);
+    }
+
+    m_calibrationDialog->setFrameCount(m_referenceBurstTotal);
+    m_calibrationDialog->setAcquireInProgress(m_acquiringReference);
 
     const bool connected = m_appController && m_appController->isConnected();
     const bool capturing = connected && m_appController->state() == CameraState::Acquiring;
-    m_calibrationDialog->setAcquireEnabled(connected && !capturing && !m_acquiringDark);
+    m_calibrationDialog->setAcquireEnabled(connected && !capturing && !m_acquiringReference);
 }
 
 void MainWindow::onCalibrationApplied(bool enabled, const QString &path, int bias)
 {
-    m_darkEnabled = enabled;
-    m_darkPath = path;
-    m_darkBias = bias;
-
-    if (enabled && !m_darkFrameValid && !path.isEmpty()) {
-        m_loadingFrameIsDark = true;
-        QMetaObject::invokeMethod(m_fileLoaderWorker, "loadFrame",
-            Qt::QueuedConnection, Q_ARG(QString, path));
+    Q_UNUSED(path);
+    if (!m_calibrationDialog) {
+        return;
     }
 
-    showStatusMessage(enabled
-        ? tr("Dark-frame calibration enabled.")
-        : tr("Dark-frame calibration disabled."), 3000);
+    m_darkSettings.enabled = enabled;
+    m_darkSettings.method = m_calibrationDialog->darkMethod();
+    m_darkSettings.matchedExposure = m_calibrationDialog->matchedDarkExposure();
+    m_darkSettings.longDarkExposure = m_calibrationDialog->longDarkExposure();
+    m_darkSettings.targetExposure = m_calibrationDialog->targetExposure();
+    m_darkSettings.outputOffset = bias;
+
+    m_flatSettings.enabled = m_calibrationDialog->flatEnabled();
+    m_flatSettings.method = m_calibrationDialog->flatMethod();
+    m_flatSettings.flatExposure = m_calibrationDialog->flatExposure();
+
+    rebuildFlatField(true);
+
+    // 兼容旧路径：若只给了路径还没真正读过文件，这里补一次加载。
+    if (enabled
+        && m_darkSettings.method == Calibration::DarkMethod::MatchedDark
+        && m_darkSettings.matchedDark.isNull()
+        && !m_calibrationDialog->darkFramePath().isEmpty()) {
+        onReferenceFileSelected(static_cast<int>(Calibration::ReferenceKind::MatchedDark),
+                                m_calibrationDialog->darkFramePath());
+    }
+
+    QStringList parts;
+    if (m_darkSettings.enabled) {
+        parts << (m_darkSettings.method == Calibration::DarkMethod::MatchedDark
+                      ? tr("dark (matched)")
+                      : tr("dark (bias + scaled)"));
+    }
+    if (m_flatSettings.enabled) {
+        parts << (m_flatSettings.method == Calibration::FlatMethod::Classic
+                      ? tr("flat (classic)")
+                      : tr("flat (variable exposure)"));
+    }
+    showStatusMessage(parts.isEmpty()
+                          ? tr("Calibration disabled.")
+                          : tr("Calibration enabled: %1.").arg(parts.join(QStringLiteral(", "))),
+                      3000);
+
+    // The Apply button leaves the dialog open, so refresh its flat-field
+    // readiness text immediately. Scalar fields stay as the user typed them.
+    refreshCalibrationDialog(false);
 }
 
 void MainWindow::onAcquireDarkFrameStartRequested(int frameCount)
 {
-    if (m_acquiringDark) {
-        showStatusMessage(tr("Dark-frame acquisition already in progress."), 2000);
+    const double exposure = m_calibrationDialog
+        ? m_calibrationDialog->matchedDarkExposure()
+        : m_darkSettings.matchedExposure;
+    startReferenceAcquisition(Calibration::ReferenceKind::MatchedDark, frameCount, exposure);
+}
+
+QString MainWindow::referenceName(Calibration::ReferenceKind kind) const
+{
+    switch (kind) {
+    case Calibration::ReferenceKind::MatchedDark:
+        return tr("dark frame");
+    case Calibration::ReferenceKind::Bias:
+        return tr("bias frame");
+    case Calibration::ReferenceKind::LongDark:
+        return tr("long dark frame");
+    case Calibration::ReferenceKind::Flat:
+        return tr("flat frame");
+    case Calibration::ReferenceKind::VffEntry:
+        return tr("variable-exposure flat frame");
+    }
+    return tr("reference frame");
+}
+
+void MainWindow::startReferenceAcquisition(Calibration::ReferenceKind kind,
+                                           int frameCount, double exposure)
+{
+    if (m_acquiringReference) {
+        showStatusMessage(tr("Reference acquisition already in progress."), 2000);
         return;
     }
     // 对话框的输入范围就是 CalibrationDialog::kMaxFrameCount，这里再夹一次是
     // 防止别的调用方（测试、快捷键）绕过它。真夹到了说明上游放进了超范围的数。
     const int n = qBound(1, frameCount, CalibrationDialog::kMaxFrameCount);
 
-    m_darkBurstTotal = n;
-    m_darkBurstRemaining = n;
-    m_darkAccumInit = false;
-    m_darkAccumFrames = 0;
-    m_darkAccumSum.clear();
+    m_acquiringKind = kind;
+    m_acquiringExposure = exposure;
+    m_referenceBurstTotal = n;
+    m_referenceBurstRemaining = n;
+    m_referenceAccumInit = false;
+    m_referenceAccumFrames = 0;
+    m_referenceAccumWidth = 0;
+    m_referenceAccumHeight = 0;
+    m_referenceAccumFormat = QImage::Format_Invalid;
+    m_referenceAccumSum.clear();
 
     QMetaObject::invokeMethod(m_appController, "startCapture",
         Qt::QueuedConnection, Q_ARG(int, n));
 
-    m_acquiringDark = true;
+    m_acquiringReference = true;
     if (m_calibrationDialog) {
         m_calibrationDialog->setAcquireInProgress(true);
     }
 
-    showStatusMessage(tr("Acquiring dark frame (%1/%2)...").arg(0).arg(n), 3000);
+    showStatusMessage(tr("Acquiring %1 (%2/%3)...")
+                          .arg(referenceName(kind)).arg(0).arg(n), 3000);
+}
+
+void MainWindow::onReferenceFileSelected(int kind, const QString &path)
+{
+    if (m_loadingReference) {
+        showStatusMessage(tr("A calibration reference is already loading."), 2000);
+        return;
+    }
+
+    m_loadingReference = true;
+    m_loadingReferenceKind = static_cast<Calibration::ReferenceKind>(kind);
+    m_loadingReferenceExposure = 0.0;
+    if (m_calibrationDialog) {
+        switch (m_loadingReferenceKind) {
+        case Calibration::ReferenceKind::MatchedDark:
+            m_loadingReferenceExposure = m_calibrationDialog->matchedDarkExposure();
+            break;
+        case Calibration::ReferenceKind::Bias:
+            // The bias frame is the zero-exposure reference; no time stamp is
+            // needed by the calibration model.
+            m_loadingReferenceExposure = 0.0;
+            break;
+        case Calibration::ReferenceKind::LongDark:
+            m_loadingReferenceExposure = m_calibrationDialog->longDarkExposure();
+            break;
+        case Calibration::ReferenceKind::Flat:
+            m_loadingReferenceExposure = m_calibrationDialog->flatExposure();
+            break;
+        case Calibration::ReferenceKind::VffEntry:
+            m_loadingReferenceExposure = m_calibrationDialog->vffExposure();
+            break;
+        }
+    }
+    m_loadingReferencePath = path;
+
+    QMetaObject::invokeMethod(m_fileLoaderWorker, "loadFrame",
+        Qt::QueuedConnection, Q_ARG(QString, path));
+    showStatusMessage(tr("Loading %1: %2")
+                          .arg(referenceName(m_loadingReferenceKind),
+                               QFileInfo(path).fileName()), 3000);
+}
+
+void MainWindow::onVffRemoveRequested(int index)
+{
+    if (index < 0 || index >= m_flatSettings.vffEntries.size()) {
+        return;
+    }
+    // The list is displayed sorted by exposure; remove the matching element.
+    QVector<Calibration::ReferenceFrame> sorted = m_flatSettings.vffEntries;
+    std::sort(sorted.begin(), sorted.end(), [](const Calibration::ReferenceFrame &a,
+                                                const Calibration::ReferenceFrame &b) {
+        return a.exposure < b.exposure;
+    });
+    if (index >= sorted.size()) {
+        return;
+    }
+    const Calibration::ReferenceFrame removed = sorted.at(index);
+    for (int i = 0; i < m_flatSettings.vffEntries.size(); ++i) {
+        const Calibration::ReferenceFrame &entry = m_flatSettings.vffEntries.at(i);
+        if (entry.exposure == removed.exposure && entry.source == removed.source
+            && entry.frameCount == removed.frameCount) {
+            m_flatSettings.vffEntries.removeAt(i);
+            break;
+        }
+    }
+    if (m_flatSettings.enabled) {
+        rebuildFlatField(false);
+    }
+    refreshCalibrationDialog();
+}
+
+void MainWindow::onVffClearRequested()
+{
+    m_flatSettings.vffEntries.clear();
+    if (m_flatSettings.enabled) {
+        rebuildFlatField(false);
+    }
+    refreshCalibrationDialog();
 }
 
 void MainWindow::on_actionAbout_triggered()
@@ -959,8 +1194,8 @@ void MainWindow::onCameraStateChanged(CameraState newState)
         break;
     case CameraState::Error:
         stateText = tr("Error");
-        if (m_acquiringDark) {
-            cancelDarkAcquisition(tr("Camera entered error state."));
+        if (m_acquiringReference) {
+            cancelReferenceAcquisition(tr("Camera entered error state."));
         }
         m_fpsTimer->stop();
 
@@ -983,136 +1218,162 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
     ui->frameCountLabel->setText(tr("Frames: %1").arg(++m_frameCount));
     m_fpsFrameCount++;
 
-    // 1. Dark-frame acquisition: build the running average across N frames.
-    //    During a burst, calibration is suppressed (we are building the dark,
-    //    not subtracting it).
-    if (m_acquiringDark) {
+    // 1. Reference acquisition: build the running average across N frames.
+    //    During a burst calibration is suppressed (we are building a reference,
+    //    not correcting a signal frame).
+    if (m_acquiringReference) {
         const QImage &img = m_currentFrame.image;
         if (!img.isNull()) {
             const int width = img.width();
             const int height = img.height();
             const QImage::Format fmt = img.format();
 
-            if (!m_darkAccumInit) {
-                m_darkAccumFormat = fmt;
+            if (width <= 0 || height <= 0
+                || (fmt != QImage::Format_Grayscale16
+                    && fmt != QImage::Format_Grayscale8
+                    && fmt != QImage::Format_RGB888)) {
+                cancelReferenceAcquisition(
+                    tr("Unsupported frame format for a reference acquisition."));
+                return;
+            }
+
+            if (!m_referenceAccumInit) {
+                m_referenceAccumWidth = width;
+                m_referenceAccumHeight = height;
+                m_referenceAccumFormat = fmt;
                 int elementCount = width * height;
                 if (fmt == QImage::Format_RGB888) {
                     elementCount *= 3;
                 }
                 // QList::fill is fill(value, size) — value first.
-                m_darkAccumSum.fill(0u, static_cast<qsizetype>(elementCount));
-                m_darkAccumInit = true;
+                m_referenceAccumSum.fill(0u, static_cast<qsizetype>(elementCount));
+                m_referenceAccumInit = true;
+            } else if (width != m_referenceAccumWidth
+                       || height != m_referenceAccumHeight
+                       || fmt != m_referenceAccumFormat) {
+                cancelReferenceAcquisition(
+                    tr("Frame size or format changed during the reference burst."));
+                return;
             }
 
-            if (width > 0 && height > 0 && fmt == m_darkAccumFormat) {
-                if (fmt == QImage::Format_Grayscale16) {
-                    const ushort *srcData = reinterpret_cast<const ushort *>(img.constBits());
-                    #pragma omp parallel for schedule(static)
-                    for (int y = 0; y < height; ++y) {
-                        const int rowBase = y * width;
-                        for (int x = 0; x < width; ++x) {
-                            m_darkAccumSum[rowBase + x] += srcData[rowBase + x];
-                        }
+            // QImage pads every scan line to a 4-byte boundary, so odd widths
+            // have bytesPerLine() > width * bytes-per-pixel. Read one row at a
+            // time instead of walking constBits() linearly.
+            if (fmt == QImage::Format_Grayscale16) {
+                #pragma omp parallel for schedule(static)
+                for (int y = 0; y < height; ++y) {
+                    const ushort *srcRow =
+                        reinterpret_cast<const ushort *>(img.constScanLine(y));
+                    const int rowBase = y * width;
+                    for (int x = 0; x < width; ++x) {
+                        m_referenceAccumSum[rowBase + x] += srcRow[x];
                     }
-                } else if (fmt == QImage::Format_Grayscale8) {
-                    const uchar *srcData = img.constBits();
-                    #pragma omp parallel for schedule(static)
-                    for (int y = 0; y < height; ++y) {
-                        const int rowBase = y * width;
-                        for (int x = 0; x < width; ++x) {
-                            m_darkAccumSum[rowBase + x] += srcData[rowBase + x];
-                        }
+                }
+            } else if (fmt == QImage::Format_Grayscale8) {
+                #pragma omp parallel for schedule(static)
+                for (int y = 0; y < height; ++y) {
+                    const uchar *srcRow = img.constScanLine(y);
+                    const int rowBase = y * width;
+                    for (int x = 0; x < width; ++x) {
+                        m_referenceAccumSum[rowBase + x] += srcRow[x];
                     }
-                } else if (fmt == QImage::Format_RGB888) {
-                    const uchar *srcData = img.constBits();
-                    const int rowStride = width * 3;
-                    #pragma omp parallel for schedule(static)
-                    for (int y = 0; y < height; ++y) {
-                        const int rowBase = y * rowStride;
-                        for (int x = 0; x < rowStride; ++x) {
-                            m_darkAccumSum[rowBase + x] += srcData[rowBase + x];
-                        }
+                }
+            } else { // RGB888
+                #pragma omp parallel for schedule(static)
+                for (int y = 0; y < height; ++y) {
+                    const uchar *srcRow = img.constScanLine(y);
+                    const int rowBase = y * width * 3;
+                    for (int x = 0; x < width * 3; ++x) {
+                        m_referenceAccumSum[rowBase + x] += srcRow[x];
                     }
                 }
             }
 
-            ++m_darkAccumFrames;
-            --m_darkBurstRemaining;
+            ++m_referenceAccumFrames;
+            --m_referenceBurstRemaining;
 
-            // Compute running average so far (rounded half-up)
-            const quint64 divisor = m_darkAccumFrames;
+            // Compute the running average (rounded half up)
+            const quint64 divisor = m_referenceAccumFrames;
             const quint64 halfDiv = divisor / 2;
             QImage result(width, height, fmt);
             if (fmt == QImage::Format_Grayscale16) {
-                ushort *dstData = reinterpret_cast<ushort *>(result.bits());
-                for (int i = 0; i < width * height; ++i) {
-                    quint64 v = (m_darkAccumSum[i] + halfDiv) / divisor;
-                    if (v > 65535) v = 65535;
-                    dstData[i] = static_cast<ushort>(v);
+                for (int y = 0; y < height; ++y) {
+                    ushort *dstRow = reinterpret_cast<ushort *>(result.scanLine(y));
+                    const int rowBase = y * width;
+                    for (int x = 0; x < width; ++x) {
+                        quint64 v = (m_referenceAccumSum[rowBase + x] + halfDiv) / divisor;
+                        if (v > 65535) v = 65535;
+                        dstRow[x] = static_cast<ushort>(v);
+                    }
                 }
             } else if (fmt == QImage::Format_Grayscale8) {
-                uchar *dstData = result.bits();
-                for (int i = 0; i < width * height; ++i) {
-                    quint64 v = (m_darkAccumSum[i] + halfDiv) / divisor;
-                    if (v > 255) v = 255;
-                    dstData[i] = static_cast<uchar>(v);
+                for (int y = 0; y < height; ++y) {
+                    uchar *dstRow = result.scanLine(y);
+                    const int rowBase = y * width;
+                    for (int x = 0; x < width; ++x) {
+                        quint64 v = (m_referenceAccumSum[rowBase + x] + halfDiv) / divisor;
+                        if (v > 255) v = 255;
+                        dstRow[x] = static_cast<uchar>(v);
+                    }
                 }
             } else if (fmt == QImage::Format_RGB888) {
-                uchar *dstData = result.bits();
-                const int n = width * height * 3;
-                for (int i = 0; i < n; ++i) {
-                    quint64 v = (m_darkAccumSum[i] + halfDiv) / divisor;
-                    if (v > 255) v = 255;
-                    dstData[i] = static_cast<uchar>(v);
+                for (int y = 0; y < height; ++y) {
+                    uchar *dstRow = result.scanLine(y);
+                    const int rowBase = y * width * 3;
+                    for (int x = 0; x < width * 3; ++x) {
+                        quint64 v = (m_referenceAccumSum[rowBase + x] + halfDiv) / divisor;
+                        if (v > 255) v = 255;
+                        dstRow[x] = static_cast<uchar>(v);
+                    }
                 }
             }
 
             m_currentFrame.image = result;
 
-            showStatusMessage(tr("Acquiring dark frame (%1/%2)...")
-                .arg(m_darkBurstTotal - m_darkBurstRemaining)
-                .arg(m_darkBurstTotal), 2000);
+            showStatusMessage(tr("Acquiring %1 (%2/%3)...")
+                .arg(referenceName(m_acquiringKind))
+                .arg(m_referenceBurstTotal - m_referenceBurstRemaining)
+                .arg(m_referenceBurstTotal), 2000);
 
-            if (m_darkBurstRemaining <= 0) {
-                m_darkFrame = result;
-                m_darkFrameValid = true;
-                m_acquiringDark = false;
-                // 窗口开着就把新采到的暗帧显示出来，用户当场能勾 Enable
-                refreshCalibrationDialog();
-                showStatusMessage(
-                    tr("Dark frame acquired (%1-frame average). Use Save Frame to keep it.")
-                    .arg(m_darkBurstTotal), 10000);
+            if (m_referenceBurstRemaining <= 0) {
+                Calibration::ReferenceFrame reference;
+                reference.exposure = m_acquiringExposure;
+                reference.frameCount = static_cast<int>(m_referenceAccumFrames);
+                QString planeError;
+                reference.plane = Calibration::planeFromImage(result, &planeError);
+
+                const Calibration::ReferenceKind finishedKind = m_acquiringKind;
+                const int frames = m_referenceBurstTotal;
+                m_acquiringReference = false;
+                m_referenceAccumInit = false;
+                m_referenceAccumFrames = 0;
+                m_referenceAccumSum.clear();
+
+                if (!reference.isNull()) {
+                    storeReferenceFrame(finishedKind, reference);
+                    refreshCalibrationDialog();
+                    showStatusMessage(
+                        tr("%1 acquired (%2-frame average). Use Save Frame to keep it.")
+                            .arg(referenceName(finishedKind))
+                            .arg(frames), 10000);
+                } else {
+                    refreshCalibrationDialog();
+                    showStatusMessage(
+                        tr("Failed to build the %1: %2")
+                            .arg(referenceName(finishedKind), planeError), 5000);
+                }
             }
         }
 
         updateDisplay(m_currentFrame);
         updateToolbarState();
-
-        QSettings settings;
-        if (settings.value("data/autoSaveEnabled", false).toBool()) {
-            on_actionSaveFrame_triggered();
-        }
+        // Do not auto-save the running average: only the completed reference is
+        // worth keeping, and the user can press Save Frame explicitly.
         return;
     }
 
-    // 2. Calibration branch (only after the burst has completed)
-    if (m_darkEnabled && m_darkFrameValid) {
-        if (m_darkFrame.size() != m_currentFrame.image.size()) {
-            const quint64 nowMs = QDateTime::currentMSecsSinceEpoch();
-            if (nowMs - m_lastDarkSizeWarnMs >= 1000) {
-                m_lastDarkSizeWarnMs = nowMs;
-                showStatusMessage(
-                    tr("Dark-frame calibration skipped: size mismatch "
-                       "(dark %1x%2 vs frame %3x%4).")
-                        .arg(m_darkFrame.width()).arg(m_darkFrame.height())
-                        .arg(m_currentFrame.image.width())
-                        .arg(m_currentFrame.image.height()),
-                    2000);
-            }
-        } else {
-            PostProcess::applyDarkCalibration(m_currentFrame, &m_darkFrame, m_darkBias);
-        }
-    }
+    // 2. Dark subtraction + flat multiplication + output offset
+    applyCalibration(m_currentFrame);
 
     // 3. vbin (pre-calibration processing, applies to display only)
     if (m_vBinEnabled) {
@@ -1149,29 +1410,140 @@ void MainWindow::onCaptureStarted()
 }
 void MainWindow::onCaptureStopped()
 {
-    // If a dark-frame burst was in flight, the user aborted via Stop (or
-    // the driver stopped early). Discard the partial accumulation; the
-    // existing m_darkFrame is left untouched so a previously-acquired dark
-    // frame stays valid.
-    if (m_acquiringDark) {
-        cancelDarkAcquisition(tr("Capture stopped before burst completed."));
+    // If a reference burst was in flight, the user aborted via Stop (or the
+    // driver stopped early). Discard the partial accumulation; previously
+    // acquired references stay valid.
+    if (m_acquiringReference) {
+        cancelReferenceAcquisition(tr("Capture stopped before burst completed."));
     }
 }
 
-void MainWindow::cancelDarkAcquisition(const QString &reason)
+void MainWindow::cancelReferenceAcquisition(const QString &reason)
 {
-    if (!m_acquiringDark) {
+    if (!m_acquiringReference) {
         return;
     }
-    m_acquiringDark = false;
-    m_darkBurstRemaining = 0;
-    m_darkAccumInit = false;
-    m_darkAccumFrames = 0;
-    m_darkAccumSum.clear();
+    m_acquiringReference = false;
+    m_referenceBurstRemaining = 0;
+    m_referenceAccumInit = false;
+    m_referenceAccumFrames = 0;
+    m_referenceAccumSum.clear();
     if (m_calibrationDialog) {
         m_calibrationDialog->setAcquireInProgress(false);
     }
-    showStatusMessage(QString("Dark-frame acquisition cancelled: %1").arg(reason), 5000);
+    showStatusMessage(tr("%1 acquisition cancelled: %2")
+                          .arg(referenceName(m_acquiringKind), reason), 5000);
+}
+
+void MainWindow::storeReferenceFrame(Calibration::ReferenceKind kind,
+                                     const Calibration::ReferenceFrame &reference)
+{
+    switch (kind) {
+    case Calibration::ReferenceKind::MatchedDark:
+        m_darkSettings.matchedDark = reference;
+        // The exposure is part of the reference: keep it in sync immediately so
+        // flat construction can validate D(t_flat) before the next Apply.
+        if (reference.exposure > 0.0) {
+            m_darkSettings.matchedExposure = reference.exposure;
+        }
+        break;
+    case Calibration::ReferenceKind::Bias:
+        m_darkSettings.bias = reference;
+        break;
+    case Calibration::ReferenceKind::LongDark:
+        m_darkSettings.longDark = reference;
+        if (reference.exposure > 0.0) {
+            m_darkSettings.longDarkExposure = reference.exposure;
+        }
+        break;
+    case Calibration::ReferenceKind::Flat:
+        m_flatSettings.flat = reference;
+        if (reference.exposure > 0.0) {
+            m_flatSettings.flatExposure = reference.exposure;
+        }
+        break;
+    case Calibration::ReferenceKind::VffEntry: {
+        // Re-acquiring the same nominal exposure replaces the entry instead of
+        // fitting two nearly identical x values.
+        const double tolerance = 1e-6 * std::max(1.0, std::abs(reference.exposure));
+        for (int i = 0; i < m_flatSettings.vffEntries.size(); ++i) {
+            if (std::abs(m_flatSettings.vffEntries.at(i).exposure - reference.exposure)
+                <= tolerance) {
+                m_flatSettings.vffEntries[i] = reference;
+                break;
+            }
+        }
+        bool replaced = false;
+        for (const Calibration::ReferenceFrame &entry : m_flatSettings.vffEntries) {
+            if (std::abs(entry.exposure - reference.exposure) <= tolerance) {
+                replaced = true;
+                break;
+            }
+        }
+        if (!replaced) {
+            m_flatSettings.vffEntries.push_back(reference);
+        }
+        std::sort(m_flatSettings.vffEntries.begin(), m_flatSettings.vffEntries.end(),
+                  [](const Calibration::ReferenceFrame &a, const Calibration::ReferenceFrame &b) {
+            return a.exposure < b.exposure;
+        });
+        break;
+    }
+    }
+
+    // A flat is built on top of the dark model, so a new dark reference can
+    // change the gain map just as much as a new flat frame.
+    if (m_flatSettings.enabled) {
+        rebuildFlatField(false);
+    }
+}
+
+void MainWindow::rebuildFlatField(bool showWarnings)
+{
+    m_flatFieldValid = false;
+    m_flatField = Calibration::FlatField();
+    m_flatFieldError.clear();
+    if (!m_flatSettings.enabled) {
+        return;
+    }
+
+    QString error;
+    if (m_flatSettings.method == Calibration::FlatMethod::Classic) {
+        m_flatField = Calibration::buildClassicFlat(m_flatSettings, m_darkSettings, &error);
+    } else {
+        m_flatField = Calibration::buildVariableExposureFlat(m_flatSettings, m_darkSettings,
+                                                             &error);
+    }
+
+    if (m_flatField.isValid()) {
+        m_flatFieldValid = true;
+    } else {
+        m_flatFieldError = error;
+        if (showWarnings) {
+            // 配置缺项是常见状态（还没采平场就勾了 Enable），用状态栏提示即可；
+            // 弹模态框会把 OK 之后的流程卡住，自动化测试也难处理。
+            showStatusMessage(tr("Flat-field calibration not applied: %1").arg(error), 6000);
+        }
+    }
+}
+
+void MainWindow::applyCalibration(ImageData &frame)
+{
+    if (!m_darkSettings.enabled && !m_flatSettings.enabled) {
+        return;
+    }
+
+    const Calibration::FlatField *flat =
+        (m_flatSettings.enabled && m_flatFieldValid) ? &m_flatField : nullptr;
+
+    QString reason;
+    if (!Calibration::apply(frame, m_darkSettings, flat, &reason)) {
+        const quint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+        if (nowMs - m_lastCalibrationWarnMs >= 1000) {
+            m_lastCalibrationWarnMs = nowMs;
+            showStatusMessage(tr("Calibration skipped: %1").arg(reason), 2000);
+        }
+    }
 }
 
 void MainWindow::onCrosshairCleared()
@@ -1390,10 +1762,12 @@ void MainWindow::updateToolbarState()
 
     ui->actionStart->setEnabled(connected && !acquiring);
     ui->actionStop->setEnabled(acquiring);
-    ui->menuActionCalibration->setEnabled(connected);
+    // 校准窗口既能采参考帧，也能从文件加载参考帧；没有相机时仍要能打开，
+    // 否则离线准备暗帧/平场就没有入口了。Acquire 按钮自己按连接状态禁用。
+    ui->menuActionCalibration->setEnabled(true);
 
     if (m_calibrationDialog) {
-        m_calibrationDialog->setAcquireEnabled(connected && !acquiring && !m_acquiringDark);
+        m_calibrationDialog->setAcquireEnabled(connected && !acquiring && !m_acquiringReference);
     }
 }
 

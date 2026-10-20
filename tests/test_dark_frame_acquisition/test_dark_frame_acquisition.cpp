@@ -20,6 +20,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QCheckBox>
+#include <QDoubleSpinBox>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
@@ -48,12 +49,16 @@ private slots:
     void test_acquire_moved_into_calibration_dialog();
     void test_burst_request_above_the_limit_is_clamped();
     void test_acquired_dark_is_enabled_from_the_same_dialog();
+    void test_flat_acquire_uses_dialog_slot_and_exposure();
 
 private:
     // Runs a full burst of `frames` Grayscale16 frames whose every pixel is
     // (baseValue + i) for frame i, and returns the running average as shown by
     // the image view. Returns a null image if the view never received one.
     QImage runBurst(MainWindow &window, int w, int h, int frames, int baseValue);
+
+    // Delivers `frames` frames to MainWindow after a burst has been armed.
+    void deliverFrames(MainWindow &window, int w, int h, int frames, int baseValue);
 
     static CalibrationDialog *openCalibrationDialog(MainWindow &window);
 
@@ -99,6 +104,15 @@ QImage TestDarkFrameAcquisition::runBurst(MainWindow &window, int w, int h,
         return QImage();
     }
 
+    deliverFrames(window, w, h, frames, baseValue);
+
+    auto *view = window.findChild<ImageViewWidget *>();
+    return view ? view->image() : QImage();
+}
+
+void TestDarkFrameAcquisition::deliverFrames(MainWindow &window, int w, int h,
+                                             int frames, int baseValue)
+{
     for (int i = 0; i < frames; ++i) {
         QImage img(w, h, QImage::Format_Grayscale16);
         for (int y = 0; y < h; ++y) {
@@ -120,9 +134,6 @@ QImage TestDarkFrameAcquisition::runBurst(MainWindow &window, int w, int h,
         // the view only picks up every few frames without this.
         QTest::qWait(40);
     }
-
-    auto *view = window.findChild<ImageViewWidget *>();
-    return view ? view->image() : QImage();
 }
 
 void TestDarkFrameAcquisition::test_burst_does_not_crash()
@@ -166,9 +177,9 @@ void TestDarkFrameAcquisition::test_burst_averages_pixels()
 void TestDarkFrameAcquisition::test_burst_handles_odd_and_even_widths()
 {
     // QImage pads Grayscale16 rows to a 4-byte boundary, so odd widths have a
-    // row stride wider than width*2. The burst must survive both; this asserts
-    // the crash is gone, not the pixel values (see the row-stride note in
-    // MainWindow::onCameraFrameReady).
+    // row stride wider than width*2. The burst must both survive and produce
+    // the right pixel values; a linear constBits() walk used to shift every
+    // row after the first and write the wrong values back.
     for (int width : {64, 63, 641}) {
         MainWindow window;
         window.resize(1130, 870);
@@ -179,6 +190,14 @@ void TestDarkFrameAcquisition::test_burst_handles_odd_and_even_widths()
         QVERIFY2(!shown.isNull(),
                  qPrintable(QStringLiteral("no frame for width %1").arg(width)));
         QCOMPARE(shown.width(), width);
+
+        // Frames hold 500..504, so the mean is 502.
+        for (int y = 0; y < shown.height(); ++y) {
+            const auto *row = reinterpret_cast<const quint16 *>(shown.constScanLine(y));
+            for (int x = 0; x < shown.width(); ++x) {
+                QCOMPARE(int(row[x]), 502);
+            }
+        }
     }
 }
 
@@ -269,8 +288,8 @@ void TestDarkFrameAcquisition::test_acquired_dark_is_enabled_from_the_same_dialo
     auto *dialog = openCalibrationDialog(window);
     QVERIFY(dialog);
 
-    auto *pathField = dialog->findChild<QLineEdit *>();
-    auto *enableCheck = dialog->findChild<QCheckBox *>();
+    auto *pathField = dialog->findChild<QLineEdit *>(QStringLiteral("matchedDarkPathEdit"));
+    auto *enableCheck = dialog->findChild<QCheckBox *>(QStringLiteral("darkEnableCheckBox"));
     auto *okButton = dialog->findChild<QPushButton *>(QStringLiteral("okButton"));
     QVERIFY(pathField);
     QVERIFY(enableCheck);
@@ -300,6 +319,46 @@ void TestDarkFrameAcquisition::test_acquired_dark_is_enabled_from_the_same_dialo
     QCOMPARE(applied.at(0).at(0).toBool(), true);
     // 走的是内存里的暗帧，路径必须是空的
     QCOMPARE(applied.at(0).at(1).toString(), QString());
+}
+
+// A non-dark Acquire button goes through the dialog's kind/exposure getters.
+// The status refresh that follows the burst must not overwrite the exposure the
+// user typed: it is still needed for the next acquisition and for the apply.
+void TestDarkFrameAcquisition::test_flat_acquire_uses_dialog_slot_and_exposure()
+{
+    MainWindow window;
+    window.resize(1130, 870);
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *dialog = openCalibrationDialog(window);
+    QVERIFY(dialog);
+
+    auto *exposureSpin = dialog->findChild<QDoubleSpinBox *>(QStringLiteral("flatExposureSpin"));
+    auto *acquire = dialog->findChild<QPushButton *>(QStringLiteral("flatAcquireButton"));
+    auto *pathField = dialog->findChild<QLineEdit *>(QStringLiteral("flatPathEdit"));
+    QVERIFY(exposureSpin);
+    QVERIFY(acquire);
+    QVERIFY(pathField);
+
+    // No camera is connected in this test; the dialog's own Acquire gate is
+    // opened explicitly to exercise the signal path.
+    dialog->setAcquireEnabled(true);
+    dialog->setFrameCount(3);
+    exposureSpin->setValue(2.5);
+    acquire->click();
+    QCoreApplication::processEvents();
+
+    deliverFrames(window, 32, 24, 3, 200);
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+
+    QVERIFY2(pathField->placeholderText().contains(QStringLiteral("in-memory flat frame")),
+             qPrintable(pathField->placeholderText()));
+    QVERIFY2(pathField->placeholderText().contains(QStringLiteral("3-frame average")),
+             qPrintable(pathField->placeholderText()));
+    QVERIFY(pathField->text().isEmpty());
+    QCOMPARE(exposureSpin->value(), 2.5);
 }
 
 QTEST_MAIN(TestDarkFrameAcquisition)
