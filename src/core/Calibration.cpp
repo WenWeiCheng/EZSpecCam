@@ -320,6 +320,58 @@ FramePlane planeFromImage(const QImage &image, QString *error)
     return plane;
 }
 
+QImage imageFromPlane(const FramePlane &plane)
+{
+    if (!plane.isValid()) {
+        return QImage();
+    }
+
+    const bool color = (plane.channels == 3);
+    const int maxValue = (plane.maxValue > 255) ? 65535 : 255;
+    const QImage::Format format = color
+        ? QImage::Format_RGB888
+        : (maxValue > 255 ? QImage::Format_Grayscale16 : QImage::Format_Grayscale8);
+
+    QImage image(plane.width, plane.height, format);
+    if (image.isNull()) {
+        return image;
+    }
+
+    const auto clampSample = [maxValue](float value) {
+        return std::clamp(static_cast<int>(std::lround(value)), 0, maxValue);
+    };
+
+    if (color) {
+        for (int y = 0; y < plane.height; ++y) {
+            uchar *row = image.scanLine(y);
+            for (int x = 0; x < plane.width; ++x) {
+                const int base = y * plane.width * 3 + x * 3;
+                row[x * 3 + 0] = static_cast<uchar>(clampSample(plane.samples[base + 0]));
+                row[x * 3 + 1] = static_cast<uchar>(clampSample(plane.samples[base + 1]));
+                row[x * 3 + 2] = static_cast<uchar>(clampSample(plane.samples[base + 2]));
+            }
+        }
+    } else if (format == QImage::Format_Grayscale16) {
+        for (int y = 0; y < plane.height; ++y) {
+            ushort *row = reinterpret_cast<ushort *>(image.scanLine(y));
+            const int rowBase = y * plane.width;
+            for (int x = 0; x < plane.width; ++x) {
+                row[x] = static_cast<ushort>(clampSample(plane.samples[rowBase + x]));
+            }
+        }
+    } else {
+        for (int y = 0; y < plane.height; ++y) {
+            uchar *row = image.scanLine(y);
+            const int rowBase = y * plane.width;
+            for (int x = 0; x < plane.width; ++x) {
+                row[x] = static_cast<uchar>(clampSample(plane.samples[rowBase + x]));
+            }
+        }
+    }
+
+    return image;
+}
+
 FlatField buildClassicFlat(const FlatSettings &settings, const DarkSettings &dark,
                            QString *error)
 {

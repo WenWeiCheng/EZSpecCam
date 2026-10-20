@@ -89,12 +89,18 @@ private slots:
     void onCalibrationApplied(bool enabled, const QString &path, int bias);
     void onAcquireDarkFrameStartRequested(int frameCount);
     void onReferenceFileSelected(int kind, const QString &path);
+    void onSaveReferenceRequested(int kind);
+    void onSaveVffEntryRequested(int index);
     void onVffRemoveRequested(int index);
     void onVffClearRequested();
 
     //! 组装 SaveRequest 并交给 FileSaverWorker。做成槽是为了让集成测试能
     //! 直接保存到临时路径，验证去尖峰结果确实进了文件
     void saveFrameToFile(const QString &filePath);
+    //! 把内存里（或从文件加载的）校准参考帧另存到 @p filePath。同样做成槽，
+    //! 方便测试绕过文件对话框直接验证写盘内容
+    void saveReferenceFrameToFile(int kind, const QString &filePath);
+    void saveVffEntryToFile(int index, const QString &filePath);
 
 private:
     // L / S / B 选中的采集模式。这是常驻状态，挂在状态栏那条常驻带子上；
@@ -128,6 +134,15 @@ private:
     void rebuildFlatField(bool showWarnings);
     void applyCalibration(ImageData &frame);
     QString referenceName(Calibration::ReferenceKind kind) const;
+    //! Reference card held in the settings, or nullptr for VffEntry/unknown.
+    const Calibration::ReferenceFrame *referenceForKind(Calibration::ReferenceKind kind) const;
+    //! Common Save As path picker: remembers the last directory in QSettings.
+    QString askReferenceSavePath(Calibration::ReferenceKind kind,
+                                 const Calibration::ReferenceFrame &reference,
+                                 const QString &stem);
+    void saveReferencePlane(Calibration::ReferenceKind kind,
+                            const Calibration::ReferenceFrame &reference,
+                            const QString &filePath);
     void requestStartCapture(int captureCount);
     void refreshCalibrationDialog(bool reloadConfig = false);
     void updateStateLabel();

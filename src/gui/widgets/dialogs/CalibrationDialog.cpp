@@ -131,11 +131,18 @@ void CalibrationDialog::setupDarkTab(QTabWidget *tabs)
     m_matchedBrowseButton->setObjectName(QStringLiteral("browseButton"));
     m_matchedAcquireButton = new QPushButton(tr("Acquire"), matchedPage);
     m_matchedAcquireButton->setObjectName(QStringLiteral("acquireButton"));
+    m_matchedSaveButton = new QPushButton(tr("Save As..."), matchedPage);
+    m_matchedSaveButton->setObjectName(QStringLiteral("matchedDarkSaveButton"));
+    m_matchedSaveButton->setToolTip(
+        tr("Write the current dark frame (acquired in memory or loaded from a file) "
+           "to a TIFF/CSV file so it can be reused next session."));
+    m_matchedSaveButton->setEnabled(false);
 
     QHBoxLayout *matchedRow = new QHBoxLayout();
     matchedRow->addWidget(m_matchedDarkPath, 1);
     matchedRow->addWidget(m_matchedBrowseButton);
     matchedRow->addWidget(m_matchedAcquireButton);
+    matchedRow->addWidget(m_matchedSaveButton);
     matchedForm->addRow(tr("Dark frame:"), matchedRow);
 
     m_matchedExposureSpin = new QDoubleSpinBox(matchedPage);
@@ -164,10 +171,16 @@ void CalibrationDialog::setupDarkTab(QTabWidget *tabs)
     m_biasBrowseButton->setObjectName(QStringLiteral("biasBrowseButton"));
     m_biasAcquireButton = new QPushButton(tr("Acquire"), biasPage);
     m_biasAcquireButton->setObjectName(QStringLiteral("biasAcquireButton"));
+    m_biasSaveButton = new QPushButton(tr("Save As..."), biasPage);
+    m_biasSaveButton->setObjectName(QStringLiteral("biasSaveButton"));
+    m_biasSaveButton->setToolTip(
+        tr("Write the current bias frame to a TIFF/CSV file so it can be reused next session."));
+    m_biasSaveButton->setEnabled(false);
     QHBoxLayout *biasRow = new QHBoxLayout();
     biasRow->addWidget(m_biasPath, 1);
     biasRow->addWidget(m_biasBrowseButton);
     biasRow->addWidget(m_biasAcquireButton);
+    biasRow->addWidget(m_biasSaveButton);
     biasForm->addRow(tr("Bias frame:"), biasRow);
 
     m_longDarkPath = new QLineEdit(biasPage);
@@ -178,10 +191,16 @@ void CalibrationDialog::setupDarkTab(QTabWidget *tabs)
     m_longDarkBrowseButton->setObjectName(QStringLiteral("longDarkBrowseButton"));
     m_longDarkAcquireButton = new QPushButton(tr("Acquire"), biasPage);
     m_longDarkAcquireButton->setObjectName(QStringLiteral("longDarkAcquireButton"));
+    m_longDarkSaveButton = new QPushButton(tr("Save As..."), biasPage);
+    m_longDarkSaveButton->setObjectName(QStringLiteral("longDarkSaveButton"));
+    m_longDarkSaveButton->setToolTip(
+        tr("Write the current long dark frame to a TIFF/CSV file so it can be reused next session."));
+    m_longDarkSaveButton->setEnabled(false);
     QHBoxLayout *longDarkRow = new QHBoxLayout();
     longDarkRow->addWidget(m_longDarkPath, 1);
     longDarkRow->addWidget(m_longDarkBrowseButton);
     longDarkRow->addWidget(m_longDarkAcquireButton);
+    longDarkRow->addWidget(m_longDarkSaveButton);
     biasForm->addRow(tr("Long dark frame:"), longDarkRow);
 
     m_longDarkExposureSpin = new QDoubleSpinBox(biasPage);
@@ -232,6 +251,9 @@ void CalibrationDialog::setupDarkTab(QTabWidget *tabs)
     wireBrowse(m_matchedBrowseButton, AcquireKind::MatchedDark);
     wireBrowse(m_biasBrowseButton, AcquireKind::Bias);
     wireBrowse(m_longDarkBrowseButton, AcquireKind::LongDark);
+    wireSave(m_matchedSaveButton, Calibration::ReferenceKind::MatchedDark);
+    wireSave(m_biasSaveButton, Calibration::ReferenceKind::Bias);
+    wireSave(m_longDarkSaveButton, Calibration::ReferenceKind::LongDark);
 
     tabs->addTab(page, tr("Dark"));
 }
@@ -273,10 +295,16 @@ void CalibrationDialog::setupFlatTab(QTabWidget *tabs)
     m_flatBrowseButton->setObjectName(QStringLiteral("flatBrowseButton"));
     m_flatAcquireButton = new QPushButton(tr("Acquire"), classicPage);
     m_flatAcquireButton->setObjectName(QStringLiteral("flatAcquireButton"));
+    m_flatSaveButton = new QPushButton(tr("Save As..."), classicPage);
+    m_flatSaveButton->setObjectName(QStringLiteral("flatSaveButton"));
+    m_flatSaveButton->setToolTip(
+        tr("Write the current flat frame to a TIFF/CSV file so it can be reused next session."));
+    m_flatSaveButton->setEnabled(false);
     QHBoxLayout *flatRow = new QHBoxLayout();
     flatRow->addWidget(m_flatPath, 1);
     flatRow->addWidget(m_flatBrowseButton);
     flatRow->addWidget(m_flatAcquireButton);
+    flatRow->addWidget(m_flatSaveButton);
     classicForm->addRow(tr("Flat frame:"), flatRow);
 
     m_flatExposureSpin = new QDoubleSpinBox(classicPage);
@@ -328,10 +356,17 @@ void CalibrationDialog::setupFlatTab(QTabWidget *tabs)
     vffLayout->addWidget(m_vffList, 1);
 
     QHBoxLayout *vffButtons = new QHBoxLayout();
+    m_vffSaveButton = new QPushButton(tr("Save Selected As..."), vffPage);
+    m_vffSaveButton->setObjectName(QStringLiteral("vffSaveButton"));
+    m_vffSaveButton->setToolTip(
+        tr("Write the selected exposure's flat frame to a TIFF/CSV file so it can be "
+           "reused next session."));
+    m_vffSaveButton->setEnabled(false);
     m_vffRemoveButton = new QPushButton(tr("Remove selected"), vffPage);
     m_vffRemoveButton->setObjectName(QStringLiteral("vffRemoveButton"));
     m_vffClearButton = new QPushButton(tr("Clear all"), vffPage);
     m_vffClearButton->setObjectName(QStringLiteral("vffClearButton"));
+    vffButtons->addWidget(m_vffSaveButton);
     vffButtons->addWidget(m_vffRemoveButton);
     vffButtons->addWidget(m_vffClearButton);
     vffButtons->addStretch(1);
@@ -360,6 +395,17 @@ void CalibrationDialog::setupFlatTab(QTabWidget *tabs)
     wireAcquire(m_vffAcquireButton, AcquireKind::VffEntry);
     wireBrowse(m_flatBrowseButton, AcquireKind::Flat);
     wireBrowse(m_vffBrowseButton, AcquireKind::VffEntry);
+    wireSave(m_flatSaveButton, Calibration::ReferenceKind::Flat);
+
+    connect(m_vffSaveButton, &QPushButton::clicked, this, [this] {
+        const int row = m_vffList->currentRow();
+        if (row >= 0) {
+            emit saveVffEntryRequested(row);
+        }
+    });
+    connect(m_vffList, &QListWidget::currentRowChanged, this, [this](int row) {
+        m_vffSaveButton->setEnabled(row >= 0);
+    });
 
     connect(m_vffRemoveButton, &QPushButton::clicked, this, [this] {
         const int row = m_vffList->currentRow();
@@ -383,6 +429,13 @@ void CalibrationDialog::wireBrowse(QPushButton *button, AcquireKind kind)
     connect(button, &QPushButton::clicked, this, [this, kind] {
         m_pendingKind = kind;
         onBrowseClicked();
+    });
+}
+
+void CalibrationDialog::wireSave(QPushButton *button, Calibration::ReferenceKind kind)
+{
+    connect(button, &QPushButton::clicked, this, [this, kind] {
+        emit saveReferenceRequested(static_cast<int>(kind));
     });
 }
 
@@ -444,6 +497,24 @@ QPushButton *CalibrationDialog::acquireButtonForKind(Calibration::ReferenceKind 
         return m_flatAcquireButton;
     case Calibration::ReferenceKind::VffEntry:
         return m_vffAcquireButton;
+    }
+    return nullptr;
+}
+
+QPushButton *CalibrationDialog::saveButtonForKind(Calibration::ReferenceKind kind) const
+{
+    switch (kind) {
+    case Calibration::ReferenceKind::MatchedDark:
+        return m_matchedSaveButton;
+    case Calibration::ReferenceKind::Bias:
+        return m_biasSaveButton;
+    case Calibration::ReferenceKind::LongDark:
+        return m_longDarkSaveButton;
+    case Calibration::ReferenceKind::Flat:
+        return m_flatSaveButton;
+    case Calibration::ReferenceKind::VffEntry:
+        // The VFF rows live in a list and are saved through the selection.
+        return nullptr;
     }
     return nullptr;
 }
@@ -604,6 +675,12 @@ void CalibrationDialog::setReferenceStatus(Calibration::ReferenceKind kind, bool
         return;
     }
 
+    // Save As only makes sense when there is a plane to write. A path typed by
+    // an old caller without a loaded plane does not count.
+    if (QPushButton *saveButton = saveButtonForKind(kind)) {
+        saveButton->setEnabled(valid);
+    }
+
     edit->clear();
     if (!valid) {
         if (kind == Calibration::ReferenceKind::MatchedDark) {
@@ -649,6 +726,10 @@ void CalibrationDialog::setVffEntries(const QVector<Calibration::ReferenceFrame>
         QListWidgetItem *item = new QListWidgetItem(text, m_vffList);
         item->setToolTip(entry.source);
     }
+    // Rebuilding the list drops the selection; "Save Selected As..." must not
+    // keep pointing at a row that no longer exists.
+    m_vffList->setCurrentRow(-1);
+    m_vffSaveButton->setEnabled(false);
 }
 
 void CalibrationDialog::setFlatFieldStatus(const QString &text, bool ok)

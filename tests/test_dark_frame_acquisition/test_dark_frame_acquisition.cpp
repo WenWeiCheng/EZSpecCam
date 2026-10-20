@@ -21,12 +21,15 @@
 #include <QDebug>
 #include <QCheckBox>
 #include <QDoubleSpinBox>
+#include <QFile>
+#include <QFileInfo>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
 #include <QPushButton>
 #include <QSignalSpy>
 #include <QStatusBar>
+#include <QTemporaryDir>
 
 #include "widgets/MainWindow.h"
 #include "widgets/dialogs/CalibrationDialog.h"
@@ -50,6 +53,7 @@ private slots:
     void test_burst_request_above_the_limit_is_clamped();
     void test_acquired_dark_is_enabled_from_the_same_dialog();
     void test_flat_acquire_uses_dialog_slot_and_exposure();
+    void test_acquired_reference_can_be_saved_to_disk();
 
 private:
     // Runs a full burst of `frames` Grayscale16 frames whose every pixel is
@@ -359,6 +363,53 @@ void TestDarkFrameAcquisition::test_flat_acquire_uses_dialog_slot_and_exposure()
              qPrintable(pathField->placeholderText()));
     QVERIFY(pathField->text().isEmpty());
     QCOMPARE(exposureSpin->value(), 2.5);
+}
+
+// The whole point of Save As is that the in-memory average survives the
+// session. Drive the real burst, write it through the same FileSaverWorker the
+// File menu uses, and check both the pixels and the metadata sidecar.
+void TestDarkFrameAcquisition::test_acquired_reference_can_be_saved_to_disk()
+{
+    MainWindow window;
+    window.resize(1130, 870);
+    window.show();
+    QCoreApplication::processEvents();
+
+    QTemporaryDir dir;
+    QVERIFY2(dir.isValid(), "无法创建临时目录");
+
+    constexpr int kFrames = 4;
+    const QImage shown = runBurst(window, 4, 2, kFrames, 100);
+    QVERIFY(!shown.isNull());
+
+    const QString path = dir.filePath(QStringLiteral("dark.csv"));
+    QVERIFY(QMetaObject::invokeMethod(&window, "saveReferenceFrameToFile",
+                                      Qt::DirectConnection,
+                                      Q_ARG(int, static_cast<int>(
+                                                     Calibration::ReferenceKind::MatchedDark)),
+                                      Q_ARG(QString, path)));
+
+    QTRY_VERIFY_WITH_TIMEOUT(QFileInfo::exists(path), 5000);
+
+    const QString metadataPath = dir.filePath(QStringLiteral("dark_metadata.json"));
+    QTRY_VERIFY_WITH_TIMEOUT(QFileInfo::exists(metadataPath), 5000);
+
+    // The sidecar is written after the image, so both files are complete now.
+    QFile imageFile(path);
+    QVERIFY2(imageFile.open(QIODevice::ReadOnly), "CSV 没有写出来");
+    const QString content = QString::fromUtf8(imageFile.readAll());
+    imageFile.close();
+
+    // Frames hold 100..103, so a 4-frame average is 101.5 -> 102.
+    QVERIFY2(content.contains(QStringLiteral("102")), qPrintable(content));
+    QVERIFY2(!content.contains(QStringLiteral("103")), qPrintable(content));
+
+    QFile metadataFile(metadataPath);
+    QVERIFY(metadataFile.open(QIODevice::ReadOnly));
+    const QString metadata = QString::fromUtf8(metadataFile.readAll());
+    QVERIFY2(metadata.contains(QStringLiteral("calibrationReference")),
+             qPrintable(metadata));
+    QVERIFY2(metadata.contains(QStringLiteral("averagedFrames")), qPrintable(metadata));
 }
 
 QTEST_MAIN(TestDarkFrameAcquisition)

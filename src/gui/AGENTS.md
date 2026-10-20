@@ -35,7 +35,7 @@ gui/
     └── dialogs/                 # Utility dialogs
         ├── CustomRangeDialog    # Custom spectrum range input
         ├── RowRangeDialog       # Row range shared by binning and despike
-        ├── CalibrationDialog    # Dark/Flat tabs: acquire or load references; flat reuses the dark model
+        ├── CalibrationDialog    # Dark/Flat tabs: acquire, load or Save As references; flat reuses the dark model
         └── DespikeDialog        # Despike primary threshold (single parameter)
 ```
 

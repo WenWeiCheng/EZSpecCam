@@ -47,7 +47,7 @@ EZSpecCam 是一个基于 Qt 6.8、C++17 的相机控制应用程序，负责相
 | `ImageViewWidget` | 控件 | `src/gui/widgets/display/ImageViewWidget.h` | 基于 QCustomPlot 的图像渲染 |
 | `SpectrumViewWidget` | 控件 | `src/gui/widgets/display/SpectrumViewWidget.h` | 光谱图控件 |
 | `Calibration::apply` | 函数 | `src/core/Calibration.cpp` | 暗场两种方法（同曝光相减 / 偏置+暗电流线性缩放）与平场两种方法（复用暗场模型后做均值归一化 / 可变曝光拟合）的统一入口 |
-| `CalibrationDialog` | 窗口 | `src/gui/widgets/dialogs/CalibrationDialog.h` | Dark/Flat 两个标签页；参考帧可 Acquire 到内存或从文件加载，曝光时间手动输入 |
+| `CalibrationDialog` | 窗口 | `src/gui/widgets/dialogs/CalibrationDialog.h` | Dark/Flat 两个标签页；参考帧可 Acquire 到内存、从文件加载，或 Save As 另存到本地；曝光时间手动输入 |
 | `PostProcess::despikeImage` | 函数 | `src/gui/widgets/PostProcess.cpp` | 图像去尖峰（按行估计噪声 + 3×3 孤立像素判据 + 行范围，OpenMP 并行） |
 | `MainWindow::rebuildDespikeAndBinning` | 方法 | `src/gui/widgets/MainWindow.cpp` | 去尖峰 → 垂直合并 → 显示/保存；开关、阈值、行范围变化时从校正后原图重建 |
 | `DespikeDialog` | 窗口 | `src/gui/widgets/dialogs/DespikeDialog.h` | 去尖峰参数（只剩主阈值） |

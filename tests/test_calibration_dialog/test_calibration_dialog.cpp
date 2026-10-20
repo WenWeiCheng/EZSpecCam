@@ -10,6 +10,7 @@
 #include <QDoubleSpinBox>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QPushButton>
 #include <QSignalSpy>
 #include <QSpinBox>
@@ -61,6 +62,9 @@ private slots:
     void test_method_selection_switches_the_visible_page();
     void test_apply_reports_but_keeps_dialog_open();
     void test_flat_status_only_appears_on_error();
+    void test_save_as_enabled_only_with_a_reference();
+    void test_save_as_reports_the_slot_kind();
+    void test_vff_save_requires_a_selection();
 };
 
 void TestCalibrationDialog::test_acquire_emits_requested_frame_count()
@@ -329,6 +333,94 @@ void TestCalibrationDialog::test_apply_reports_but_keeps_dialog_open()
     ok->click();
     QCOMPARE(spy.count(), 2);
     QVERIFY(!dialog.isVisible());
+}
+
+// Save As belongs to a slot, not to the window: it must stay disabled until a
+// reference plane actually exists, and disabling the slot again must lock it.
+void TestCalibrationDialog::test_save_as_enabled_only_with_a_reference()
+{
+    CalibrationDialog dialog;
+    auto *save = dialog.findChild<QPushButton *>(QStringLiteral("matchedDarkSaveButton"));
+    QVERIFY2(save, "暗帧没有 Save As 按钮");
+    QVERIFY(!save->isEnabled());
+
+    dialog.setReferenceStatus(Calibration::ReferenceKind::MatchedDark, true, true, 8, QString());
+    QVERIFY(save->isEnabled());
+
+    dialog.setReferenceStatus(Calibration::ReferenceKind::MatchedDark, false, false, 0, QString());
+    QVERIFY(!save->isEnabled());
+}
+
+void TestCalibrationDialog::test_save_as_reports_the_slot_kind()
+{
+    CalibrationDialog dialog;
+
+    auto *flatSave = dialog.findChild<QPushButton *>(QStringLiteral("flatSaveButton"));
+    auto *biasSave = dialog.findChild<QPushButton *>(QStringLiteral("biasSaveButton"));
+    auto *longDarkSave = dialog.findChild<QPushButton *>(QStringLiteral("longDarkSaveButton"));
+    QVERIFY2(flatSave, "平场没有 Save As 按钮");
+    QVERIFY(biasSave);
+    QVERIFY(longDarkSave);
+
+    dialog.setReferenceStatus(Calibration::ReferenceKind::Bias, true, true, 3, QString());
+    dialog.setReferenceStatus(Calibration::ReferenceKind::LongDark, true, true, 4, QString());
+    dialog.setReferenceStatus(Calibration::ReferenceKind::Flat, true, true, 5, QString());
+
+    QSignalSpy spy(&dialog, &CalibrationDialog::saveReferenceRequested);
+    flatSave->click();
+    biasSave->click();
+    longDarkSave->click();
+
+    QCOMPARE(spy.count(), 3);
+    QCOMPARE(spy.at(0).at(0).toInt(),
+             static_cast<int>(Calibration::ReferenceKind::Flat));
+    QCOMPARE(spy.at(1).at(0).toInt(),
+             static_cast<int>(Calibration::ReferenceKind::Bias));
+    QCOMPARE(spy.at(2).at(0).toInt(),
+             static_cast<int>(Calibration::ReferenceKind::LongDark));
+}
+
+// VFF entries have no single path field, so their Save As button follows the
+// list selection. Rebuilding the list must clear that selection.
+void TestCalibrationDialog::test_vff_save_requires_a_selection()
+{
+    CalibrationDialog dialog;
+    auto *list = dialog.findChild<QListWidget *>(QStringLiteral("vffList"));
+    auto *save = dialog.findChild<QPushButton *>(QStringLiteral("vffSaveButton"));
+    QVERIFY(list);
+    QVERIFY2(save, "变曝光平场没有 Save Selected As 按钮");
+    QVERIFY(!save->isEnabled());
+
+    const auto makeEntry = [](double exposure) {
+        Calibration::ReferenceFrame entry;
+        entry.plane.width = 1;
+        entry.plane.height = 1;
+        entry.plane.channels = 1;
+        entry.plane.maxValue = 65535;
+        entry.plane.samples = {100.0f};
+        entry.exposure = exposure;
+        entry.frameCount = 2;
+        return entry;
+    };
+
+    QVector<Calibration::ReferenceFrame> entries;
+    entries << makeEntry(2.0) << makeEntry(1.0);
+    dialog.setVffEntries(entries);
+
+    QCOMPARE(list->count(), 2);
+    QVERIFY2(!save->isEnabled(), "没有选中行时不能另存");
+
+    // setVffEntries sorts by exposure, so row 1 is the 2.0 s entry.
+    list->setCurrentRow(1);
+    QVERIFY(save->isEnabled());
+
+    QSignalSpy spy(&dialog, &CalibrationDialog::saveVffEntryRequested);
+    save->click();
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(spy.at(0).at(0).toInt(), 1);
+
+    list->setCurrentRow(-1);
+    QVERIFY(!save->isEnabled());
 }
 
 QTEST_MAIN(TestCalibrationDialog)

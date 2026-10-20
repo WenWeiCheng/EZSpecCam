@@ -49,6 +49,44 @@ Q_LOGGING_CATEGORY(configCategory, "Config")
 Q_LOGGING_CATEGORY(displayCategory, "Display")
 Q_LOGGING_CATEGORY(captureCategory, "Capture")
 
+namespace
+{
+//! Stable ASCII stem used for reference file names and save metadata.
+QString referenceFileStem(Calibration::ReferenceKind kind)
+{
+    switch (kind) {
+    case Calibration::ReferenceKind::MatchedDark:
+        return QStringLiteral("dark");
+    case Calibration::ReferenceKind::Bias:
+        return QStringLiteral("bias");
+    case Calibration::ReferenceKind::LongDark:
+        return QStringLiteral("long_dark");
+    case Calibration::ReferenceKind::Flat:
+        return QStringLiteral("flat");
+    case Calibration::ReferenceKind::VffEntry:
+        return QStringLiteral("vff_flat");
+    }
+    return QStringLiteral("reference");
+}
+
+QString defaultReferenceFileName(const QString &stem,
+                                 const Calibration::ReferenceFrame &reference)
+{
+    QString name = stem;
+    if (reference.exposure > 0.0) {
+        QString exposure = QString::number(reference.exposure, 'g', 6);
+        exposure.replace(QLatin1Char('.'), QLatin1Char('p'));
+        name += QStringLiteral("_%1s").arg(exposure);
+    }
+    if (reference.frameCount > 0) {
+        name += QStringLiteral("_avg%1").arg(reference.frameCount);
+    }
+    name += QLatin1Char('_');
+    name += QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_hhmmss"));
+    return name;
+}
+} // namespace
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new MainWindowUi(this))
@@ -724,6 +762,10 @@ void MainWindow::on_actionCalibration_triggered()
                 });
         connect(m_calibrationDialog, &CalibrationDialog::referenceFileSelected,
                 this, &MainWindow::onReferenceFileSelected);
+        connect(m_calibrationDialog, &CalibrationDialog::saveReferenceRequested,
+                this, &MainWindow::onSaveReferenceRequested);
+        connect(m_calibrationDialog, &CalibrationDialog::saveVffEntryRequested,
+                this, &MainWindow::onSaveVffEntryRequested);
         connect(m_calibrationDialog, &CalibrationDialog::vffRemoveRequested,
                 this, &MainWindow::onVffRemoveRequested);
         connect(m_calibrationDialog, &CalibrationDialog::vffClearRequested,
@@ -884,6 +926,162 @@ QString MainWindow::referenceName(Calibration::ReferenceKind kind) const
         return tr("variable-exposure flat frame");
     }
     return tr("reference frame");
+}
+
+const Calibration::ReferenceFrame *MainWindow::referenceForKind(
+    Calibration::ReferenceKind kind) const
+{
+    switch (kind) {
+    case Calibration::ReferenceKind::MatchedDark:
+        return &m_darkSettings.matchedDark;
+    case Calibration::ReferenceKind::Bias:
+        return &m_darkSettings.bias;
+    case Calibration::ReferenceKind::LongDark:
+        return &m_darkSettings.longDark;
+    case Calibration::ReferenceKind::Flat:
+        return &m_flatSettings.flat;
+    case Calibration::ReferenceKind::VffEntry:
+        // VFF entries live in a list and are addressed by row, not by slot.
+        return nullptr;
+    }
+    return nullptr;
+}
+
+void MainWindow::onSaveReferenceRequested(int kind)
+{
+    const auto referenceKind = static_cast<Calibration::ReferenceKind>(kind);
+    const Calibration::ReferenceFrame *reference = referenceForKind(referenceKind);
+    if (!reference || reference->isNull()) {
+        showStatusMessage(tr("No %1 is available to save.")
+                              .arg(referenceName(referenceKind)), 3000);
+        return;
+    }
+
+    const QString filePath = askReferenceSavePath(referenceKind, *reference,
+                                                  referenceFileStem(referenceKind));
+    if (!filePath.isEmpty()) {
+        saveReferenceFrameToFile(kind, filePath);
+    }
+}
+
+void MainWindow::onSaveVffEntryRequested(int index)
+{
+    QVector<Calibration::ReferenceFrame> sorted = m_flatSettings.vffEntries;
+    std::sort(sorted.begin(), sorted.end(),
+              [](const Calibration::ReferenceFrame &a, const Calibration::ReferenceFrame &b) {
+        return a.exposure < b.exposure;
+    });
+    if (index < 0 || index >= sorted.size()) {
+        showStatusMessage(tr("No variable-exposure flat frame is selected."), 3000);
+        return;
+    }
+
+    const QString filePath = askReferenceSavePath(Calibration::ReferenceKind::VffEntry,
+                                                  sorted.at(index),
+                                                  referenceFileStem(
+                                                      Calibration::ReferenceKind::VffEntry));
+    if (!filePath.isEmpty()) {
+        saveVffEntryToFile(index, filePath);
+    }
+}
+
+QString MainWindow::askReferenceSavePath(Calibration::ReferenceKind kind,
+                                         const Calibration::ReferenceFrame &reference,
+                                         const QString &stem)
+{
+    QSettings settings;
+    QString saveDir = settings.value("calibration/lastSaveDirectory").toString();
+    if (saveDir.isEmpty() || !QDir(saveDir).exists()) {
+        // 第一次给参考帧找目录时，沿用普通图像的另存位置比凭空猜一个更好
+        saveDir = settings.value("data/lastSaveAsDirectory").toString();
+    }
+    if (saveDir.isEmpty() || !QDir(saveDir).exists()) {
+        saveDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    }
+
+    const QString imageFormat = settings.value("data/imageFormat", "TIFF").toString();
+    const QString extension = (imageFormat.compare(QStringLiteral("CSV"), Qt::CaseInsensitive) == 0)
+        ? QStringLiteral("csv")
+        : QStringLiteral("tiff");
+
+    QFileDialog dialog(this, tr("Save %1 As").arg(referenceName(kind)), saveDir);
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    dialog.setFileMode(QFileDialog::AnyFile);
+    dialog.setNameFilters(m_fileSaverWorker->availableFormatNames());
+    dialog.selectFile(defaultReferenceFileName(stem, reference) + QLatin1Char('.') + extension);
+    if (extension == QStringLiteral("csv")) {
+        dialog.selectNameFilter(QStringLiteral("CSV File (*.csv)"));
+    } else {
+        dialog.selectNameFilter(QStringLiteral("TIFF Image (*.tiff *.tif)"));
+    }
+
+    if (!dialog.exec() || dialog.selectedFiles().isEmpty()) {
+        return QString();
+    }
+
+    const QString filePath = dialog.selectedFiles().first();
+    settings.setValue("calibration/lastSaveDirectory",
+                      QFileInfo(filePath).absoluteDir().absolutePath());
+    return filePath;
+}
+
+void MainWindow::saveReferenceFrameToFile(int kind, const QString &filePath)
+{
+    const auto referenceKind = static_cast<Calibration::ReferenceKind>(kind);
+    const Calibration::ReferenceFrame *reference = referenceForKind(referenceKind);
+    if (!reference || reference->isNull()) {
+        showStatusMessage(tr("No %1 is available to save.")
+                              .arg(referenceName(referenceKind)), 3000);
+        return;
+    }
+    saveReferencePlane(referenceKind, *reference, filePath);
+}
+
+void MainWindow::saveVffEntryToFile(int index, const QString &filePath)
+{
+    // The dialog lists the entries sorted by exposure, so the row index must be
+    // resolved against a sorted copy just like Remove does.
+    QVector<Calibration::ReferenceFrame> sorted = m_flatSettings.vffEntries;
+    std::sort(sorted.begin(), sorted.end(),
+              [](const Calibration::ReferenceFrame &a, const Calibration::ReferenceFrame &b) {
+        return a.exposure < b.exposure;
+    });
+    if (index < 0 || index >= sorted.size()) {
+        showStatusMessage(tr("No variable-exposure flat frame is selected."), 3000);
+        return;
+    }
+    saveReferencePlane(Calibration::ReferenceKind::VffEntry, sorted.at(index), filePath);
+}
+
+void MainWindow::saveReferencePlane(Calibration::ReferenceKind kind,
+                                    const Calibration::ReferenceFrame &reference,
+                                    const QString &filePath)
+{
+    const QImage image = Calibration::imageFromPlane(reference.plane);
+    if (image.isNull()) {
+        showStatusMessage(tr("Failed to prepare the %1 for saving.")
+                              .arg(referenceName(kind)), 5000);
+        return;
+    }
+
+    // 参考帧和普通帧走同一条保存链路（同一套 TIFF/CSV 处理器），只是不带
+    // originalImage，并把采集事实写进 metadata 方便以后追溯。
+    SaveRequest request;
+    request.filePath = filePath;
+    request.options = SaveOptions{};
+    request.frame.image = image;
+    request.frame.timestamp = static_cast<quint64>(QDateTime::currentMSecsSinceEpoch());
+    request.frame.parameters[QStringLiteral("exposureSeconds")] = reference.exposure;
+    request.frame.parameters[QStringLiteral("averagedFrames")] = reference.frameCount;
+    request.frame.softwareSettings[QStringLiteral("calibrationReference")] =
+        referenceFileStem(kind);
+
+    showStatusMessage(tr("Saving %1: %2")
+                          .arg(referenceName(kind), QFileInfo(filePath).fileName()), 3000);
+
+    QMetaObject::invokeMethod(m_fileSaverWorker, [this, request]() {
+        m_fileSaverWorker->saveFrame(request);
+    }, Qt::QueuedConnection);
 }
 
 void MainWindow::startReferenceAcquisition(Calibration::ReferenceKind kind,
@@ -1387,7 +1585,7 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
                     storeReferenceFrame(finishedKind, reference);
                     refreshCalibrationDialog();
                     showStatusMessage(
-                        tr("%1 acquired (%2-frame average). Use Save Frame to keep it.")
+                        tr("%1 acquired (%2-frame average). Use Save As to keep it.")
                             .arg(referenceName(finishedKind))
                             .arg(frames), 10000);
                 } else {
@@ -1402,7 +1600,7 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
         updateDisplay(m_currentFrame);
         updateToolbarState();
         // Do not auto-save the running average: only the completed reference is
-        // worth keeping, and the user can press Save Frame explicitly.
+        // worth keeping, and the user can press Save As explicitly.
         return;
     }
 

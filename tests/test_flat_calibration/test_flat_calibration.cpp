@@ -30,6 +30,8 @@ private slots:
     void test_vff_rejects_matched_dark();
     void test_vff_requires_two_distinct_exposures();
     void test_plane_from_grayscale8_and_rgb();
+    void test_image_from_plane_round_trip();
+    void test_image_from_plane_clamps_out_of_range_samples();
 
 private:
     static QImage makeGrayscale16(const QVector<int> &values);
@@ -410,6 +412,64 @@ void TestFlatCalibration::test_plane_from_grayscale8_and_rgb()
     QCOMPARE(color.samples[0], 1.0f);
     QCOMPARE(color.samples[1], 2.0f);
     QCOMPARE(color.samples[2], 3.0f);
+}
+
+// Saving a calibration reference goes FramePlane -> QImage. The depth must
+// follow the plane's nominal range so a 16-bit dark frame is not silently
+// squeezed into 8 bits on the way to disk.
+void TestFlatCalibration::test_image_from_plane_round_trip()
+{
+    const QVector<int> values{0, 1, 1000, 65535};
+    const Calibration::FramePlane gray16 =
+        Calibration::planeFromImage(makeGrayscale16(values));
+    const QImage gray16Image = Calibration::imageFromPlane(gray16);
+    QVERIFY(!gray16Image.isNull());
+    QCOMPARE(gray16Image.format(), QImage::Format_Grayscale16);
+    QCOMPARE(gray16Image.width(), values.size());
+    const auto *row = reinterpret_cast<const ushort *>(gray16Image.constScanLine(0));
+    for (int x = 0; x < values.size(); ++x) {
+        QCOMPARE(int(row[x]), values[x]);
+    }
+
+    QImage gray8(3, 1, QImage::Format_Grayscale8);
+    gray8.scanLine(0)[0] = 5;
+    gray8.scanLine(0)[1] = 128;
+    gray8.scanLine(0)[2] = 255;
+    const QImage gray8Image = Calibration::imageFromPlane(Calibration::planeFromImage(gray8));
+    QCOMPARE(gray8Image.format(), QImage::Format_Grayscale8);
+    for (int x = 0; x < 3; ++x) {
+        QCOMPARE(int(gray8Image.constScanLine(0)[x]), int(gray8.scanLine(0)[x]));
+    }
+
+    QImage rgb(2, 1, QImage::Format_RGB888);
+    rgb.scanLine(0)[0] = 7;
+    rgb.scanLine(0)[1] = 200;
+    rgb.scanLine(0)[2] = 13;
+    const QImage rgbImage = Calibration::imageFromPlane(Calibration::planeFromImage(rgb));
+    QCOMPARE(rgbImage.format(), QImage::Format_RGB888);
+    const uchar *p = rgbImage.constScanLine(0);
+    QCOMPARE(int(p[0]), 7);
+    QCOMPARE(int(p[1]), 200);
+    QCOMPARE(int(p[2]), 13);
+}
+
+// Floating-point residuals from the calibration math must not wrap when they
+// are written back into an integer image.
+void TestFlatCalibration::test_image_from_plane_clamps_out_of_range_samples()
+{
+    Calibration::FramePlane plane;
+    plane.width = 3;
+    plane.height = 1;
+    plane.channels = 1;
+    plane.maxValue = 65535;
+    plane.samples = {-12.4f, 123.6f, 70000.2f};
+
+    const QImage image = Calibration::imageFromPlane(plane);
+    QVERIFY(!image.isNull());
+    const auto *row = reinterpret_cast<const ushort *>(image.constScanLine(0));
+    QCOMPARE(int(row[0]), 0);
+    QCOMPARE(int(row[1]), 124);
+    QCOMPARE(int(row[2]), 65535);
 }
 
 QTEST_MAIN(TestFlatCalibration)

@@ -174,6 +174,14 @@ struct FlatField
 //! failure and fills @p error when it is non-null.
 FramePlane planeFromImage(const QImage &image, QString *error = nullptr);
 
+//! Convert a reference plane back to a QImage so it can be written to disk.
+//!
+//! Single-channel planes become Grayscale16 when the plane's maxValue is above
+//! 255 and Grayscale8 otherwise; three-channel planes become RGB888. Samples
+//! are rounded and clamped to [0, maxValue]. Returns a null image for an
+//! invalid plane.
+QImage imageFromPlane(const FramePlane &plane);
+
 //! Build the classic mean-normalized flat field from `F - D(t_flat)`.
 //!
 //! The dark model comes from @p dark. With `BiasScaled` any flat exposure is

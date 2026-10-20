@@ -30,7 +30,8 @@ class QTabWidget;
  *
  * Every reference has an Acquire button (uses the current camera lighting)
  * and a Browse button (loads a saved TIFF/CSV image). Acquired references stay
- * in memory until the application exits; use Save Frame to persist them.
+ * in memory until the application exits; Save As writes either an acquired or
+ * a loaded reference back to disk so it can be reloaded next session.
  */
 class CalibrationDialog : public QDialog
 {
@@ -121,6 +122,10 @@ signals:
     void acquireRequested(int frameCount);
     //! Emitted after the user picks a saved reference image.
     void referenceFileSelected(int kind, const QString &path);
+    //! Emitted by a per-slot Save As button when that reference is valid.
+    void saveReferenceRequested(int kind);
+    //! Emitted by "Save Selected As..." with the row shown in the VFF list.
+    void saveVffEntryRequested(int index);
     void vffRemoveRequested(int index);
     void vffClearRequested();
 
@@ -135,9 +140,11 @@ private:
     void setupFlatTab(QTabWidget *tabs);
     void wireAcquire(QPushButton *button, AcquireKind kind);
     void wireBrowse(QPushButton *button, AcquireKind kind);
+    void wireSave(QPushButton *button, Calibration::ReferenceKind kind);
     void beginAcquisition(AcquireKind kind);
     QLineEdit *lineEditForKind(Calibration::ReferenceKind kind) const;
     QPushButton *acquireButtonForKind(Calibration::ReferenceKind kind) const;
+    QPushButton *saveButtonForKind(Calibration::ReferenceKind kind) const;
     QDoubleSpinBox *exposureSpinForKind(Calibration::ReferenceKind kind) const;
     QString inMemoryPlaceholder(Calibration::ReferenceKind kind, int frameCount) const;
 
@@ -153,10 +160,13 @@ private:
     QLineEdit *m_longDarkPath = nullptr;
     QPushButton *m_matchedBrowseButton = nullptr;
     QPushButton *m_matchedAcquireButton = nullptr;
+    QPushButton *m_matchedSaveButton = nullptr;
     QPushButton *m_biasBrowseButton = nullptr;
     QPushButton *m_biasAcquireButton = nullptr;
+    QPushButton *m_biasSaveButton = nullptr;
     QPushButton *m_longDarkBrowseButton = nullptr;
     QPushButton *m_longDarkAcquireButton = nullptr;
+    QPushButton *m_longDarkSaveButton = nullptr;
     QDoubleSpinBox *m_matchedExposureSpin = nullptr;
     QDoubleSpinBox *m_longDarkExposureSpin = nullptr;
     QDoubleSpinBox *m_targetExposureSpin = nullptr;
@@ -171,11 +181,13 @@ private:
     QLineEdit *m_flatPath = nullptr;
     QPushButton *m_flatBrowseButton = nullptr;
     QPushButton *m_flatAcquireButton = nullptr;
+    QPushButton *m_flatSaveButton = nullptr;
     QDoubleSpinBox *m_flatExposureSpin = nullptr;
     QDoubleSpinBox *m_vffExposureSpin = nullptr;
     QPushButton *m_vffBrowseButton = nullptr;
     QPushButton *m_vffAcquireButton = nullptr;
     QListWidget *m_vffList = nullptr;
+    QPushButton *m_vffSaveButton = nullptr;
     QPushButton *m_vffRemoveButton = nullptr;
     QPushButton *m_vffClearButton = nullptr;
     QLabel *m_flatStatusLabel = nullptr;
