@@ -1852,7 +1852,7 @@ void MainWindow::on_despike_toggled(bool checked)
         return;
     }
 
-    showStatusMessage(tr("Despike on: %1 of %2 pixels replaced (shown and saved).")
+    showStatusMessage(tr("Despike on: %1 of %2 pixels replaced.")
                           .arg(m_lastDespikeResult.markedCount)
                           .arg(m_lastDespikeResult.sampleCount),
                       4000);
