@@ -130,7 +130,7 @@ CLI 脚本同理；这些都要继续能用，所以 `setParameter` 收 token、
 `fromVariant` 对认不出的字符串按原样当 token 处理，保证 token 绝不会原样进 GUI、
 也绝不会以 label 的形态进设备。
 
-没有 label 的枚举项（`freq_sel` 的 `100k` / `500k`）直接显示 token 本身。
+没有 label 的枚举项（`freq_sel` 的 `100k` / `50k`）直接显示 token 本身。
 
 ### 描述与分类由插件持有（SDK 不再上报）
 
@@ -155,10 +155,10 @@ EZSpecCam 漂移，与其让两份对不上，不如只留一份。`displayName`
 
 | 类别 | 参数 |
 |------|------|
-| Core | `exposure_time_us` `read_mode` `freq_sel` `adc_gain_r` `adc_gain_g` `adc_gain_b` `adc_offset_r` `adc_offset_g` `adc_offset_b` |
+| Core | `exposure_time_us` `read_mode` `freq_sel` |
 | Cooling | `tec_enable` `tec_set_temp` `sensor_temp` `environment_temp` `tec_voltage` `tec_current` |
 | Info | `camera_name` |
-| Advanced | `tec_kp` `tec_ki` `tec_kd` `mon_dwell_ms` |
+| Advanced | `adc_gain_r` `adc_gain_g` `adc_gain_b` `adc_offset_r` `adc_offset_g` `adc_offset_b` `tec_kp` `tec_ki` `tec_kd` `mon_dwell_ms` |
 | Debug | `mock_mode` `cdsclk_delay` `image_width` `image_height` `bevel_left` `bevel_top` `bevel_right` `bevel_bottom` `blank_left` `blank_right` `acq_state` `frame_num_ready` `frame_capacity` `exception_flag` `exception_cnt` |
 
 **只读 ≠ Info。** `sensor_temp` 等四个遥测虽然只读，但归 `Cooling` —— 它们和

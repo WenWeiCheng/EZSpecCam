@@ -462,15 +462,15 @@ void TestHk16011Driver::test_parameterCategories()
         QCOMPARE(m_driver->parameter(entry.first).category, entry.second);
     }
 
-    // The six ADC codes are whole-device settings a user actually dials in for
-    // white balance, so they belong with exposure and readout mode.
+    // The six ADC trims are device-wide calibration knobs rather than something
+    // dialled in per acquisition, so the table groups them under Advanced.
     for (const QString &name : { QStringLiteral("adc_gain_r"),
                                  QStringLiteral("adc_gain_g"),
                                  QStringLiteral("adc_gain_b"),
                                  QStringLiteral("adc_offset_r"),
                                  QStringLiteral("adc_offset_g"),
                                  QStringLiteral("adc_offset_b") }) {
-        QCOMPARE(m_driver->parameter(name).category, ParameterCategory::Core);
+        QCOMPARE(m_driver->parameter(name).category, ParameterCategory::Advanced);
     }
 }
 
@@ -579,10 +579,11 @@ void TestHk16011Driver::test_parameter_freq_sel()
 
     const ParameterDefinition def = m_driver->parameter(QStringLiteral("freq_sel"));
     QCOMPARE(def.type, ParameterType::StringCollection);
-    QVERIFY2(def.constraint.validValues.contains(QStringLiteral("500k")),
-             "freq_sel should offer the 500k token");
+    // Firmware 1.21 dropped 500k and offers 100k / 50k now.
+    QVERIFY2(def.constraint.validValues.contains(QStringLiteral("50k")),
+             "freq_sel should offer the 50k token");
 
-    roundTripParameter(QStringLiteral("freq_sel"), QStringLiteral("500k"));
+    roundTripParameter(QStringLiteral("freq_sel"), QStringLiteral("50k"));
 }
 
 void TestHk16011Driver::test_parameter_mock_mode()
@@ -717,8 +718,8 @@ void TestHk16011Driver::test_enumValuesAreLabels()
     // freq_sel carries no labels at all, so it has to display as its tokens
     // rather than fall back to something blank.
     const ParameterDefinition freq = m_driver->parameter(QStringLiteral("freq_sel"));
-    QVERIFY2(freq.constraint.validValues.contains(QStringLiteral("500k")),
-             qPrintable(QString("freq_sel should offer '500k', got %1")
+    QVERIFY2(freq.constraint.validValues.contains(QStringLiteral("50k")),
+             qPrintable(QString("freq_sel should offer '50k', got %1")
                             .arg(joinValues(freq.constraint.validValues))));
     QVERIFY2(freq.constraint.validValues.contains(
                  m_driver->parameterValue(QStringLiteral("freq_sel")).toString()),

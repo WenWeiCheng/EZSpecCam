@@ -100,31 +100,30 @@ const QMap<QString, ParameterMetadata> &hk16011ParameterMetadata()
             { 1000.0, 1000000.0 } } },
         { QStringLiteral("read_mode"),
           { ParameterCategory::Core,
-            QStringLiteral("Line binning combines the 64 sensor rows into a single 1024x1 "
-                           "line; image reads the full 1024x64 frame.") } },
+            QStringLiteral("Line binning combines the sensor rows into a single line.") } },
         { QStringLiteral("freq_sel"),
           { ParameterCategory::Core,
             QStringLiteral("Pixel clock used to shift accumulated charge out of the CCD. "
                            "It bounds the shortest exposure the sensor can use.") } },
         { QStringLiteral("adc_gain_r"),
-          { ParameterCategory::Core,
+          { ParameterCategory::Advanced,
             QStringLiteral("Analog gain applied to the red channel before conversion, in V/V.") } },
         { QStringLiteral("adc_gain_g"),
-          { ParameterCategory::Core,
+          { ParameterCategory::Advanced,
             QStringLiteral("Analog gain applied to the green channel before conversion, in V/V.") } },
         { QStringLiteral("adc_gain_b"),
-          { ParameterCategory::Core,
+          { ParameterCategory::Advanced,
             QStringLiteral("Analog gain applied to the blue channel before conversion, in V/V.") } },
         { QStringLiteral("adc_offset_r"),
-          { ParameterCategory::Core,
+          { ParameterCategory::Advanced,
             QStringLiteral("Offset voltage subtracted from the red channel before conversion, "
                            "in mV.") } },
         { QStringLiteral("adc_offset_g"),
-          { ParameterCategory::Core,
+          { ParameterCategory::Advanced,
             QStringLiteral("Offset voltage subtracted from the green channel before conversion, "
                            "in mV.") } },
         { QStringLiteral("adc_offset_b"),
-          { ParameterCategory::Core,
+          { ParameterCategory::Advanced,
             QStringLiteral("Offset voltage subtracted from the blue channel before conversion, "
                            "in mV.") } },
 
@@ -132,7 +131,7 @@ const QMap<QString, ParameterMetadata> &hk16011ParameterMetadata()
         { QStringLiteral("tec_enable"),
           { ParameterCategory::Cooling,
             QStringLiteral("Turns the thermoelectric cooler on; it closes the loop around "
-                           "tec_set_temp.") } },
+                           "target temperature.") } },
         { QStringLiteral("tec_set_temp"),
           { ParameterCategory::Cooling,
             QStringLiteral("Temperature the cooler loop drives towards, in degrees Celsius.") } },
@@ -151,11 +150,11 @@ const QMap<QString, ParameterMetadata> &hk16011ParameterMetadata()
             {}, {}, true, true } },
         { QStringLiteral("tec_voltage"),
           { ParameterCategory::Cooling,
-            QStringLiteral("Voltage the cooler is being driven at."),
+            QStringLiteral("Voltage the cooler is being driven at. (V)"),
             {}, {}, true, true } },
         { QStringLiteral("tec_current"),
           { ParameterCategory::Cooling,
-            QStringLiteral("Current the cooler is drawing."),
+            QStringLiteral("Current the cooler is drawing. (A)"),
             {}, {}, true, true } },
 
         // —— Info ——
@@ -575,7 +574,7 @@ void Hk16011Driver::buildParameterTable()
             // translate in both directions — validValues is also the validation
             // set and the value stored for the parameter, so a bare token would
             // never match the combo's currentData(). Items without a label (the
-            // readout clock, "100k"/"500k") display as the token itself.
+            // readout clock, "100k"/"50k") display as the token itself.
             QHash<QString, QString> labelByToken;
             QHash<QString, QString> tokenByLabel;
             const size_t itemCount =
