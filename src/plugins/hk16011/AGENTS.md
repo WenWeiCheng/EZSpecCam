@@ -209,23 +209,17 @@ HamamatsuDriver 同一契约），实读成功就更新缓存，失败回落到�
 `HK16011_FreeValue` 有类型保护（标量时是 no-op），只有 `String`/`Enumeration`
 才持有堆内存。
 
-### 未实测的遥测
+### 遥测（Cooling 里那四个只读参数）
 
-以下四个参数固件没有接真实传感器，返回的是**落在自身声明量程之外**的占位值：
+`sensor_temp` / `environment_temp` 是 ADS1118 上两路 NTC 的换算结果（AIN0 传感器、
+AIN3 环境），`tec_voltage` / `tec_current` 来自 ADN8833 的 V/I monitor；
+`mon_dwell_ms` 决定这四个通道的轮转周期。
 
-| 参数 | 读数 | 声明量程 |
-|------|------|----------|
-| `sensor_temp` | -50.0 | [0, 80] |
-| `environment_temp` | -50.0 | [0, 80] |
-| `tec_voltage` | -5.001 | [-3.3, 3.3] |
-| `tec_current` | -2.381 | [-1.1, 1.1] |
-
-整条 TEC 温控环没有接实际硬件，`tec_set_temp` / `tec_kp` / `tec_ki` / `tec_kd`
-可以写可以读回，但控制不了任何物理量。
-
-驱动用**「只读数值参数的读数落在自身声明量程之外」**这一通用特征识别占位值
-（而不是硬编码参数名，这样以后固件新增占位项也能自动识别），
-并在其 `description` 追加 `[not implemented: ...]` 注记，避免 GUI 把它当真实数据显示。
+**驱动不加任何「未实现」注记。** 原先有一套启发式：只读数值参数的读数落在自身
+声明量程之外就当作固件占位值，并在 `description` 追加 `[not implemented: ...]`。
+它只在 NTC 未接时才成立 —— 那时分压点悬到 Vref，查表钳位在 −50.0 —— NTC 接上后
+读数变成真实温度，这条规则只会误伤。所以随 NTC 接通一并删掉了：固件报什么就显示
+什么，量程外的读数也照原样显示。
 
 ---
 
@@ -306,7 +300,7 @@ cmake --preset linux-debug
 逐类别归属（Core/Cooling/Info/Advanced/Debug 各取代表，外加六个 `adc_*`）、
 枚举的 label 与 token 双向换算、枚举写入是否真的到达设备（靠重连后复读）、
 `exposure_time_us` 单位换算、只读与 dynamic/extrinsic 标志、
-14 个已验证可回读参数各一个用例、只读参数与未实测遥测、越界与未知参数拒绝、
+14 个已验证可回读参数各一个用例、只读参数与 Cooling 遥测、越界与未知参数拒绝、
 批量语义与关键参数整批拒绝、单帧 / 定量 / 实时采集。共 49 项。
 
 ---
@@ -330,6 +324,6 @@ cmake --preset linux-debug
 - **不要**只把 `validValues` 换成 label 而不同时归一化读回来的值 ——
   下拉框会静默停在第 0 项，并把错误值写回去。
 - **不要**在 CMakeLists 里写死 SDK 的绝对路径。
-- **不要**为那四个占位遥测断言具体数值。
+- **不要**为遥测（`sensor_temp` 等四个）断言具体数值 —— 读数跟着实际温度与 TEC 驱动走。
 - **不要**指望设备替 EZSpecCam 决定分类 —— 那份分类已经从 SDK 里删掉了，
   新增参数要自己往 `hk16011ParameterMetadata()` 里加，否则它不会出现在界面上。

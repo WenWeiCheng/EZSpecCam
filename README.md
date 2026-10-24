@@ -135,8 +135,8 @@ Qt GUI 应用程序：相机发现、连接管理、参数配置、实时图像�
 | PI | 硬件 | 支持 Princeton 相机 | PIXIS100B,PIXIS400B | [下载](https://www.princetoninstruments.com.cn/products_driver.html) |
 | HK16011 | 硬件 | CCD 光谱相机（Linux，仅厂商 SDK） | HK16011 | 随设备提供，见 `HK16011_ROOT` |
 
-> **HK16011 说明**：温控环尚未接入真实传感器，`sensor_temp` / `environment_temp` /
-> `tec_voltage` / `tec_current` 返回的是固件占位值，驱动会在参数描述中标注「未实现」。
+> **HK16011 说明**：温控遥测（`sensor_temp` / `environment_temp` / `tec_voltage` /
+> `tec_current`）由固件实时上报，驱动原样透传，不再对读数加任何「未实现」注记。
 > 详见 [`src/plugins/hk16011/AGENTS.md`](src/plugins/hk16011/AGENTS.md)。
 
 ## 构建

@@ -611,8 +611,7 @@ void Hk16011Driver::buildParameterTable()
 
     HK16011_FreeParamList(defs);
 
-    // Read the live value of every parameter. This also lets us spot the
-    // telemetry the firmware reports but does not actually implement.
+    // Read the live value of every parameter; these become the defaults below.
     for (auto it = m_parameterDefinitions.constBegin();
          it != m_parameterDefinitions.constEnd(); ++it) {
         bool ok = false;
@@ -651,33 +650,6 @@ void Hk16011Driver::buildParameterTable()
         } else if (def.type == ParameterType::Boolean) {
             def.defaultValue = false;
         }
-    }
-
-    // A read-only parameter whose live reading falls outside the range the
-    // device itself declares is a firmware placeholder, not a measurement.
-    // Say so in the description so the GUI does not present it as real data.
-    const QString placeholderNote = QStringLiteral(
-        " [not implemented: the firmware reports a placeholder value for this "
-        "telemetry, not a real measurement]");
-
-    for (auto it = m_parameterDefinitions.begin(); it != m_parameterDefinitions.end(); ++it) {
-        const ParameterDefinition &def = it.value();
-        if (!def.isReadOnly
-            || (def.type != ParameterType::IntRange
-                && def.type != ParameterType::FloatRange)) {
-            continue;
-        }
-        const QVariant value = m_parameters.value(def.name);
-        if (!value.isValid()) {
-            continue;
-        }
-        const double v = value.toDouble();
-        if (v >= def.constraint.minValue && v <= def.constraint.maxValue) {
-            continue;
-        }
-        ParameterDefinition annotated = def;
-        annotated.description += placeholderNote;
-        it.value() = annotated;
     }
 }
 

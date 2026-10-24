@@ -13,8 +13,8 @@
  *    milliseconds, and the device occasionally stalls for seconds), so the
  *    waits here are generous rather than tight.
  *
- * Parameters the firmware reports but does not actually measure are never
- * asserted for real values — see test_unimplemented_telemetry().
+ * Telemetry readings track the physical temperature / TEC drive, so no test
+ * asserts a particular value — see test_coolingTelemetry().
  */
 
 #include <QTest>
@@ -106,7 +106,7 @@ private slots:
     // ——— Read-only / telemetry ———
     void test_readOnly_camera_name();
     void test_readOnly_acq_state();
-    void test_unimplemented_telemetry();
+    void test_coolingTelemetry();
 
     // ——— Validation and batch semantics ———
     void test_setParameterRejectsOutOfRange();
@@ -842,30 +842,29 @@ void TestHk16011Driver::test_readOnly_acq_state()
     QCOMPARE(m_driver->parameterValue(QStringLiteral("acq_state")).toString(), state.toString());
 }
 
-void TestHk16011Driver::test_unimplemented_telemetry()
+void TestHk16011Driver::test_coolingTelemetry()
 {
     REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
 
-    // The TEC loop is not wired to real sensors, so the firmware returns
-    // placeholders that fall outside the range the device itself declares.
-    // These must be reported as read-only and must never be presented to the
-    // user as measurements. They sit next to tec_set_temp in the Cooling group
-    // rather than in Info: grouping follows what a parameter is for, and being
+    // The four Cooling telemetry channels are live measurements: the two NTCs
+    // the ADS1118 rotates through (sensor AIN0 / ambient AIN3) and the ADN8833
+    // V/I monitors. They sit next to tec_set_temp in the Cooling group rather
+    // than in Info: grouping follows what a parameter is for, and being
     // read-only no longer implies Info.
-    const QStringList placeholders = { QStringLiteral("sensor_temp"),
-                                       QStringLiteral("environment_temp"),
-                                       QStringLiteral("tec_voltage"),
-                                       QStringLiteral("tec_current") };
+    const QStringList telemetry = { QStringLiteral("sensor_temp"),
+                                    QStringLiteral("environment_temp"),
+                                    QStringLiteral("tec_voltage"),
+                                    QStringLiteral("tec_current") };
 
-    for (const QString &name : placeholders) {
+    for (const QString &name : telemetry) {
         const ParameterDefinition def = m_driver->parameter(name);
         QVERIFY2(def.isReadOnly,
                  qPrintable(QString("'%1' should be read-only").arg(name)));
         QCOMPARE(def.category, ParameterCategory::Cooling);
-        QVERIFY2(def.description.contains(QStringLiteral("not implemented")),
-                 qPrintable(QString("'%1' should be flagged as not implemented, "
-                                    "description was: %2")
+        QVERIFY2(!def.description.contains(QStringLiteral("not implemented")),
+                 qPrintable(QString("'%1' is a real measurement and must not be "
+                                    "flagged as not implemented, description was: %2")
                                 .arg(name, def.description)));
 
         const QVariant value = m_driver->parameterValue(name);
@@ -874,8 +873,8 @@ void TestHk16011Driver::test_unimplemented_telemetry()
                  qPrintable(QString("'%1' should be a float, got type %2")
                                 .arg(name).arg(static_cast<int>(def.type))));
 
-        // Deliberately no assertion about the value itself: it is a
-        // placeholder and the firmware is free to change it.
+        // Deliberately no assertion about the reading itself: it tracks the
+        // actual temperature / TEC drive, so its value is bench-dependent.
     }
 }
 
