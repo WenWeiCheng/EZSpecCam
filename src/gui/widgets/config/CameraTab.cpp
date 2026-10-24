@@ -10,6 +10,17 @@
 #include <QComboBox>
 #include <QPushButton>
 
+namespace {
+
+// How often the read-only telemetry labels are refreshed. Each tick costs one
+// blocking UART round trip per dynamic parameter (~9 ms on hk16011), paid on the
+// GUI thread, so the interval is deliberately coarse: a 1 s refresh is plenty
+// for temperatures and acquisition state, and it leaves the GUI thread to frame
+// rendering.
+constexpr int kTelemetryPollMs = 1000;
+
+} // namespace
+
 CameraTab::CameraTab(QWidget *parent)
     : QWidget(parent)
     , ui(new CameraTabUi(this))
@@ -78,7 +89,7 @@ void CameraTab::setAppController(AppController *controller)
             m_committedConfig = controller->allParameters();
             updateConnectionState();
             buildDynamicParameterPanel();
-            m_coolingTimer->start(100);
+            m_coolingTimer->start(kTelemetryPollMs);
         }
     }
     updateConnectionState();
@@ -262,7 +273,7 @@ void CameraTab::onCameraStateChanged(CameraState state)
         if (m_parameterWidgets.isEmpty()) {
             setBufferedConfig(m_appController->allParameters());
             buildDynamicParameterPanel();
-            m_coolingTimer->start(100);
+            m_coolingTimer->start(kTelemetryPollMs);
             if (ui->parameterGroup) {
                 ui->parameterGroup->setVisible(true);
             }

@@ -175,14 +175,14 @@ EZSpecCam 漂移，与其让两份对不上，不如只留一份。`displayName`
 `hk16011ParameterMetadata()` 同时给每个参数标注 `isDynamic` / `isExtrinsic`。
 四个 Cooling 遥测和 Debug 的 `acq_state` / `frame_num_ready` / `exception_flag` /
 `exception_cnt` 只读且会自行变化，两个标志都给 —— CameraTab 对
-`isReadOnly && isDynamic && isExtrinsic` 的参数每 100 ms 轮询一次；
+`isReadOnly && isDynamic && isExtrinsic` 的参数每 1000 ms 轮询一次；
 `camera_name` / `frame_capacity` 恒定不变，两个都不给，轮询没有意义。
 
 `parameterValue()` 对这两类参数**每次调用都回设备实读**（与 PicamDriver /
 HamamatsuDriver 同一契约），实读成功就更新缓存，失败回落到缓存。代价是
-每次 GETPARAM 都是 ~9 ms 的 UART 往返：GUI 轮询的 tick 最多会被 8 个参数
-阻塞掉大半，读遥测期间也会短暂占住 `m_mutex`、推迟 `deliverQueuedFrames()`
-—— 这是接受的取舍，**不要**在这里再加缓存或限频。
+每次 GETPARAM 都是 ~9 ms 的 UART 往返：GUI 一个轮询 tick 串行读 8 个动态参数
+（约 70 ms，在 1 s 周期里占比很小），读遥测期间也会短暂占住 `m_mutex`、
+推迟 `deliverQueuedFrames()` —— 这是接受的取舍，**不要**在这里再加缓存或限频。
 
 ### `exposure_time_us` 的单位下拉
 
