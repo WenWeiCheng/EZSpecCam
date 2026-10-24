@@ -101,10 +101,11 @@ const QMap<QString, ParameterMetadata> &hk16011ParameterMetadata()
             { 1000.0, 1000000.0 } } },
         { QStringLiteral("read_mode"),
           { ParameterCategory::Core,
-            QStringLiteral("Line binning combines the sensor rows into a single line.") } },
+            QStringLiteral("Line binning: combines the sensor rows into a single line.\n"
+                           "Image: read as an image. ") } },
         { QStringLiteral("freq_sel"),
           { ParameterCategory::Core,
-            QStringLiteral("Pixel clock used to shift accumulated charge out of the CCD. "
+            QStringLiteral("Pixel clock used to shift accumulated charge out of the CCD.\n "
                            "It bounds the shortest exposure the sensor can use.") } },
         { QStringLiteral("adc_gain_r"),
           { ParameterCategory::Advanced,
@@ -131,23 +132,22 @@ const QMap<QString, ParameterMetadata> &hk16011ParameterMetadata()
         // —— Cooling ——
         { QStringLiteral("tec_enable"),
           { ParameterCategory::Cooling,
-            QStringLiteral("Turns the thermoelectric cooler on; it closes the loop around "
-                           "target temperature.") } },
+            QStringLiteral("Turns the thermoelectric cooler on. Controls the cooler loop.") } },
         { QStringLiteral("tec_set_temp"),
           { ParameterCategory::Cooling,
             QStringLiteral("Temperature the cooler loop drives towards, in degrees Celsius.") } },
         { QStringLiteral("mon_dwell_ms"),
           { ParameterCategory::Advanced,
-            QStringLiteral("Settle delay, in ms, between switching an ADS1118 monitor channel "
-                           "and reading it. The four telemetry channels rotate with a period "
+            QStringLiteral("Settle delay, in ms, between switching an ADS1118 monitor channel\n"
+                           "and reading it. The four telemetry channels rotate with a period\n"
                            "of 4x this value; a new value takes effect on the next rotation.") } },
         { QStringLiteral("sensor_temp"),
           { ParameterCategory::Cooling,
-            QStringLiteral("Temperature reported at the sensor package."),
+            QStringLiteral("Temperature at the sensor package, in degrees Celsius."),
             {}, {}, true, true } },
         { QStringLiteral("environment_temp"),
           { ParameterCategory::Cooling,
-            QStringLiteral("Ambient temperature reported near the camera."),
+            QStringLiteral("Ambient temperature near the camera, in degrees Celsius."),
             {}, {}, true, true } },
         { QStringLiteral("tec_voltage"),
           { ParameterCategory::Cooling,
@@ -177,15 +177,14 @@ const QMap<QString, ParameterMetadata> &hk16011ParameterMetadata()
         // —— Debug ——
         { QStringLiteral("mock_mode"),
           { ParameterCategory::Debug,
-            QStringLiteral("Replaces the sensor with a synthetic test pattern. For bench "
-                           "bring-up, not for measurements.") } },
+            QStringLiteral("Replaces the sensor with a synthetic test pattern. For bench") } },
         { QStringLiteral("cdsclk_delay"),
           { ParameterCategory::Debug,
-            QStringLiteral("Extra clock cycles inserted between correlated double sampling "
-                           "samples, in CCD clocks.") } },
+            QStringLiteral("Extra delay before correlated double sampling,\n"
+                           "in system clocks (10ns).") } },
         { QStringLiteral("image_width"),
           { ParameterCategory::Debug,
-            QStringLiteral("Number of valid pixels per line the camera programs.") } },
+            QStringLiteral("Number of valid pixels per line.") } },
         { QStringLiteral("image_height"),
           { ParameterCategory::Debug,
             QStringLiteral("Number of sensor lines the camera programs.") } },
@@ -207,22 +206,12 @@ const QMap<QString, ParameterMetadata> &hk16011ParameterMetadata()
         { QStringLiteral("blank_right"),
           { ParameterCategory::Debug,
             QStringLiteral("Pixels left at zero along the right edge.") } },
-        { QStringLiteral("acq_state"),
-          { ParameterCategory::Debug,
-            QStringLiteral("What the acquisition engine is doing right now: idle, exposing "
-                           "or reading."),
-            {}, {}, true, true } },
-        { QStringLiteral("frame_num_ready"),
-          { ParameterCategory::Debug,
-            QStringLiteral("Frames already buffered in the camera that have not been fetched. "
-                           "A bounded fetch is only accepted once this reaches the count."),
-            {}, {}, true, true } },
         { QStringLiteral("frame_capacity"),
           { ParameterCategory::Debug,
             QStringLiteral("How many frames the camera's buffer can hold.") } },
         { QStringLiteral("exception_flag"),
           { ParameterCategory::Debug,
-            QStringLiteral("Set when the firmware has raised an exception; read exception_cnt "
+            QStringLiteral("Set when the firmware has raised an exception; read exception_cnt\n"
                            "alongside it."),
             {}, {}, true, true } },
         { QStringLiteral("exception_cnt"),
