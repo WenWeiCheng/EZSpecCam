@@ -15,7 +15,44 @@ namespace {
 constexpr int kColorBarWidth = 20;
 // Never narrower than this, so the bar still reads as a bar on tiny fonts.
 constexpr int kMinColorScaleWidth = 60;
-}
+
+/**
+ * 十字线。图像可以换成 Hot / Cold / Jet 等任意色图，单色线一旦落在同色像素上就
+ * 看不出来了，所以每条线画两遍：先用描边色铺一条更宽的实线，再叠上主色的虚线。
+ * 描边与主色的亮度相反（亮绿配黑、暗绿配白），无论底图是亮是暗、是什么颜色，
+ * 两道里总有一道能和它分开。
+ *
+ * 用子类而不是再建一个 QCPItemLine：一个十字线仍然只有两个 item，坐标、裁剪、
+ * 增删逻辑都不用动。
+ */
+class CrosshairLine : public QCPItemLine
+{
+public:
+    explicit CrosshairLine(QCustomPlot *plot)
+        : QCPItemLine(plot)
+    {
+        setSelectable(false);
+    }
+
+    void setHaloPen(const QPen &pen) { mHaloPen = pen; }
+
+protected:
+    void draw(QCPPainter *painter) override
+    {
+        const QPen core = pen();
+        if (mHaloPen.style() != Qt::NoPen) {
+            // setPen() 只是赋值，不会触发 replot，所以可以在 draw 里来回换
+            setPen(mHaloPen);
+            QCPItemLine::draw(painter);
+        }
+        setPen(core);
+        QCPItemLine::draw(painter);
+    }
+
+private:
+    QPen mHaloPen;
+};
+} // namespace
 
 ImageViewWidget::ImageViewWidget(QWidget *parent)
     : QWidget(parent)
@@ -116,8 +153,10 @@ void ImageViewWidget::applyTheme()
 
     // 十字线是取色时现建的，主题变了得回头给已经画上的那些补一遍
     for (const auto &pair : m_crosshairs) {
-        pair.first->setPen(crosshairPen());
-        pair.second->setPen(crosshairPen());
+        for (QCPItemLine *line : { pair.first, pair.second }) {
+            line->setPen(crosshairPen());
+            static_cast<CrosshairLine *>(line)->setHaloPen(crosshairHaloPen());
+        }
     }
 
     m_plot->replot(QCustomPlot::rpQueuedReplot);
@@ -128,6 +167,18 @@ QPen ImageViewWidget::crosshairPen() const
     QPen pen(Theme::instance()->plotColors().crosshair);
     pen.setWidth(1);
     pen.setStyle(Qt::DashLine);
+    return pen;
+}
+
+QPen ImageViewWidget::crosshairHaloPen() const
+{
+    QPen pen(Theme::instance()->plotColors().crosshairHalo);
+    pen.setWidth(3); // 1 px 主线两侧各露 1 px
+    // 节距要手动换算：Qt 的 dashPattern 以线宽为单位，直接沿用 Qt::DashLine 会让
+    // 3 px 的描边节距变成主线的 3 倍，和主线错相，看着像两条不相干的线。
+    // 这里把 1 px 的默认节距（4 实 2 空）按线宽折算，两道的虚实就对齐了。
+    pen.setStyle(Qt::CustomDashLine);
+    pen.setDashPattern({ 4.0 / 3.0, 2.0 / 3.0 });
     return pen;
 }
 
@@ -418,16 +469,17 @@ void ImageViewWidget::addCrosshair(int x, int y)
     clearCrosshairs();
 
     const QPen pen = crosshairPen();
+    const QPen haloPen = crosshairHaloPen();
 
-    QCPItemLine *verticalLine = new QCPItemLine(m_plot);
+    auto *verticalLine = new CrosshairLine(m_plot);
     verticalLine->setPen(pen);
-    verticalLine->setSelectable(false);
+    verticalLine->setHaloPen(haloPen);
     verticalLine->start->setCoords(x + 0.5, 0);
     verticalLine->end->setCoords(x + 0.5, m_originalImage.height());
 
-    QCPItemLine *horizontalLine = new QCPItemLine(m_plot);
+    auto *horizontalLine = new CrosshairLine(m_plot);
     horizontalLine->setPen(pen);
-    horizontalLine->setSelectable(false);
+    horizontalLine->setHaloPen(haloPen);
     horizontalLine->start->setCoords(0, y + 0.5);
     horizontalLine->end->setCoords(m_originalImage.width(), y + 0.5);
 

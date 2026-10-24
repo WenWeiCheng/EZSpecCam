@@ -116,6 +116,7 @@ private:
     void setupColorScalePlot();
     void applyTheme();
     QPen crosshairPen() const;
+    QPen crosshairHaloPen() const;
     QPointF widgetToImageCoords(int widgetX, int widgetY) const;
     void updateCursorReadout(const QPoint &widgetPos);
     void updateDisplayData();

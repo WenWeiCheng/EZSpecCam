@@ -31,7 +31,8 @@ public:
         QColor text;            //!< 刻度标签与轴标题
         QColor grid;            //!< 网格线
         QColor curve;           //!< 数据曲线
-        QColor crosshair;       //!< 图像十字线
+        QColor crosshair;       //!< 图像十字线主色
+        QColor crosshairHalo;   //!< 十字线描边：与主色亮度相反，保证在任何色图上都能分辨
         QColor overlayText;     //!< 悬浮读数的文字
         QColor overlayBackground; //!< 悬浮读数的底色
         QColor spinner;         //!< 加载指示器

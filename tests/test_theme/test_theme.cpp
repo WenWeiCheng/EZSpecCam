@@ -296,6 +296,77 @@ private slots:
         QVERIFY2(countColor(plot, darkBg) > 0, "深色主题下绘图区一个背景像素都没有");
     }
 
+    void test_crosshair_halo_contrasts_with_its_core()
+    {
+        // 十字线靠「亮绿 + 黑边」「暗绿 + 白边」两道理清边界，两道的亮度必须拉开，
+        // 否则描边等于没画
+        for (Theme::Mode mode : { Theme::Mode::Light, Theme::Mode::Dark }) {
+            const Theme::PlotColors c = Theme::plotColorsFor(mode);
+            QVERIFY2(qAbs(c.crosshair.lightness() - c.crosshairHalo.lightness()) >= 100,
+                     qPrintable(QStringLiteral("mode=%1 core=%2 halo=%3")
+                                    .arg(int(mode))
+                                    .arg(c.crosshair.name(), c.crosshairHalo.name())));
+            QVERIFY(c.crosshair.alpha() > 0);
+            QVERIFY(c.crosshairHalo.alpha() > 0);
+        }
+    }
+
+    void test_crosshair_stays_visible_on_every_colormap()
+    {
+        // 换色图之后十字线仍要认得出来。色图里总有一段和十字线同色（绿色线压在
+        // Jet 的绿带、Spectrum 的绿段上），主线在那里等于隐形，能把它抠出来的只有
+        // 描边。所以这里验的是「描边确实比底图暗下去一大截」——把描边去掉，最深
+        // 像素就和底图一样亮，这个用例会失败。
+        m_theme->setMode(Theme::Mode::Dark);
+
+        QImage flat(64, 48, QImage::Format_Grayscale8);
+        flat.fill(128);
+
+        for (ImageViewWidget::ColorMap map :
+             { ImageViewWidget::ColorMap::Grayscale, ImageViewWidget::ColorMap::Hot,
+               ImageViewWidget::ColorMap::Cold, ImageViewWidget::ColorMap::Night,
+               ImageViewWidget::ColorMap::Candy, ImageViewWidget::ColorMap::Geography,
+               ImageViewWidget::ColorMap::Ion, ImageViewWidget::ColorMap::Thermal,
+               ImageViewWidget::ColorMap::Polar, ImageViewWidget::ColorMap::Spectrum,
+               ImageViewWidget::ColorMap::Jet }) {
+            ImageViewWidget widget;
+            widget.resize(400, 300);
+            widget.setColorScaleMode(ImageViewWidget::ColorScaleMode::Fixed8Bit);
+            widget.setImage(flat);
+            widget.setColorMap(map);
+            widget.show();
+            QCoreApplication::processEvents();
+
+            auto *plot = widget.findChild<QCustomPlot *>();
+            QVERIFY(plot);
+            widget.addCrosshair(32, 24);
+            plot->replot();
+            const QImage rendered = plot->grab().toImage();
+
+            // 竖直十字线的像素列，以及紧挨着它、没被线覆盖的参考列
+            const int lineX = qRound(plot->xAxis->coordToPixel(32.5));
+            const int refX = lineX + 8;
+            const QRect area = plot->axisRect()->rect();
+            QVERIFY(area.contains(lineX, area.center().y()));
+            QVERIFY(area.contains(refX, area.center().y()));
+
+            int darkest = 255;
+            int background = 0;
+            for (int y = area.top() + 2; y <= area.bottom() - 2; ++y) {
+                for (int x = lineX - 1; x <= lineX + 1; ++x) {
+                    darkest = qMin(darkest, rendered.pixelColor(x, y).lightness());
+                }
+                background = qMax(background, rendered.pixelColor(refX, y).lightness());
+            }
+
+            QVERIFY2(background - darkest >= 60,
+                     qPrintable(QStringLiteral("colormap %1: line=%2 background=%3")
+                                    .arg(int(map))
+                                    .arg(darkest)
+                                    .arg(background)));
+        }
+    }
+
 private:
     Theme *m_theme = nullptr;
 };

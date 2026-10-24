@@ -28,7 +28,18 @@ const QColor kDarkPlotAxis(0xb0, 0xb3, 0xb8);
 const QColor kDarkPlotText(0xd4, 0xd7, 0xdb);
 const QColor kDarkPlotGrid(0x45, 0x48, 0x4d);
 const QColor kDarkPlotCurve(0xe8, 0xea, 0xed);
-const QColor kDarkCrosshair(0xff, 0x6b, 0x6b, 180);
+// 十字线取 555 nm —— 明视觉光谱光视效率 V(λ) 的峰值，落在黄绿区。sRGB 没有
+// 555 nm 这个色度点（在色域外），纯绿的主波长 549 nm 是能表示的最接近的饱和色，
+// 再往黄偏只会牺牲蓝通道、亮度提升换不回辨识度。深色底上用满亮度，浅色底上同一
+// 色相压暗一档，否则白底上近乎看不见。
+//
+// 光有一个颜色不够：图像可以换成 Hot/Cold/Jet 等任意色图，主线一旦落在同色区域
+// 就消失了。所以每条线下面再铺一道亮度相反的实线描边（亮绿配黑、暗绿配白），
+// 无论底图什么颜色，两道里总有一道能和它分开。
+const QColor kDarkCrosshair(0x00, 0xff, 0x00, 180);
+const QColor kLightCrosshair(0x00, 0xa5, 0x00, 180);
+const QColor kDarkCrosshairHalo(0x00, 0x00, 0x00, 170);
+const QColor kLightCrosshairHalo(0xff, 0xff, 0xff, 200);
 
 } // namespace
 
@@ -97,6 +108,7 @@ Theme::PlotColors Theme::plotColorsFor(Mode mode)
         // 深色底上黑色曲线等于没有曲线，浅色下再翻回黑色
         c.curve = kDarkPlotCurve;
         c.crosshair = kDarkCrosshair;
+        c.crosshairHalo = kDarkCrosshairHalo;
         c.overlayText = kDarkText;
         c.overlayBackground = kDarkWindow;
         c.spinner = kDarkPlotAxis;
@@ -108,7 +120,8 @@ Theme::PlotColors Theme::plotColorsFor(Mode mode)
     c.text = Qt::black;
     c.grid = QColor(200, 200, 200);
     c.curve = Qt::black;
-    c.crosshair = QColor(255, 0, 0, 180);
+    c.crosshair = kLightCrosshair;
+    c.crosshairHalo = kLightCrosshairHalo;
     c.overlayText = Qt::black;
     c.overlayBackground = Qt::white;
     c.spinner = Qt::darkGray;
