@@ -158,6 +158,13 @@ private:
     QMap<QString, QHash<QString, QString>> m_enumLabelByToken; ///< parameter -> token -> label
     QMap<QString, QHash<QString, QString>> m_enumTokenByLabel; ///< parameter -> label -> token
 
+    /// Value type the firmware declared for each parameter, captured from
+    /// HK16011_ListParams(). A ParameterDefinition's ParameterType is a UI
+    /// decision — a scaled unit selector is rendered as a float range so it can
+    /// show sub-unit values — while SETPARAM has to keep speaking the type the
+    /// firmware declared: its int parser rejects any token with a decimal point.
+    QHash<QString, HK16011_ValueTypeEnum> m_wireTypes;
+
     // ——— Capture ———
     std::atomic<bool> m_capturing{false};
     int m_captureCount = 0;                  ///< Qt thread only

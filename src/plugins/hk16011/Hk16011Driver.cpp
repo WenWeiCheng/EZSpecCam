@@ -10,6 +10,7 @@
 #include <QMutexLocker>
 #include <QtEndian>
 
+#include <cmath>
 #include <cstring>
 
 Q_LOGGING_CATEGORY(parameterCategory, "Parameter")
@@ -463,6 +464,7 @@ void Hk16011Driver::clearParameterTable()
     m_pendingParameters.clear();
     m_enumLabelByToken.clear();
     m_enumTokenByLabel.clear();
+    m_wireTypes.clear();
 }
 
 void Hk16011Driver::applyParameterMetadata()
@@ -505,6 +507,14 @@ void Hk16011Driver::applyParameterMetadata()
         if (!it.value().units.isEmpty()) {
             def->constraint.unit = it.value().units;
             def->constraint.unitRange = it.value().unitScale;
+            // A scaled unit selector promises sub-unit resolution: 1 us is
+            // 1e-6 in "s", which an integer spin box cannot even represent (and
+            // whose display value used to be truncated, turning 10 s into 9 s).
+            // Present it as a float range instead; the wire type stays whatever
+            // the firmware declared (see m_wireTypes), so SETPARAM is unaffected.
+            if (def->type == ParameterType::IntRange) {
+                def->type = ParameterType::FloatRange;
+            }
         }
     }
 }
@@ -545,6 +555,9 @@ void Hk16011Driver::buildParameterTable()
         }
         def.isReadOnly = readOnly;
         def.order = static_cast<float>(i);
+        // The firmware's own type, kept regardless of how the widget will be
+        // presented; fromVariant() sends the value back with it.
+        m_wireTypes.insert(name, src.type);
 
         const QString unit = QString::fromLatin1(src.unit).trimmed();
         if (!unit.isEmpty()) {
@@ -697,6 +710,17 @@ bool Hk16011Driver::fromVariant(const ParameterDefinition &def, const QVariant &
         out->data.i = value.toLongLong();
         return true;
     case ParameterType::FloatRange:
+        if (m_wireTypes.value(def.name) == HK16011_ValueType_Int) {
+            // Shown as a float so a scaled unit selector can express 1.5 s, but
+            // the firmware only parses a bare decimal integer: sending the
+            // "%.3f" form HK16011_FormatParamValue() produces for a float makes
+            // its Proto_ParseInt() reject the token (ERR 3). Round to the
+            // nearest raw unit rather than letting toLongLong() truncate
+            // 9.999999999 (what 10 s turns into after the unit round-trip) to 9.
+            out->type = HK16011_ValueType_Int;
+            out->data.i = static_cast<int64_t>(std::llround(value.toDouble()));
+            return true;
+        }
         out->type = HK16011_ValueType_Float;
         out->data.d = value.toDouble();
         return true;

@@ -99,7 +99,7 @@
 
 | SDK `HK16011_ValueType` | EZSpecCam `ParameterType` | 备注 |
 |-------------------------|---------------------------|------|
-| `Int` | `IntRange` | 读 `min/max/step` 的 `data.i` |
+| `Int` | `IntRange` | 读 `min/max/step` 的 `data.i`；带单位下拉的展示为 `FloatRange` —— 见「`exposure_time_us` 的单位下拉」 |
 | `Float` | `FloatRange` | 读 `data.d` |
 | `Bool` | `Boolean` | |
 | `Enumeration` | `StringCollection` | `validValues` 放 **label**，设备只认 token —— 见下 |
@@ -196,6 +196,18 @@ HamamatsuDriver 同一契约），实读成功就更新缓存，失败回落到�
 另外，**单独一个 `unit` 字符串在 GUI 上是看不见的** ——
 `ParameterWidgetFactory` 只有在 `unitRange` 同时非空（`hasUnitRange()`）时才渲染单位
 下拉。raw 值始终是 µs，设备侧和 CLI 输出都不受影响。
+
+**带单位下拉的参数一律展示为 `FloatRange`。** `applyParameterMetadata()` 在套用
+`units` / `unitScale` 时把 `IntRange` 提升为 `FloatRange`：1 µs 在「s」档只有 1e-6，
+整数 spin box 表示不了，而且会把缩放后的显示值截断 —— 输入 10 s 会变成 9 s
+（`correctStep()` 算得 9.999999999999998，`static_cast<int>` 向零截断）。浮点微件顺带
+让 1.5 s 这类亚秒值可以输入。
+
+**线上类型与展示类型是两件事。** `m_wireTypes` 记住 `HK16011_ListParams()` 报的
+`src.type`，`fromVariant()` 按它填 `HK16011_ValueStruct::type`。固件这个参数声明的是
+`Int`，而 SDK 对 `Float` 用 `%.3f` 序列化，固件的 `Proto_ParseInt()` 要求整串都是数字、
+遇到小数点直接 ERR 3 —— 所以 **`def.type` 不能顺着流到 SETPARAM**。写回前还会
+`llround()` 到最近的整数 µs，否则浮点误差会让 10 s 变成 9,999,999 µs。
 
 ### 两个固件侧的坑
 

@@ -395,7 +395,9 @@ QWidget *ParameterWidgetFactory::createFloatRangeWidgetWithUnit(const ParameterD
             rangeMax = def.constraint.maxValue;
             decimals = 0;
         } else {
-            rangeMin = 1;
+            // Scale the lower bound too: with minValue == 1 us the "s" range
+            // starts at 1e-6, not at 1, or every sub-second input is clamped.
+            rangeMin = def.constraint.minValue / def.constraint.unitRange[unitIndex - 1];
             rangeMax = def.constraint.maxValue / def.constraint.unitRange[unitIndex - 1];
             decimals = std::log10(static_cast<double>(def.constraint.unitRange[unitIndex - 1]));
         }
@@ -406,7 +408,11 @@ QWidget *ParameterWidgetFactory::createFloatRangeWidgetWithUnit(const ParameterD
         spinBox->setSingleStep(displayStep);
         spinBox->setDecimals(decimals);
         spinBox->setRange(rangeMin, rangeMax);
-        slider->setRange(static_cast<int>(rangeMin), static_cast<int>(rangeMax));
+        // The slider is integer-only, so a scaled range can start below 1 (1e-6
+        // in "s"). Floor it at 1 instead of 0 so dragging cannot land on a value
+        // the constraint rejects; typing stays free down to rangeMin.
+        slider->setRange(qMax(1, static_cast<int>(std::ceil(rangeMin))),
+                         static_cast<int>(rangeMax));
         slider->setSingleStep(displayStep);
     };
 
@@ -613,7 +619,9 @@ QWidget *ParameterWidgetFactory::createIntRangeWidgetWithUnit(const ParameterDef
             rangeMin = def.constraint.minValue;
             rangeMax = def.constraint.maxValue;
         } else {
-            rangeMin = 1;
+            // An integer spin box cannot represent a value below 1 in a scaled
+            // unit, so the scaled lower bound is floored to 1 rather than to 0.
+            rangeMin = qMax(1.0, def.constraint.minValue / def.constraint.unitRange[unitIndex - 1]);
             rangeMax = def.constraint.maxValue / def.constraint.unitRange[unitIndex - 1];
         }
         spinBox->setSingleStep(def.constraint.step > 0 ? static_cast<int>(def.constraint.step) : 1);
@@ -816,7 +824,7 @@ void ParameterWidgetFactory::setFloatRangeWidgetWithUnitValue(QWidget *widget,
         rangeMax = def.constraint.maxValue;
         decimals = 0;
     } else {
-        rangeMin = 1;
+        rangeMin = def.constraint.minValue / def.constraint.unitRange[unitIndex - 1];
         rangeMax = def.constraint.maxValue / def.constraint.unitRange[unitIndex - 1];
         decimals = static_cast<int>(std::log10(static_cast<double>(def.constraint.unitRange[unitIndex - 1])));
     }
@@ -829,7 +837,9 @@ void ParameterWidgetFactory::setFloatRangeWidgetWithUnitValue(QWidget *widget,
     spinBox->setDecimals(decimals);
     spinBox->setRange(rangeMin, rangeMax);
     if (slider) {
-        slider->setRange(static_cast<int>(rangeMin), static_cast<int>(rangeMax));
+        // See createFloatRangeWidgetWithUnit(): the slider is integer-only.
+        slider->setRange(qMax(1, static_cast<int>(std::ceil(rangeMin))),
+                         static_cast<int>(rangeMax));
         slider->setSingleStep(displayStep);
     }
 
@@ -864,7 +874,9 @@ void ParameterWidgetFactory::setIntRangeWidgetWithUnitValue(QWidget *widget,
         rangeMin = def.constraint.minValue;
         rangeMax = def.constraint.maxValue;
     } else {
-        rangeMin = 1;
+        // See createIntRangeWidgetWithUnit(): an integer spin box cannot go
+        // below 1 in a scaled unit.
+        rangeMin = qMax(1.0, def.constraint.minValue / def.constraint.unitRange[unitIndex - 1]);
         rangeMax = def.constraint.maxValue / def.constraint.unitRange[unitIndex - 1];
     }
     int singleStep = def.constraint.step > 0 ? static_cast<int>(def.constraint.step) : 1;

@@ -482,7 +482,14 @@ void TestHk16011Driver::test_exposureUnitSelector()
     // A bare unit string is invisible in the GUI: ParameterWidgetFactory only
     // builds a unit combo when unitRange is present as well. Without the scale
     // the exposure spin box would span 1..2147483647 us, which no one can type.
-    const ParameterConstraint &c = m_driver->parameter(QStringLiteral("exposure_time_us")).constraint;
+    const ParameterDefinition exposure = m_driver->parameter(QStringLiteral("exposure_time_us"));
+    const ParameterConstraint &c = exposure.constraint;
+    // A scaled selector promises sub-unit resolution — 1 us is 1e-6 s — which an
+    // integer spin box cannot represent (it truncated 10 s back to 9 s). The
+    // driver presents it as a float range and keeps the firmware's int type on
+    // the wire; see Hk16011Driver::fromVariant().
+    QVERIFY2(exposure.type == ParameterType::FloatRange,
+             "a parameter with a unit selector must be presented as a float range");
     const QStringList expectedUnits = { QStringLiteral("us"), QStringLiteral("ms"), QStringLiteral("s") };
     QVERIFY2(c.unit == expectedUnits,
              qPrintable(QString("unit list is %1, expected us/ms/s").arg(c.unit.join(','))));
@@ -553,6 +560,10 @@ void TestHk16011Driver::test_parameter_exposure_time_us()
     REQUIRE_HK16011();
     QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
     roundTripParameter(QStringLiteral("exposure_time_us"), QVariant::fromValue(qlonglong(1234)));
+    // The "s" unit shows six decimals now, so a sub-second count must survive the
+    // round-trip: the widget hands over 1.5e6 as a double, and the driver has to
+    // send it as the integer 1500000 (a "%.3f" token would be rejected as ERR 3).
+    roundTripParameter(QStringLiteral("exposure_time_us"), 1500000.0);
 }
 
 void TestHk16011Driver::test_parameter_read_mode()
