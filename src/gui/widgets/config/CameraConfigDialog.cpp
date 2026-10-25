@@ -90,6 +90,13 @@ void CameraConfigDialog::setAppController(AppController *controller)
                     }
                 });
     }
+
+    // 对话框可能在采集过程中才第一次打开，这时已经错过了进入 Acquiring 的那次
+    // stateChanged；按当前状态补一次，避免采集期间还能点 Apply
+    if (ui && ui->buttonBox) {
+        const bool acquiring = controller && controller->state() == CameraState::Acquiring;
+        ui->buttonBox->setEnabled(!acquiring);
+    }
 }
 
 AppController *CameraConfigDialog::appController() const

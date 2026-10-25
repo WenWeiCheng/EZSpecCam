@@ -99,7 +99,7 @@ void CameraTab::setAppController(AppController *controller)
         ui->cameraComboBox->addItems(cameras);
         ui->cameraComboBox->setEnabled(!cameras.isEmpty());
 
-        if (controller->isConnected()) {
+        if (controller->isActive()) {
             QString currentId = controller->currentCameraId();
             int index = ui->cameraComboBox->findText(currentId);
             if (index >= 0) {
@@ -128,7 +128,7 @@ void CameraTab::setAppController(AppController *controller)
         connect(controller, &AppController::commitParametersFinished,
                 this, &CameraTab::onCommitParametersFinished);
 
-        if (controller->isConnected()) {
+        if (controller->isActive()) {
             setBufferedConfig(controller->allParameters());
             m_committedConfig = controller->allParameters();
             updateConnectionState();
@@ -336,7 +336,7 @@ void CameraTab::onCameraStateChanged(CameraState state)
 
 void CameraTab::buildDynamicParameterPanel()
 {
-    if (!m_appController || !m_appController->isConnected()) {
+    if (!m_appController || !m_appController->isActive()) {
         return;
     }
 
@@ -590,7 +590,7 @@ void CameraTab::refreshCameraList()
     ui->cameraComboBox->clear();
     ui->cameraComboBox->addItems(cameras);
 
-    if (m_appController->isConnected()) {
+    if (m_appController->isActive()) {
         QString currentId = m_appController->currentCameraId();
         int index = ui->cameraComboBox->findText(currentId);
         if (index >= 0) {
@@ -652,7 +652,9 @@ QVariantMap CameraTab::getBufferedConfig() const
 
 void CameraTab::onTelemetryTimerTimeout()
 {
-    if (!m_appController || !m_appController->isConnected()) {
+    // 采集期间也要继续轮询：否则一开始采图，温度曲线和读数就断一段。
+    // isConnected() 只认空闲状态，这里要的是「连着且在跑」的 isActive()
+    if (!m_appController || !m_appController->isActive()) {
         return;
     }
 

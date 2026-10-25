@@ -64,6 +64,10 @@ gui/
   explicitly. New plots go through `Theme::applyToPlot()` rather than being
   styled in place, or they will stay light in dark mode
 - Camera state machine: Disconnected → Connecting → Connected → Acquiring → Error
+- Telemetry polling (temperature/history) keeps running while `Acquiring`:
+  `CameraTab` gates it on `AppController::isActive()` (Connected **or** Acquiring),
+  not `isConnected()`, otherwise the curves stop as soon as a capture starts.
+  Parameter writes still require `isConnected()` (idle)
 - `QCPBars` cannot draw a bar whose base is 0 on a logarithmic axis —
   `QCPBars::getBarRect` computes `coordToPixel(base + value)` and `log10(0)`
   is `-inf`, which destroys the bar geometry. `HistogramViewWidget` therefore

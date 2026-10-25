@@ -142,6 +142,11 @@ bool AppController::isConnected() const
     return m_state == CameraState::Connected;
 }
 
+bool AppController::isActive() const
+{
+    return m_state == CameraState::Connected || m_state == CameraState::Acquiring;
+}
+
 bool AppController::hasError() const
 {
     return m_state == CameraState::Error;

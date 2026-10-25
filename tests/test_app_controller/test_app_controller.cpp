@@ -54,6 +54,8 @@ private slots:
                  "Initial camera ID should be empty");
         QVERIFY2(!m_controller->isConnected(),
                  "Should not be connected initially");
+        QVERIFY2(!m_controller->isActive(),
+                 "Should not be active initially");
         QVERIFY2(!m_controller->hasError(),
                  "Should not have error initially");
     }
@@ -372,6 +374,50 @@ private slots:
                  "Should remain connected after scanPlugins()");
         QVERIFY2(m_controller->driver() != nullptr,
                  "Driver should not be nullptr after scanPlugins() - active plugin preserved");
+    }
+
+    void test_is_active_while_acquiring()
+    {
+        // isConnected() 只表示空闲；遥测轮询在采集期间也必须继续，所以要有一个
+        // 连 Acquiring 一起算的 isActive()
+        QTemporaryDir tempDir;
+        QVERIFY2(tempDir.isValid(), "Temp directory should be valid");
+
+        QString pluginsDirPath = tempDir.path() + "/plugins/drivers";
+        QDir().mkpath(pluginsDirPath);
+
+        QString sourcePlugin = QCoreApplication::applicationDirPath()
+                              + "/plugins/drivers/mock_camera_driver.dll";
+        QFileInfo pluginFile(sourcePlugin);
+        if (!pluginFile.exists()) {
+            pluginFile.setFile(QCoreApplication::applicationDirPath()
+                               + "/../lib/Debug/mock_camera_driver.dll");
+        }
+        if (!pluginFile.exists()) {
+            QSKIP("Mock driver DLL not found, skipping test");
+        }
+
+        QFile::copy(pluginFile.absoluteFilePath(),
+                    pluginsDirPath + "/mock_camera_driver.dll");
+        app::plugins::setExtraRoots({ pluginsDirPath });
+        m_controller->scanPlugins();
+
+        QVERIFY2(m_controller->hasPlugins(), "Should have plugins after scan");
+        QVERIFY2(m_controller->connectCamera("mock-001"), "Should connect to mock-001");
+
+        QVERIFY2(m_controller->isConnected(), "Connected is the idle state");
+        QVERIFY2(m_controller->isActive(), "Connected counts as active");
+
+        QVERIFY2(m_controller->startCapture(1), "Should start capture");
+        QCOMPARE(m_controller->state(), CameraState::Acquiring);
+        QVERIFY2(!m_controller->isConnected(), "Acquiring is not idle");
+        QVERIFY2(m_controller->isActive(),
+                 "Acquiring must still count as active for telemetry polling");
+
+        m_controller->stopCapture();
+        QCOMPARE(m_controller->state(), CameraState::Connected);
+        QVERIFY2(m_controller->isConnected(), "Stopping capture returns to idle");
+        QVERIFY2(m_controller->isActive(), "Idle is still active");
     }
 
 private:

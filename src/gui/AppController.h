@@ -75,9 +75,18 @@ public:
 
     /**
      * @brief Check if connected to a camera
-     * @return true if connected and ready
+     * @return true if connected and idle
      */
     bool isConnected() const;
+
+    /**
+     * @brief Check if the camera is connected and usable, including while capturing
+     * @return true if the state is Connected or Acquiring
+     *
+     * isConnected() 只表示「已连接且空闲」。遥测轮询、历史记录这类后台工作要
+     * 在采集期间继续跑，因此用这个；参数写入仍然只允许在 isConnected() 下进行。
+     */
+    bool isActive() const;
 
     /**
      * @brief Check if the controller is in an error state
