@@ -359,7 +359,12 @@ private slots:
                 background = qMax(background, rendered.pixelColor(refX, y).lightness());
             }
 
-            QVERIFY2(background - darkest >= 60,
+            // 描边要比底图暗下去一大截。底图本身很暗时（Polar 的中段只有 ~58 亮度）
+            // 60 的绝对落差不可能达到，这里退化成「至少暗一半」；两种判据都能抓住
+            // 「描边被去掉」的回归——那时最深像素与底图同亮度，两边都不成立。
+            const bool outlineSeparates =
+                (background - darkest >= 60) || (darkest * 2 <= background);
+            QVERIFY2(outlineSeparates,
                      qPrintable(QStringLiteral("colormap %1: line=%2 background=%3")
                                     .arg(int(map))
                                     .arg(darkest)
