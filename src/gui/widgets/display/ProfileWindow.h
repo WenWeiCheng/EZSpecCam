@@ -5,7 +5,7 @@
 #include <QVector>
 #include <QLabel>
 
-class SpectrumViewWidget;
+class LineViewWidget;
 
 class ProfileWindow : public QDialog
 {
@@ -23,8 +23,8 @@ public:
 private:
     void setupUi();
 
-    SpectrumViewWidget *m_horizontalProfile;
-    SpectrumViewWidget *m_verticalProfile;
+    LineViewWidget *m_horizontalProfile;
+    LineViewWidget *m_verticalProfile;
     QLabel *m_horizontalLabel;
     QLabel *m_verticalLabel;
     int m_imageWidth;

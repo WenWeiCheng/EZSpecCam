@@ -19,7 +19,7 @@ class MainWindowUi;
 class CameraTab;
 class CameraConfigDialog;
 class ImageViewWidget;
-class SpectrumViewWidget;
+class LineViewWidget;
 class ProfileWindow;
 class HistogramWindow;
 class ScaleControlDialog;
@@ -247,7 +247,7 @@ private:
     QShortcut *shortcutBurst = nullptr;
     CameraTab *m_cameraTab;
     ImageViewWidget *m_imageViewWidget;
-    SpectrumViewWidget *m_spectrumViewWidget;
+    LineViewWidget *m_spectrumViewWidget;
 };
 
 

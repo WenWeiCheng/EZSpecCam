@@ -26,7 +26,7 @@ gui/
     │   └── LoadingIndicator     # Spinner overlay
     ├── display/                 # Image/spectrum display widgets
     │   ├── ImageViewWidget      # QCustomPlot-based frame rendering
-    │   ├── SpectrumViewWidget   # Spectrum plot
+    │   ├── LineViewWidget       # Generic x-y curve plot
     │   ├── ProfileWindow        # Cross-section profile
     │   ├── HistogramViewWidget  # Bar-chart plot (histogram only)
     │   ├── HistogramWindow      # Histogram + overexposure statistics
@@ -46,7 +46,7 @@ gui/
 | Main window + toolbar actions | `widgets/MainWindow.cpp` |
 | UI layout construction | `ui/MainWindowUi.cpp` |
 | Frame rendering | `widgets/display/ImageViewWidget.cpp` |
-| Spectrum display | `widgets/display/SpectrumViewWidget.cpp` |
+| Curve plots (spectrum / profile) | `widgets/display/LineViewWidget.cpp` |
 | Histogram + overexposure count | `widgets/display/HistogramWindow.cpp` |
 | Despike (algorithm + pipeline + params window) | `widgets/PostProcess.cpp`, `widgets/MainWindow.cpp` (`rebuildDespikeAndBinning`), `widgets/dialogs/DespikeDialog.cpp` |
 | Dynamic parameter widgets | `widgets/config/ParameterWidgetFactory.cpp` |

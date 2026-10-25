@@ -45,7 +45,7 @@ EZSpecCam 是一个基于 Qt 6.8、C++17 的相机控制应用程序，负责相
 | `MainWindowUi` | 类 | `src/gui/ui/MainWindowUi.h` | 拆分出来的 UI 搭建（工具栏、菜单、停靠窗口） |
 | `CameraTab` | 控件 | `src/gui/widgets/config/CameraTab.h` | 相机参数配置标签页 |
 | `ImageViewWidget` | 控件 | `src/gui/widgets/display/ImageViewWidget.h` | 基于 QCustomPlot 的图像渲染 |
-| `SpectrumViewWidget` | 控件 | `src/gui/widgets/display/SpectrumViewWidget.h` | 光谱图控件 |
+| `LineViewWidget` | 控件 | `src/gui/widgets/display/LineViewWidget.h` | 通用 x-y 曲线控件（光谱图、Profile、参数历史共用） |
 | `Calibration::apply` | 函数 | `src/core/Calibration.cpp` | 暗场两种方法（同曝光相减 / 偏置+暗电流线性缩放）与平场两种方法（复用暗场模型后做均值归一化 / 可变曝光拟合）的统一入口 |
 | `CalibrationDialog` | 窗口 | `src/gui/widgets/dialogs/CalibrationDialog.h` | Dark/Flat 两个标签页；参考帧可 Acquire 到内存、从文件加载，或 Save As 另存到本地；曝光时间手动输入 |
 | `PostProcess::despikeImage` | 函数 | `src/gui/widgets/PostProcess.cpp` | 图像去尖峰（按行估计噪声 + 3×3 孤立像素判据 + 行范围，OpenMP 并行） |

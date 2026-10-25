@@ -1,6 +1,6 @@
 #include "MainWindowUi.h"
 #include "../widgets/display/ImageViewWidget.h"
-#include "../widgets/display/SpectrumViewWidget.h"
+#include "../widgets/display/LineViewWidget.h"
 
 #include <QMenuBar>
 #include <QMenu>
@@ -288,7 +288,11 @@ void MainWindowUi::setupCentralWidget(QMainWindow *mainWindow)
     centralStackedWidget = new QStackedWidget(mainWindow);
 
     imageViewWidget = new ImageViewWidget(centralStackedWidget);
-    spectrumViewWidget = new SpectrumViewWidget(centralStackedWidget);
+    spectrumViewWidget = new LineViewWidget(centralStackedWidget);
+
+    // 曲线控件是通用的，主轴标题由具体视图自己给；这里是光谱视图
+    spectrumViewWidget->setXAxisLabel("X (pixels)");
+    spectrumViewWidget->setYAxisLabel("Intensity");
 
     imageViewWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     spectrumViewWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);

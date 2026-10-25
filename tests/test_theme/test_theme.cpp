@@ -7,7 +7,7 @@
 
 #include "Theme.h"
 #include "ImageViewWidget.h"
-#include "SpectrumViewWidget.h"
+#include "LineViewWidget.h"
 #include "qcustomplot.h"
 
 
@@ -164,7 +164,7 @@ private slots:
 
     void test_spectrum_plot_follows_theme()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         QVector<double> x(100), y(100);
@@ -193,7 +193,7 @@ private slots:
 
     void test_spectrum_curve_color_follows_theme()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         QVector<double> x(100), y(100);
@@ -219,7 +219,7 @@ private slots:
     void test_spectrum_cursor_label_follows_theme()
     {
         // 读数框是白色实底，不跟着换的话深色下就是一块白斑
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         m_theme->setMode(Theme::Mode::Dark);
@@ -284,7 +284,7 @@ private slots:
     {
         // Theme 是单例，先设深色再建控件，控件必须一出生就是深色
         m_theme->setMode(Theme::Mode::Dark);
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(400, 300);
 
         auto *plot = widget.findChild<QCustomPlot *>();

@@ -4,7 +4,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 
-#include "SpectrumViewWidget.h"
+#include "LineViewWidget.h"
 
 ProfileWindow::ProfileWindow(QWidget *parent)
     : QDialog(parent)
@@ -31,14 +31,16 @@ void ProfileWindow::setupUi()
 
     QVBoxLayout *horizontalLayout = new QVBoxLayout();
     m_horizontalLabel = new QLabel("Horizontal Profile (Row Y)", this);
-    m_horizontalProfile = new SpectrumViewWidget(this);
+    m_horizontalProfile = new LineViewWidget(this);
+    m_horizontalProfile->setYAxisLabel("Intensity");
     horizontalLayout->addWidget(m_horizontalLabel);
     horizontalLayout->addWidget(m_horizontalProfile);
 
     QVBoxLayout *verticalLayout = new QVBoxLayout();
     m_verticalLabel = new QLabel("Vertical Profile (Column X)", this);
-    m_verticalProfile = new SpectrumViewWidget(this);
+    m_verticalProfile = new LineViewWidget(this);
     m_verticalProfile->setXAxisLabel("Y (pixels)");
+    m_verticalProfile->setYAxisLabel("Intensity");
     verticalLayout->addWidget(m_verticalLabel);
     verticalLayout->addWidget(m_verticalProfile);
 

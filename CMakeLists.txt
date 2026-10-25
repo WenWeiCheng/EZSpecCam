@@ -159,8 +159,8 @@ set(EZSPECCAM_GUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/HistogramWindow.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/ImageViewWidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/ImageViewWidget.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/SpectrumViewWidget.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/SpectrumViewWidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/LineViewWidget.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/LineViewWidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/workers/FileLoaderWorker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/formats/IImageFormatHandler.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/formats/SaveTypes.h

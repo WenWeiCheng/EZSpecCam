@@ -3,7 +3,7 @@
 #include <QTest>
 #include <QVector>
 #include <QtMath>
-#include "SpectrumViewWidget.h"
+#include "LineViewWidget.h"
 
 class TestSpectrumAxisRange : public QObject
 {
@@ -17,7 +17,7 @@ private slots:
 
     void test_default_modes_are_auto()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         QVector<double> x(100), y(100);
@@ -27,8 +27,8 @@ private slots:
         }
         widget.setData(x, y);
 
-        QCOMPARE(widget.xAxisRangeMode(), SpectrumViewWidget::AxisRangeMode::Auto);
-        QCOMPARE(widget.yAxisRangeMode(), SpectrumViewWidget::AxisRangeMode::Auto);
+        QCOMPARE(widget.xAxisRangeMode(), LineViewWidget::AxisRangeMode::Auto);
+        QCOMPARE(widget.yAxisRangeMode(), LineViewWidget::AxisRangeMode::Auto);
 
         const double expXMin = 0.0 - 99.0 * 0.02;
         const double expXMax = 99.0 + 99.0 * 0.02;
@@ -42,7 +42,7 @@ private slots:
 
     void test_manual_x_range_applies()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         QVector<double> x(100), y(100);
@@ -52,7 +52,7 @@ private slots:
         }
         widget.setData(x, y);
 
-        widget.setXAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
+        widget.setXAxisRangeMode(LineViewWidget::AxisRangeMode::Manual);
         widget.setManualXRange(10.0, 50.0);
 
         QCOMPARE(widget.currentXMin(), 10.0);
@@ -65,7 +65,7 @@ private slots:
 
     void test_manual_y_range_applies()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         QVector<double> x(100), y(100);
@@ -75,7 +75,7 @@ private slots:
         }
         widget.setData(x, y);
 
-        widget.setYAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
+        widget.setYAxisRangeMode(LineViewWidget::AxisRangeMode::Manual);
         widget.setManualYRange(0.0, 1000.0);
 
         QCOMPARE(widget.currentYMin(), 0.0);
@@ -88,7 +88,7 @@ private slots:
 
     void test_right_click_resets_manual()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         QVector<double> x(100), y(100);
@@ -98,8 +98,8 @@ private slots:
         }
         widget.setData(x, y);
 
-        widget.setXAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
-        widget.setYAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
+        widget.setXAxisRangeMode(LineViewWidget::AxisRangeMode::Manual);
+        widget.setYAxisRangeMode(LineViewWidget::AxisRangeMode::Manual);
         widget.setManualXRange(20.0, 80.0);
         widget.setManualYRange(-5.0, 50.0);
 
@@ -114,7 +114,7 @@ private slots:
 
     void test_right_click_resets_auto_to_data_bounds()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         QVector<double> x(100), y(100);
@@ -126,13 +126,13 @@ private slots:
 
         widget.setManualXRange(20.0, 80.0);
         widget.setManualYRange(-5.0, 50.0);
-        widget.setXAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
-        widget.setYAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
+        widget.setXAxisRangeMode(LineViewWidget::AxisRangeMode::Manual);
+        widget.setYAxisRangeMode(LineViewWidget::AxisRangeMode::Manual);
 
         widget.setZoomedForTest(true);
 
-        widget.setXAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Auto);
-        widget.setYAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Auto);
+        widget.setXAxisRangeMode(LineViewWidget::AxisRangeMode::Auto);
+        widget.setYAxisRangeMode(LineViewWidget::AxisRangeMode::Auto);
 
         widget.resetZoom();
 
@@ -148,7 +148,7 @@ private slots:
 
     void test_right_click_mixed_modes()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         QVector<double> x(100), y(100);
@@ -158,8 +158,8 @@ private slots:
         }
         widget.setData(x, y);
 
-        widget.setXAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
-        widget.setYAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Auto);
+        widget.setXAxisRangeMode(LineViewWidget::AxisRangeMode::Manual);
+        widget.setYAxisRangeMode(LineViewWidget::AxisRangeMode::Auto);
         widget.setManualXRange(10.0, 90.0);
 
         widget.setZoomedForTest(true);
@@ -175,7 +175,7 @@ private slots:
 
     void test_new_data_preserves_zoom()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         QVector<double> x(100), y(100);
@@ -186,8 +186,8 @@ private slots:
         widget.setData(x, y);
 
         widget.setZoomedForTest(true);
-        widget.setXAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
-        widget.setYAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
+        widget.setXAxisRangeMode(LineViewWidget::AxisRangeMode::Manual);
+        widget.setYAxisRangeMode(LineViewWidget::AxisRangeMode::Manual);
         widget.setManualXRange(20.0, 60.0);
         widget.setManualYRange(10.0, 70.0);
 
@@ -205,7 +205,7 @@ private slots:
 
     void test_new_data_rescales_when_not_zoomed()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         QVector<double> x(100), y(100);
@@ -229,7 +229,7 @@ private slots:
 
     void test_axis_modes_independent()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         QVector<double> x(10), y(10);
@@ -239,19 +239,19 @@ private slots:
         }
         widget.setData(x, y);
 
-        widget.setXAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
-        QCOMPARE(widget.yAxisRangeMode(), SpectrumViewWidget::AxisRangeMode::Auto);
+        widget.setXAxisRangeMode(LineViewWidget::AxisRangeMode::Manual);
+        QCOMPARE(widget.yAxisRangeMode(), LineViewWidget::AxisRangeMode::Auto);
 
-        widget.setYAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
-        QCOMPARE(widget.xAxisRangeMode(), SpectrumViewWidget::AxisRangeMode::Manual);
+        widget.setYAxisRangeMode(LineViewWidget::AxisRangeMode::Manual);
+        QCOMPARE(widget.xAxisRangeMode(), LineViewWidget::AxisRangeMode::Manual);
 
-        widget.setXAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Auto);
-        QCOMPARE(widget.yAxisRangeMode(), SpectrumViewWidget::AxisRangeMode::Manual);
+        widget.setXAxisRangeMode(LineViewWidget::AxisRangeMode::Auto);
+        QCOMPARE(widget.yAxisRangeMode(), LineViewWidget::AxisRangeMode::Manual);
     }
 
     void test_top_and_right_axes_complete_the_box()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         QVector<double> x(100), y(100);
@@ -286,7 +286,7 @@ private slots:
 
     void test_right_axis_follows_manual_and_zoom_ranges()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         QVector<double> x(100), y(100);
@@ -301,9 +301,9 @@ private slots:
         QCPAxis *top = plot->axisRect()->axis(QCPAxis::atTop);
         QCPAxis *right = plot->axisRect()->axis(QCPAxis::atRight);
 
-        widget.setXAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
+        widget.setXAxisRangeMode(LineViewWidget::AxisRangeMode::Manual);
         widget.setManualXRange(10.0, 90.0);
-        widget.setYAxisRangeMode(SpectrumViewWidget::AxisRangeMode::Manual);
+        widget.setYAxisRangeMode(LineViewWidget::AxisRangeMode::Manual);
         widget.setManualYRange(-5.0, 50.0);
 
         QCOMPARE(top->range().lower, 10.0);
@@ -314,7 +314,7 @@ private slots:
 
     void test_right_axis_follows_log_scale()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         QVector<double> x(100), y(100);
@@ -324,7 +324,7 @@ private slots:
         }
         widget.setData(x, y);
 
-        widget.setIntensityScaleType(SpectrumViewWidget::IntensityScaleType::Log);
+        widget.setScaleType(LineViewWidget::ScaleType::Log);
 
         auto *plot = widget.findChild<QCustomPlot *>();
         QVERIFY(plot);

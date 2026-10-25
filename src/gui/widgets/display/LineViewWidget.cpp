@@ -1,4 +1,4 @@
-#include "SpectrumViewWidget.h"
+#include "LineViewWidget.h"
 
 #include <QVBoxLayout>
 #include <QMouseEvent>
@@ -16,15 +16,15 @@ constexpr int kCursorFontPointSize = 12;
 constexpr int kCursorLabelInset = 10;
 } // namespace
 
-SpectrumViewWidget::SpectrumViewWidget(QWidget *parent)
+LineViewWidget::LineViewWidget(QWidget *parent)
     : QWidget(parent)
     , m_plot(nullptr)
     , m_graph(nullptr)
     , m_cursorLine(nullptr)
     , m_cursorLabel(nullptr)
     , m_dataValid(false)
-    , m_xAxisLabel("X (pixels)")
-    , m_yAxisLabel("Intensity")
+    , m_xAxisLabel("X")
+    , m_yAxisLabel("Y")
     , m_rubberBand(nullptr)
 {
     m_plot = new QCustomPlot(this);
@@ -39,11 +39,11 @@ SpectrumViewWidget::SpectrumViewWidget(QWidget *parent)
     setupPlot();
 }
 
-SpectrumViewWidget::~SpectrumViewWidget()
+LineViewWidget::~LineViewWidget()
 {
 }
 
-void SpectrumViewWidget::setupPlot()
+void LineViewWidget::setupPlot()
 {
     m_plot->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
@@ -89,12 +89,12 @@ void SpectrumViewWidget::setupPlot()
 
     // 建完轴再上色：applyToPlot 要遍历 axisRect 里的四条轴
     applyTheme();
-    connect(Theme::instance(), &Theme::themeChanged, this, &SpectrumViewWidget::applyTheme);
+    connect(Theme::instance(), &Theme::themeChanged, this, &LineViewWidget::applyTheme);
 
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
-void SpectrumViewWidget::applyTheme()
+void LineViewWidget::applyTheme()
 {
     const Theme::PlotColors &c = Theme::instance()->plotColors();
 
@@ -116,7 +116,7 @@ void SpectrumViewWidget::applyTheme()
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
-void SpectrumViewWidget::setData(const QVector<double> &x, const QVector<double> &y)
+void LineViewWidget::setData(const QVector<double> &x, const QVector<double> &y)
 {
     if (x.size() != y.size()) {
         return;
@@ -134,7 +134,7 @@ void SpectrumViewWidget::setData(const QVector<double> &x, const QVector<double>
 }
 
 // 光标读数、纵轴范围读的都是 m_yData，和图上画出来的始终是同一份数据
-void SpectrumViewWidget::refreshGraphData()
+void LineViewWidget::refreshGraphData()
 {
     if (!m_dataValid || m_xData.isEmpty()) {
         return;
@@ -151,7 +151,7 @@ void SpectrumViewWidget::refreshGraphData()
     double readoutY = 0.0;
     const bool refreshReadout = m_cursorActive;
     if (refreshReadout) {
-        readoutY = intensityAt(m_lastCursorX);
+        readoutY = valueAt(m_lastCursorX);
         applyCursor(m_lastCursorX, readoutY);
     }
 
@@ -162,7 +162,7 @@ void SpectrumViewWidget::refreshGraphData()
     }
 }
 
-void SpectrumViewWidget::setFromImage(const QImage &image)
+void LineViewWidget::setFromImage(const QImage &image)
 {
     if (image.isNull()) {
         return;
@@ -185,41 +185,54 @@ void SpectrumViewWidget::setFromImage(const QImage &image)
     setData(xData, yData);
 }
 
-void SpectrumViewWidget::setSpectrumData(const QVector<quint64> &spectrum)
+void LineViewWidget::setValues(const QVector<double> &values)
 {
-    if (spectrum.isEmpty()) {
+    if (values.isEmpty()) {
         return;
     }
 
     QVector<double> xData;
-    QVector<double> yData;
-    xData.reserve(spectrum.size());
-    yData.reserve(spectrum.size());
+    xData.reserve(values.size());
 
-    for (int i = 0; i < spectrum.size(); ++i) {
+    for (int i = 0; i < values.size(); ++i) {
         xData.append(i);
-        yData.append(static_cast<double>(spectrum[i]));
     }
 
-    setData(xData, yData);
+    setData(xData, values);
 }
 
-QVector<double> SpectrumViewWidget::xData() const
+void LineViewWidget::setValues(const QVector<quint64> &values)
+{
+    if (values.isEmpty()) {
+        return;
+    }
+
+    QVector<double> yData;
+    yData.reserve(values.size());
+
+    for (quint64 value : values) {
+        yData.append(static_cast<double>(value));
+    }
+
+    setValues(yData);
+}
+
+QVector<double> LineViewWidget::xData() const
 {
     return m_xData;
 }
 
-QVector<double> SpectrumViewWidget::yData() const
+QVector<double> LineViewWidget::yData() const
 {
     return m_yData;
 }
 
-bool SpectrumViewWidget::hasData() const
+bool LineViewWidget::hasData() const
 {
     return m_dataValid;
 }
 
-void SpectrumViewWidget::clearData()
+void LineViewWidget::clearData()
 {
     m_xData.clear();
     m_yData.clear();
@@ -238,7 +251,7 @@ void SpectrumViewWidget::clearData()
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
-void SpectrumViewWidget::setLineStyle(LineStyle style)
+void LineViewWidget::setLineStyle(LineStyle style)
 {
     if (m_lineStyle == style) {
         return;
@@ -266,7 +279,7 @@ void SpectrumViewWidget::setLineStyle(LineStyle style)
     }
 }
 
-double SpectrumViewWidget::intensityAt(double x) const
+double LineViewWidget::valueAt(double x) const
 {
     if (!m_dataValid || m_xData.isEmpty()) {
         return 0.0;
@@ -289,21 +302,21 @@ double SpectrumViewWidget::intensityAt(double x) const
     return 0.0;
 }
 
-void SpectrumViewWidget::setXAxisLabel(const QString &label)
+void LineViewWidget::setXAxisLabel(const QString &label)
 {
     m_xAxisLabel = label;
     m_plot->xAxis->setLabel(label);
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
-void SpectrumViewWidget::setYAxisLabel(const QString &label)
+void LineViewWidget::setYAxisLabel(const QString &label)
 {
     m_yAxisLabel = label;
     m_plot->yAxis->setLabel(label);
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 }
 
-void SpectrumViewWidget::setXAxisRangeMode(AxisRangeMode mode)
+void LineViewWidget::setXAxisRangeMode(AxisRangeMode mode)
 {
     if (m_xAxisRangeMode == mode) {
         return;
@@ -318,7 +331,7 @@ void SpectrumViewWidget::setXAxisRangeMode(AxisRangeMode mode)
     }
 }
 
-void SpectrumViewWidget::setYAxisRangeMode(AxisRangeMode mode)
+void LineViewWidget::setYAxisRangeMode(AxisRangeMode mode)
 {
     if (m_yAxisRangeMode == mode) {
         return;
@@ -333,7 +346,7 @@ void SpectrumViewWidget::setYAxisRangeMode(AxisRangeMode mode)
     }
 }
 
-void SpectrumViewWidget::setManualXRange(double min, double max)
+void LineViewWidget::setManualXRange(double min, double max)
 {
     if (max <= min) {
         return;
@@ -348,7 +361,7 @@ void SpectrumViewWidget::setManualXRange(double min, double max)
     }
 }
 
-void SpectrumViewWidget::setManualYRange(double min, double max)
+void LineViewWidget::setManualYRange(double min, double max)
 {
     if (max <= min) {
         return;
@@ -363,22 +376,22 @@ void SpectrumViewWidget::setManualYRange(double min, double max)
     }
 }
 
-void SpectrumViewWidget::setIntensityScaleType(IntensityScaleType type)
+void LineViewWidget::setScaleType(ScaleType type)
 {
-    if (m_intensityScaleType == type) {
+    if (m_scaleType == type) {
         return;
     }
 
-    m_intensityScaleType = type;
+    m_scaleType = type;
 
-    switch (m_intensityScaleType) {
-        case IntensityScaleType::Auto: {
+    switch (m_scaleType) {
+        case ScaleType::Linear: {
             m_plot->yAxis->setScaleType(QCPAxis::stLinear);
             auto ticker = QSharedPointer<QCPAxisTicker>(new QCPAxisTicker());
             m_plot->yAxis->setTicker(ticker);
             break;
         }
-        case IntensityScaleType::Log: {
+        case ScaleType::Log: {
             m_plot->yAxis->setScaleType(QCPAxis::stLogarithmic);
             auto ticker = QSharedPointer<QCPAxisTickerLog>(new QCPAxisTickerLog());
             m_plot->yAxis->setTicker(ticker);
@@ -396,7 +409,7 @@ void SpectrumViewWidget::setIntensityScaleType(IntensityScaleType type)
     }
 }
 
-void SpectrumViewWidget::applyAxisRange()
+void LineViewWidget::applyAxisRange()
 {
     if (!m_dataValid || m_xData.isEmpty()) {
         return;
@@ -429,7 +442,7 @@ void SpectrumViewWidget::applyAxisRange()
     }
 }
 
-void SpectrumViewWidget::mouseMoveEvent(QMouseEvent *event)
+void LineViewWidget::mouseMoveEvent(QMouseEvent *event)
 {
     if (!m_dataValid || m_xData.isEmpty()) {
         QWidget::mouseMoveEvent(event);
@@ -450,7 +463,7 @@ void SpectrumViewWidget::mouseMoveEvent(QMouseEvent *event)
     QWidget::mouseMoveEvent(event);
 }
 
-void SpectrumViewWidget::leaveEvent(QEvent *event)
+void LineViewWidget::leaveEvent(QEvent *event)
 {
     m_cursorActive = false;
     m_cursorLine->setVisible(false);
@@ -462,19 +475,19 @@ void SpectrumViewWidget::leaveEvent(QEvent *event)
     QWidget::leaveEvent(event);
 }
 
-void SpectrumViewWidget::resizeEvent(QResizeEvent *event)
+void LineViewWidget::resizeEvent(QResizeEvent *event)
 {
     if (m_plot) {
         m_plot->resize(size());
         // 读数框是按像素定位的，窗口一变就得重新贴回绘图区左上角
         if (m_cursorActive) {
-            applyCursor(m_lastCursorX, intensityAt(m_lastCursorX));
+            applyCursor(m_lastCursorX, valueAt(m_lastCursorX));
         }
     }
     QWidget::resizeEvent(event);
 }
 
-void SpectrumViewWidget::showEvent(QShowEvent *event)
+void LineViewWidget::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
 
@@ -483,7 +496,7 @@ void SpectrumViewWidget::showEvent(QShowEvent *event)
     }
 }
 
-bool SpectrumViewWidget::eventFilter(QObject *obj, QEvent *event)
+bool LineViewWidget::eventFilter(QObject *obj, QEvent *event)
 {
     if (obj == m_plot) {
         if (event->type() == QEvent::MouseButtonPress) {
@@ -535,7 +548,7 @@ bool SpectrumViewWidget::eventFilter(QObject *obj, QEvent *event)
     return QWidget::eventFilter(obj, event);
 }
 
-void SpectrumViewWidget::updateCursor(double x, double y)
+void LineViewWidget::updateCursor(double x, double y)
 {
     if (!m_dataValid) {
         return;
@@ -553,7 +566,7 @@ void SpectrumViewWidget::updateCursor(double x, double y)
 
 // 只改 overlay 上的图元和文字。数据刷新那条路也要用它，但那边已经把
 // 整幅图排进重绘队列了，不能再单独让 overlay 同步重绘一遍
-void SpectrumViewWidget::applyCursor(double x, double y)
+void LineViewWidget::applyCursor(double x, double y)
 {
     double minY = m_plot->yAxis->range().lower;
     double maxY = m_plot->yAxis->range().upper;
@@ -562,7 +575,7 @@ void SpectrumViewWidget::applyCursor(double x, double y)
     m_cursorLine->end->setCoords(x, maxY);
     m_cursorLine->setVisible(true);
 
-    QString labelText = QString("X: %1\nI: %2")
+    QString labelText = QString("X: %1\nY: %2")
         .arg(x, 0, 'f', 1)
         .arg(y, 0, 'f', 0);
 
@@ -576,7 +589,7 @@ void SpectrumViewWidget::applyCursor(double x, double y)
     m_cursorLabel->setVisible(true);
 }
 
-double SpectrumViewWidget::widgetToDataX(int widgetX) const
+double LineViewWidget::widgetToDataX(int widgetX) const
 {
     if (!m_dataValid || m_xData.isEmpty()) {
         return 0.0;
@@ -597,7 +610,7 @@ double SpectrumViewWidget::widgetToDataX(int widgetX) const
     return dataX;
 }
 
-QVector<double> SpectrumViewWidget::extractRowData(const QImage &image) const
+QVector<double> LineViewWidget::extractRowData(const QImage &image) const
 {
     QVector<double> data;
 
@@ -628,7 +641,7 @@ QVector<double> SpectrumViewWidget::extractRowData(const QImage &image) const
     return data;
 }
 
-void SpectrumViewWidget::resetZoom()
+void LineViewWidget::resetZoom()
 {
     if (!m_dataValid || m_xData.isEmpty()) {
         return;

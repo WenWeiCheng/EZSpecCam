@@ -6,7 +6,7 @@
 #include <QDebug>
 #include <QVector>
 #include "ImageViewWidget.h"
-#include "SpectrumViewWidget.h"
+#include "LineViewWidget.h"
 
 class TestViewWidgetsPerf : public QObject
 {
@@ -83,13 +83,13 @@ private slots:
         }
     }
 
-    void test_spectrumviewwidget_6000x1()
+    void test_lineviewwidget_6000x1()
     {
         const int runs = 10;
         QList<qint64> timings;
 
         for (int i = 0; i < runs; ++i) {
-            SpectrumViewWidget widget;
+            LineViewWidget widget;
             widget.resize(800, 600);
 
             QImage image(6000, 1, QImage::Format_Grayscale16);
@@ -108,16 +108,16 @@ private slots:
             QVERIFY2(widget.dataWidth() == 6000, "Data width should be 6000");
         }
 
-        printStats("SpectrumViewWidget 6000x1", timings);
+        printStats("LineViewWidget 6000x1", timings);
     }
 
-    void test_spectrumviewwidget_6000_points()
+    void test_lineviewwidget_6000_points()
     {
         const int runs = 10;
         QList<qint64> timings;
 
         for (int i = 0; i < runs; ++i) {
-            SpectrumViewWidget widget;
+            LineViewWidget widget;
             widget.resize(800, 600);
 
             QVector<double> xData(6000);
@@ -136,16 +136,16 @@ private slots:
             QVERIFY2(widget.dataWidth() == 6000, "Data width should be 6000");
         }
 
-        printStats("SpectrumViewWidget 6000 points", timings);
+        printStats("LineViewWidget 6000 points", timings);
     }
 
-    void test_spectrumviewwidget_setSpectrumData_640()
+    void test_lineviewwidget_setValues_640()
     {
         const int runs = 10;
         QList<qint64> timings;
 
         for (int i = 0; i < runs; ++i) {
-            SpectrumViewWidget widget;
+            LineViewWidget widget;
             widget.resize(800, 600);
 
             QVector<quint64> spectrum(640);
@@ -155,23 +155,23 @@ private slots:
 
             QElapsedTimer timer;
             timer.start();
-            widget.setSpectrumData(spectrum);
+            widget.setValues(spectrum);
             timings.append(timer.elapsed());
 
-            QVERIFY2(widget.hasData(), "Widget should have data after setSpectrumData");
+            QVERIFY2(widget.hasData(), "Widget should have data after setValues");
             QVERIFY2(widget.dataWidth() == 640, "Data width should be 640");
         }
 
-        printStats("SpectrumViewWidget::setSpectrumData 640 points", timings);
+        printStats("LineViewWidget::setValues 640 points", timings);
     }
 
-    void test_spectrumviewwidget_setSpectrumData_1920()
+    void test_lineviewwidget_setValues_1920()
     {
         const int runs = 10;
         QList<qint64> timings;
 
         for (int i = 0; i < runs; ++i) {
-            SpectrumViewWidget widget;
+            LineViewWidget widget;
             widget.resize(800, 600);
 
             QVector<quint64> spectrum(1920);
@@ -181,23 +181,23 @@ private slots:
 
             QElapsedTimer timer;
             timer.start();
-            widget.setSpectrumData(spectrum);
+            widget.setValues(spectrum);
             timings.append(timer.elapsed());
 
-            QVERIFY2(widget.hasData(), "Widget should have data after setSpectrumData");
+            QVERIFY2(widget.hasData(), "Widget should have data after setValues");
             QVERIFY2(widget.dataWidth() == 1920, "Data width should be 1920");
         }
 
-        printStats("SpectrumViewWidget::setSpectrumData 1920 points", timings);
+        printStats("LineViewWidget::setValues 1920 points", timings);
     }
 
-    void test_spectrumviewwidget_setSpectrumData_6000()
+    void test_lineviewwidget_setValues_6000()
     {
         const int runs = 10;
         QList<qint64> timings;
 
         for (int i = 0; i < runs; ++i) {
-            SpectrumViewWidget widget;
+            LineViewWidget widget;
             widget.resize(800, 600);
 
             QVector<quint64> spectrum(6000);
@@ -207,14 +207,14 @@ private slots:
 
             QElapsedTimer timer;
             timer.start();
-            widget.setSpectrumData(spectrum);
+            widget.setValues(spectrum);
             timings.append(timer.elapsed());
 
-            QVERIFY2(widget.hasData(), "Widget should have data after setSpectrumData");
+            QVERIFY2(widget.hasData(), "Widget should have data after setValues");
             QVERIFY2(widget.dataWidth() == 6000, "Data width should be 6000");
         }
 
-        printStats("SpectrumViewWidget::setSpectrumData 6000 points", timings);
+        printStats("LineViewWidget::setValues 6000 points", timings);
     }
 
     void test_imageviewwidget_repeated_sets()

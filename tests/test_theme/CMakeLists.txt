@@ -4,7 +4,7 @@ target_sources(test_theme PRIVATE
     test_theme.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/Theme.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/qcustomplot.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/SpectrumViewWidget.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/LineViewWidget.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/PostProcess.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/ImageViewWidget.cpp
 )

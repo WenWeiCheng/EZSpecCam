@@ -1,5 +1,5 @@
-#ifndef SPECTRUMVIEWWIDGET_H
-#define SPECTRUMVIEWWIDGET_H
+#ifndef LINEVIEWWIDGET_H
+#define LINEVIEWWIDGET_H
 
 #include <QWidget>
 #include <QImage>
@@ -15,7 +15,10 @@ class QCPGraph;
 class QCPItemLine;
 class QCPItemText;
 
-class SpectrumViewWidget : public QWidget
+//! 通用 x-y 曲线控件：主界面的光谱图、Profile 窗口和参数历史窗口都复用它。
+//! 除了 setValues() / setFromImage() 这两个把一维数据摊成 (x, y) 的适配器，
+//! 它不包含任何领域逻辑。
+class LineViewWidget : public QWidget
 {
     Q_OBJECT
 public:
@@ -32,18 +35,22 @@ public:
     };
     Q_ENUM(LineStyle)
 
-    enum class IntensityScaleType {
-        Auto,
+    enum class ScaleType {
+        Linear,
         Log
     };
-    Q_ENUM(IntensityScaleType)
+    Q_ENUM(ScaleType)
 
-    explicit SpectrumViewWidget(QWidget *parent = nullptr);
-    ~SpectrumViewWidget() override;
+    explicit LineViewWidget(QWidget *parent = nullptr);
+    ~LineViewWidget() override;
 
+    //! 显式 x/y 数据。x 必须按升序排列：光标按 x 找最近采样点
     void setData(const QVector<double> &x, const QVector<double> &y);
+    //! 只有 y 时 x 取 0..n-1
+    void setValues(const QVector<double> &values);
+    void setValues(const QVector<quint64> &values);
+    //! 把 1 行图像摊成曲线（光谱、图像剖面）
     void setFromImage(const QImage &image);
-    void setSpectrumData(const QVector<quint64> &spectrum);
 
     QVector<double> xData() const;
     QVector<double> yData() const;
@@ -53,13 +60,13 @@ public:
     LineStyle lineStyle() const { return m_lineStyle; }
     void setLineStyle(LineStyle style);
 
-    double intensityAt(double x) const;
+    double valueAt(double x) const;
 
     void setXAxisLabel(const QString &label);
     void setYAxisLabel(const QString &label);
 
-    IntensityScaleType intensityScaleType() const { return m_intensityScaleType; }
-    void setIntensityScaleType(IntensityScaleType type);
+    ScaleType scaleType() const { return m_scaleType; }
+    void setScaleType(ScaleType type);
 
     AxisRangeMode xAxisRangeMode() const { return m_xAxisRangeMode; }
     void setXAxisRangeMode(AxisRangeMode mode);
@@ -83,12 +90,12 @@ public:
     double currentYMax() const { return m_plot->yAxis->range().upper; }
 
     void resetZoom();
-#ifdef SPECTRUM_AXIS_RANGE_TESTING
+#ifdef CURVE_VIEW_AXIS_RANGE_TESTING
     void setZoomedForTest(bool zoomed) { m_userHasZoomed = zoomed; }
 #endif
 
 signals:
-    void cursorPosition(double x, double intensity);
+    void cursorPosition(double x, double y);
     void cursorLeft();
 
 protected:
@@ -121,7 +128,7 @@ private:
     AxisRangeMode m_xAxisRangeMode = AxisRangeMode::Auto;
     AxisRangeMode m_yAxisRangeMode = AxisRangeMode::Auto;
     LineStyle m_lineStyle = LineStyle::Line;
-    IntensityScaleType m_intensityScaleType = IntensityScaleType::Auto;
+    ScaleType m_scaleType = ScaleType::Linear;
     double m_manualXMin = 0.0;
     double m_manualXMax = 100.0;
     double m_manualYMin = 0.0;
@@ -136,4 +143,4 @@ private:
     bool m_cursorActive = false;
 };
 
-#endif // SPECTRUMVIEWWIDGET_H
+#endif // LINEVIEWWIDGET_H

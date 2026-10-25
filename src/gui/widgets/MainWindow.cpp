@@ -4,7 +4,7 @@
 #include "../Theme.h"
 #include "config/CameraTab.h"
 #include "display/ImageViewWidget.h"
-#include "display/SpectrumViewWidget.h"
+#include "display/LineViewWidget.h"
 #include "CameraTypes.h"
 #include "display/StatisticsDialog.h"
 #include "display/ProfileWindow.h"
@@ -189,9 +189,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_scaleDialog, &ScaleControlDialog::spectrumScaleTypeChanged,
             this, [this](int type) {
                 if (m_spectrumViewWidget) {
-                    m_spectrumViewWidget->setIntensityScaleType(
-                        type == 0 ? SpectrumViewWidget::IntensityScaleType::Auto
-                                  : SpectrumViewWidget::IntensityScaleType::Log);
+                    m_spectrumViewWidget->setScaleType(
+                        type == 0 ? LineViewWidget::ScaleType::Linear
+                                  : LineViewWidget::ScaleType::Log);
                 }
             });
 
@@ -207,8 +207,8 @@ MainWindow::MainWindow(QWidget *parent)
                             m_spectrumViewWidget->currentXMax());
                     }
                     m_spectrumViewWidget->setXAxisRangeMode(
-                        mode == 0 ? SpectrumViewWidget::AxisRangeMode::Auto
-                                  : SpectrumViewWidget::AxisRangeMode::Manual);
+                        mode == 0 ? LineViewWidget::AxisRangeMode::Auto
+                                  : LineViewWidget::AxisRangeMode::Manual);
                 }
             });
 
@@ -224,8 +224,8 @@ MainWindow::MainWindow(QWidget *parent)
                             m_spectrumViewWidget->currentYMax());
                     }
                     m_spectrumViewWidget->setYAxisRangeMode(
-                        mode == 0 ? SpectrumViewWidget::AxisRangeMode::Auto
-                                  : SpectrumViewWidget::AxisRangeMode::Manual);
+                        mode == 0 ? LineViewWidget::AxisRangeMode::Auto
+                                  : LineViewWidget::AxisRangeMode::Manual);
                 }
             });
 
@@ -265,7 +265,7 @@ MainWindow::MainWindow(QWidget *parent)
             this, [this](int style) {
                 if (m_spectrumViewWidget) {
                     m_spectrumViewWidget->setLineStyle(
-                        static_cast<SpectrumViewWidget::LineStyle>(style));
+                        static_cast<LineViewWidget::LineStyle>(style));
                 }
             });
 
@@ -2119,7 +2119,7 @@ void MainWindow::updateDisplay(const ImageData &frame, bool force)
 
     if (height == 1) {
         if (!frame.spectrum.isEmpty()) {
-            m_spectrumViewWidget->setSpectrumData(frame.spectrum);
+            m_spectrumViewWidget->setValues(frame.spectrum);
         } else {
             m_spectrumViewWidget->setFromImage(frame.image);
         }

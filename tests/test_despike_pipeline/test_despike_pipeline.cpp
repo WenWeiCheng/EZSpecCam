@@ -18,7 +18,7 @@
 #include "CameraTypes.h"
 #include "widgets/MainWindow.h"
 #include "widgets/display/ImageViewWidget.h"
-#include "widgets/display/SpectrumViewWidget.h"
+#include "widgets/display/LineViewWidget.h"
 #include "widgets/dialogs/RowRangeDialog.h"
 
 namespace {
@@ -114,7 +114,7 @@ void TestDespikePipeline::test_toggle_rebuilds_image_and_spectrum()
     QTest::qWait(50);
 
     auto *imageView = window.findChild<ImageViewWidget *>();
-    auto *spectrumView = window.findChild<SpectrumViewWidget *>();
+    auto *spectrumView = window.findChild<LineViewWidget *>();
     QAction *despikeAction = findAction(window, QStringLiteral("Despike"));
     QAction *vbinAction = findAction(window, QStringLiteral("Software Vertical Binning"));
     QVERIFY(imageView);
@@ -162,7 +162,7 @@ void TestDespikePipeline::test_row_range_limits_despike()
     QTest::qWait(50);
 
     auto *imageView = window.findChild<ImageViewWidget *>();
-    auto *spectrumView = window.findChild<SpectrumViewWidget *>();
+    auto *spectrumView = window.findChild<LineViewWidget *>();
     QAction *despikeAction = findAction(window, QStringLiteral("Despike"));
     QAction *vbinAction = findAction(window, QStringLiteral("Software Vertical Binning"));
     QVERIFY(imageView);

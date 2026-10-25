@@ -12,7 +12,7 @@
 #include <QStackedWidget>
 
 class ImageViewWidget;
-class SpectrumViewWidget;
+class LineViewWidget;
 
 class MainWindowUi : public QObject
 {
@@ -69,7 +69,7 @@ public:
     QToolBar *toolBar;
     QStackedWidget *centralStackedWidget;
     ImageViewWidget *imageViewWidget;
-    SpectrumViewWidget *spectrumViewWidget;
+    LineViewWidget *spectrumViewWidget;
 
     void setupCentralWidget(QMainWindow *mainWindow);
 

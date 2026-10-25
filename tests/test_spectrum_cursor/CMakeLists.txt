@@ -1,11 +1,11 @@
-# Cursor readout behaviour tests for SpectrumViewWidget: the readout must follow
+# Cursor readout behaviour tests for LineViewWidget: the readout must follow
 # new data even when the mouse has not moved (live mode).
 add_executable(test_spectrum_cursor)
 target_sources(test_spectrum_cursor PRIVATE
     test_spectrum_cursor.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/Theme.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/qcustomplot.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/SpectrumViewWidget.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/LineViewWidget.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/PostProcess.cpp
 )
 target_link_libraries(test_spectrum_cursor PRIVATE

@@ -5,10 +5,10 @@
 #include <QTest>
 #include <QVector>
 
-#include "SpectrumViewWidget.h"
+#include "LineViewWidget.h"
 #include "qcustomplot.h"
 
-static QCustomPlot *plotOf(SpectrumViewWidget *widget)
+static QCustomPlot *plotOf(LineViewWidget *widget)
 {
     return widget->findChild<QCustomPlot *>();
 }
@@ -27,7 +27,7 @@ static QCPItemText *readoutOf(QCustomPlot *plot)
 // 走真实的鼠标事件，而不是调私有函数：这次要验的恰恰是「鼠标没动」这条路
 // 没 show 过的话 QCustomPlot 还没排版，axisRect 是空的，鼠标坐标会一律落到数据
 // 起点，测的就不是「某个像素对应哪个数据点」了
-static void showLayout(SpectrumViewWidget *widget)
+static void showLayout(LineViewWidget *widget)
 {
     widget->show();
     QCoreApplication::processEvents();
@@ -62,11 +62,11 @@ static QVector<double> indices(int size)
 }
 
 // 读数框第二行是 "I: <值>"
-static double intensityInReadout(const QCPItemText *readout)
+static double valueInReadout(const QCPItemText *readout)
 {
     const QStringList lines = readout->text().split(QLatin1Char('\n'));
     for (const QString &line : lines) {
-        if (line.startsWith(QLatin1String("I: "))) {
+        if (line.startsWith(QLatin1String("Y: "))) {
             return line.mid(3).toDouble();
         }
     }
@@ -92,7 +92,7 @@ private slots:
 
     void test_data_refresh_updates_readout()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         auto *plot = plotOf(&widget);
@@ -107,15 +107,15 @@ private slots:
 
         moveMouseOver(plot, plot->axisRect()->rect().left() + plot->axisRect()->rect().width() / 2);
         QVERIFY(readout->visible());
-        const double first = intensityInReadout(readout);
+        const double first = valueInReadout(readout);
         QVERIFY(first > 0.0);
 
         // 鼠标不动，只换一帧数据
-        QSignalSpy spy(&widget, &SpectrumViewWidget::cursorPosition);
+        QSignalSpy spy(&widget, &LineViewWidget::cursorPosition);
         widget.setData(indices(100), ramp(100, 6000.0));
 
         QVERIFY(readout->visible());
-        const double second = intensityInReadout(readout);
+        const double second = valueInReadout(readout);
         QVERIFY2(qAbs(second - first) > 100.0,
                  qPrintable(QStringLiteral("读数没有跟着新数据更新：%1 -> %2")
                                 .arg(first).arg(second)));
@@ -127,7 +127,7 @@ private slots:
 
     void test_x_stays_put_while_value_changes()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         auto *plot = plotOf(&widget);
@@ -140,13 +140,13 @@ private slots:
 
         moveMouseOver(plot, plot->axisRect()->rect().left() + 100);
         const QString before = xLineInReadout(readout);
-        const double valueBefore = intensityInReadout(readout);
+        const double valueBefore = valueInReadout(readout);
 
         widget.setData(indices(100), ramp(100, 5000.0));
 
         // 只有强度那一行变，横坐标那一行必须原样不动
         QCOMPARE(xLineInReadout(readout), before);
-        const double valueAfter = intensityInReadout(readout);
+        const double valueAfter = valueInReadout(readout);
         QVERIFY2(qAbs(valueAfter - valueBefore - 4000.0) < 0.5,
                  qPrintable(QStringLiteral("before=%1 after=%2 text='%3'")
                                 .arg(valueBefore).arg(valueAfter).arg(readout->text())));
@@ -155,7 +155,7 @@ private slots:
     void test_no_readout_before_first_mouse_move()
     {
         // 反过来也要守住：鼠标从没进过画面，不能凭空冒出一个读数
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         auto *plot = plotOf(&widget);
@@ -172,7 +172,7 @@ private slots:
 
     void test_readout_hidden_after_mouse_left()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         auto *plot = plotOf(&widget);
@@ -197,7 +197,7 @@ private slots:
 
     void test_clear_data_resets_cursor()
     {
-        SpectrumViewWidget widget;
+        LineViewWidget widget;
         widget.resize(800, 600);
 
         auto *plot = plotOf(&widget);

@@ -1,11 +1,11 @@
-# Performance tests for ImageViewWidget and SpectrumViewWidget
+# Performance tests for ImageViewWidget and LineViewWidget
 add_executable(test_view_widgets_perf)
 target_sources(test_view_widgets_perf PRIVATE
     test_view_widgets_perf.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/qcustomplot.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/Theme.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/ImageViewWidget.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/SpectrumViewWidget.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/LineViewWidget.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/PostProcess.cpp
 )
 target_link_libraries(test_view_widgets_perf PRIVATE
