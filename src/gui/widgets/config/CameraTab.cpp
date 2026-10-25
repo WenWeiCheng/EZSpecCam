@@ -1,14 +1,25 @@
 #include "CameraTab.h"
 #include "../../DebugMacros.h"
+#include "../../Theme.h"
 #include "../../ui/CameraTabUi.h"
+#include "../display/ParameterHistoryWindow.h"
+#include "ParameterHistoryStore.h"
 #include "ParameterWidgetFactory.h"
-#include <QDebug>
-#include <QObject>
-#include <QTimer>
-#include <QMetaObject>
-#include <QSettings>
 #include <QComboBox>
+#include <QDateTime>
+#include <QDebug>
+#include <QHBoxLayout>
+#include <QIcon>
+#include <QLabel>
+#include <QMetaObject>
+#include <QObject>
+#include <QPainter>
+#include <QPen>
+#include <QPolygonF>
 #include <QPushButton>
+#include <QSettings>
+#include <QTimer>
+#include <QToolButton>
 
 namespace {
 
@@ -19,16 +30,49 @@ namespace {
 // rendering.
 constexpr int kTelemetryPollMs = 1000;
 
+// 行内曲线按钮的图标。调色板里没有现成的折线图标，画一个：左下两条轴 +
+// 一条折线，颜色取按钮文字色，主题切换时由 updatePlotButtonIcons() 重画
+QIcon makePlotIcon(const QPalette &palette)
+{
+    // 16 px 显示尺寸的 2 倍，缩小后用在高 DPI 屏上也还清楚
+    constexpr int kSize = 32;
+
+    QPixmap pixmap(kSize, kSize);
+    pixmap.fill(Qt::transparent);
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    QPen pen(palette.color(QPalette::ButtonText), 2.0);
+    pen.setCapStyle(Qt::RoundCap);
+    pen.setJoinStyle(Qt::RoundJoin);
+    painter.setPen(pen);
+
+    painter.drawLine(QPointF(5.0, 5.0), QPointF(5.0, 27.0));
+    painter.drawLine(QPointF(5.0, 27.0), QPointF(28.0, 27.0));
+
+    QPolygonF curve;
+    curve << QPointF(9.0, 21.0)
+          << QPointF(15.0, 13.0)
+          << QPointF(20.0, 18.0)
+          << QPointF(27.0, 8.0);
+    painter.drawPolyline(curve);
+
+    return QIcon(pixmap);
+}
+
 } // namespace
 
 CameraTab::CameraTab(QWidget *parent)
     : QWidget(parent)
     , ui(new CameraTabUi(this))
     , m_appController(nullptr)
-    , m_coolingTimer(new QTimer(this))
+    , m_telemetryTimer(new QTimer(this))
+    , m_history(new ParameterHistoryStore(this))
 {
     ui->setupUi(this);
-    connect(m_coolingTimer, &QTimer::timeout, this, &CameraTab::onCoolingTimerTimeout);
+    connect(m_telemetryTimer, &QTimer::timeout, this, &CameraTab::onTelemetryTimerTimeout);
+    connect(Theme::instance(), &Theme::themeChanged, this, &CameraTab::updatePlotButtonIcons);
     connect(ui->scanButton, &QPushButton::clicked,
             this, &CameraTab::onScanButtonClicked);
     connect(ui->connectButton, &QPushButton::clicked,
@@ -89,7 +133,7 @@ void CameraTab::setAppController(AppController *controller)
             m_committedConfig = controller->allParameters();
             updateConnectionState();
             buildDynamicParameterPanel();
-            m_coolingTimer->start(kTelemetryPollMs);
+            m_telemetryTimer->start(kTelemetryPollMs);
         }
     }
     updateConnectionState();
@@ -165,6 +209,8 @@ void CameraTab::onConnectCameraFinished(const QString &cameraId, bool success, c
         QTimer::singleShot(2000, this, [this]() {
             ui->m_statusLabel->setVisible(false);
         });
+        // 新会话：历史从干净状态重新开始。断开时不清，窗口里还能继续看/导出
+        m_history->clear();
     } else {
         ui->m_statusLabel->setText(error.isEmpty() ? "Connection failed" : error);
         ui->m_statusLabel->setVisible(true);
@@ -273,14 +319,14 @@ void CameraTab::onCameraStateChanged(CameraState state)
         if (m_parameterWidgets.isEmpty()) {
             setBufferedConfig(m_appController->allParameters());
             buildDynamicParameterPanel();
-            m_coolingTimer->start(kTelemetryPollMs);
+            m_telemetryTimer->start(kTelemetryPollMs);
             if (ui->parameterGroup) {
                 ui->parameterGroup->setVisible(true);
             }
         }
     } else if (state == CameraState::Disconnected || state == CameraState::Error) {
         clearDynamicParameterPanel();
-        m_coolingTimer->stop();
+        m_telemetryTimer->stop();
         if (ui->parameterGroup) {
             ui->parameterGroup->setVisible(false);
         }
@@ -335,15 +381,16 @@ void CameraTab::buildDynamicParameterPanel()
             const QString &name = paramPair.first;
             const ParameterDefinition &def = paramPair.second;
 
-            QWidget *widget = ParameterWidgetFactory::createWidget(def);
+            const ParameterField field = createParameterField(name, def);
 
-            if (widget) {
-                m_parameterWidgets.insert(name, widget);
+            if (field.widget) {
+                m_parameterWidgets.insert(name, field.widget);
+                registerParameterField(name, field);
                 if (m_bufferedConfig.contains(name)) {
-                    ParameterWidgetFactory::setWidgetValue(widget, m_bufferedConfig.value(name), def);
+                    ParameterWidgetFactory::setWidgetValue(field.widget, m_bufferedConfig.value(name), def);
                     CONFIG_DEBUG << "Set widget value for" << name << ":" << m_bufferedConfig.value(name);
                 }
-                paramFormLayout->addRow(def.displayName + ":", widget);
+                paramFormLayout->addRow(def.displayName + ":", field.widget);
             }
         }
 
@@ -380,6 +427,8 @@ void CameraTab::clearDynamicParameterPanel()
     }
     m_parameterWidgets.clear();
     m_parameterDefinitions.clear();
+    m_telemetryLabels.clear();
+    m_plotButtons.clear();
 }
 
 void CameraTab::rebuildParameterWidget(const QString &paramName)
@@ -415,20 +464,121 @@ void CameraTab::rebuildParameterWidget(const QString &paramName)
         return;
     }
 
-    QWidget *newWidget = ParameterWidgetFactory::createWidget(newDef);
-    if (!newWidget) {
+    const ParameterField field = createParameterField(paramName, newDef);
+    if (!field.widget) {
         return;
     }
 
     if (m_bufferedConfig.contains(paramName)) {
-        ParameterWidgetFactory::setWidgetValue(newWidget, m_bufferedConfig.value(paramName), newDef);
+        ParameterWidgetFactory::setWidgetValue(field.widget, m_bufferedConfig.value(paramName), newDef);
     }
 
-    formLayout->replaceWidget(oldWidget, newWidget);
+    formLayout->replaceWidget(oldWidget, field.widget);
+    unregisterParameterField(paramName);
     oldWidget->deleteLater();
 
-    m_parameterWidgets.insert(paramName, newWidget);
+    m_parameterWidgets.insert(paramName, field.widget);
+    registerParameterField(paramName, field);
     m_parameterDefinitions.insert(paramName, newDef);
+}
+
+CameraTab::ParameterField CameraTab::createParameterField(const QString &paramName,
+                                                          const ParameterDefinition &def)
+{
+    ParameterField field;
+    field.widget = ParameterWidgetFactory::createWidget(def);
+    if (!field.widget) {
+        return field;
+    }
+
+    if (ParameterHistoryStore::isTelemetryParameter(def)) {
+        field.label = qobject_cast<QLabel *>(field.widget);
+    }
+
+    if (!ParameterHistoryStore::isPlottableTelemetry(def) || !field.label) {
+        return field;
+    }
+
+    // 数值型遥测：值标签 + 行内曲线按钮。按钮只放图标不放文字，靠 tooltip 说明
+    auto *container = new QWidget();
+    auto *layout = new QHBoxLayout(container);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(4);
+    layout->addWidget(field.label, 1);
+
+    field.button = new QToolButton(container);
+    field.button->setAutoRaise(true);
+    field.button->setIcon(makePlotIcon(container->palette()));
+    field.button->setIconSize(QSize(16, 16));
+    field.button->setFixedSize(20, 20);
+    field.button->setCursor(Qt::PointingHandCursor);
+    field.button->setToolTip(tr("Show the history plot of %1")
+                                 .arg(def.displayName.isEmpty() ? paramName : def.displayName));
+    layout->addWidget(field.button, 0);
+
+    connect(field.button, &QToolButton::clicked, this, [this, paramName]() {
+        openHistoryWindow(paramName);
+    });
+
+    field.widget = container;
+    return field;
+}
+
+void CameraTab::registerParameterField(const QString &paramName, const ParameterField &field)
+{
+    if (field.label) {
+        m_telemetryLabels.insert(paramName, field.label);
+    }
+    if (field.button) {
+        m_plotButtons.insert(paramName, field.button);
+    }
+}
+
+void CameraTab::unregisterParameterField(const QString &paramName)
+{
+    m_telemetryLabels.remove(paramName);
+    m_plotButtons.remove(paramName);
+}
+
+void CameraTab::updatePlotButtonIcons()
+{
+    for (QToolButton *button : m_plotButtons) {
+        if (button) {
+            button->setIcon(makePlotIcon(button->palette()));
+        }
+    }
+}
+
+void CameraTab::openHistoryWindow(const QString &paramName)
+{
+    if (!m_appController) {
+        return;
+    }
+
+    // 已经开过就抬到前面，别开第二个同名窗口
+    if (ParameterHistoryWindow *existing = m_historyWindows.value(paramName)) {
+        existing->show();
+        existing->raise();
+        existing->activateWindow();
+        return;
+    }
+
+    const ParameterDefinition def = m_appController->parameter(paramName);
+    auto *window = new ParameterHistoryWindow(paramName, def, m_history, this);
+    m_historyWindows.insert(paramName, window);
+    window->show();
+    window->raise();
+    window->activateWindow();
+}
+
+int CameraTab::historyCapacity() const
+{
+    return m_history->capacity();
+}
+
+void CameraTab::setHistoryCapacity(int points)
+{
+    m_history->setCapacity(points);
 }
 
 void CameraTab::refreshCameraList()
@@ -500,24 +650,41 @@ QVariantMap CameraTab::getBufferedConfig() const
     return m_bufferedConfig;
 }
 
-void CameraTab::onCoolingTimerTimeout()
+void CameraTab::onTelemetryTimerTimeout()
 {
     if (!m_appController || !m_appController->isConnected()) {
         return;
     }
 
-    QStringList paramNames = m_appController->parameterNames();
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    const QStringList paramNames = m_appController->parameterNames();
+
     for (const QString &paramName : paramNames) {
-        ParameterDefinition def = m_appController->parameter(paramName);
-        if (def.isReadOnly && def.isDynamic && def.isExtrinsic) {
-            QVariant value = m_appController->parameterValue(paramName);
-            QWidget *widget = m_parameterWidgets.value(paramName);
-            if (widget) {
-                QLabel *label = qobject_cast<QLabel*>(widget);
-                if (label) {
-                    label->setText(value.toString());
-                }
+        const ParameterDefinition def = m_appController->parameter(paramName);
+        if (!ParameterHistoryStore::isTelemetryParameter(def)) {
+            continue;
+        }
+
+        // 本轮只读一次：标签和曲线用的是同一个读数
+        const QVariant value = m_appController->parameterValue(paramName);
+
+        if (QLabel *label = m_telemetryLabels.value(paramName)) {
+            label->setText(value.toString());
+        }
+
+        if (ParameterHistoryStore::isPlottableTelemetry(def)) {
+            bool ok = false;
+            const double numericValue = value.toDouble(&ok);
+            if (ok) {
+                m_history->append(paramName, now, numericValue);
             }
+        }
+    }
+
+    // 值都读完了再刷窗口，一轮 tick 每个窗口只重画一次
+    for (ParameterHistoryWindow *window : m_historyWindows) {
+        if (window && window->isVisible()) {
+            window->refresh();
         }
     }
 }

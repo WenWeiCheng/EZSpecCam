@@ -16,6 +16,11 @@
 #include "LoadingIndicator.h"
 #include "../../ui/CameraTabUi.h"
 
+class QLabel;
+class QToolButton;
+class ParameterHistoryStore;
+class ParameterHistoryWindow;
+
 class CameraTab : public QWidget
 {
     Q_OBJECT
@@ -36,6 +41,11 @@ public:
 
     int getCaptureCount() const;
 
+    //! 历史曲线保留的采样点数（所有遥测参数共用），外部可随时修改
+    int historyCapacity() const;
+    void setHistoryCapacity(int points);
+    ParameterHistoryStore *historyStore() const { return m_history; }
+
     // 「Capture Mode」下拉框是采集模式的唯一出处：L / S / B 快捷键改的就是它，
     // MainWindow 状态栏上显示的 Mode 也是从它来的
     QString getCaptureMode() const;
@@ -54,7 +64,7 @@ protected slots:
     void onCameraStateChanged(CameraState state);
     void onCaptureModeChanged(int index);
     void onParametersCommitted();
-    void onCoolingTimerTimeout();
+    void onTelemetryTimerTimeout();
     void onConnectCameraFinished(const QString &cameraId, bool success, const QString &error);
     void onDisconnectCameraFinished(const QString &cameraId);
     void onScanProgress(int current, int total, const QString &currentFile);
@@ -64,12 +74,25 @@ protected slots:
     void onCommitParametersFinished(const QStringList &failedParameters);
 
 private:
+    //! createParameterField() 的产物。曲线按钮和值标签只在数值型遥测参数上存在
+    struct ParameterField
+    {
+        QWidget *widget = nullptr;
+        QLabel *label = nullptr;
+        QToolButton *button = nullptr;
+    };
+
     void updateConnectionState();
     void clearDynamicParameterPanel();
     void applyCaptureMode();
+    ParameterField createParameterField(const QString &paramName, const ParameterDefinition &def);
+    void registerParameterField(const QString &paramName, const ParameterField &field);
+    void unregisterParameterField(const QString &paramName);
     void rebuildParameterWidget(const QString &paramName);
     void restoreWidgetsFromConfig(const QVariantMap &config, const QStringList &onlyNames = QStringList());
     void refreshCommittedConfigFromController();
+    void updatePlotButtonIcons();
+    void openHistoryWindow(const QString &paramName);
 
     QPointer<AppController> m_appController;
     QVariantMap m_bufferedConfig;
@@ -78,8 +101,13 @@ private:
     QHash<QString, QWidget*> m_parameterWidgets;
     QMap<ParameterCategory, QGroupBox*> m_categoryGroups;
     QHash<QString, ParameterDefinition> m_parameterDefinitions;
-    QTimer *m_coolingTimer;
+    QTimer *m_telemetryTimer;
     int m_lastScanFailed = 0;
+
+    QHash<QString, QLabel*> m_telemetryLabels;
+    QHash<QString, QToolButton*> m_plotButtons;
+    QHash<QString, ParameterHistoryWindow*> m_historyWindows;
+    ParameterHistoryStore *m_history;
 };
 
 #endif // CAMERATAB_H

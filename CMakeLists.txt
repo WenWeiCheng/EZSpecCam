@@ -133,6 +133,8 @@ set(EZSPECCAM_GUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/MainWindowUi.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/CameraTab.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/CameraTab.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/ParameterHistoryStore.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/ParameterHistoryStore.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/CameraTabUi.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/CameraTabUi.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/LoadingIndicator.h
@@ -161,6 +163,8 @@ set(EZSPECCAM_GUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/ImageViewWidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/LineViewWidget.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/LineViewWidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/ParameterHistoryWindow.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/ParameterHistoryWindow.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/workers/FileLoaderWorker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/formats/IImageFormatHandler.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/formats/SaveTypes.h
