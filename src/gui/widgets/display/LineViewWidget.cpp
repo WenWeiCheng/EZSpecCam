@@ -148,17 +148,20 @@ void LineViewWidget::refreshGraphData()
 
     // 鼠标不动时读数会一直停在上一帧的数值上，live 模式下等于挂着一个假读数。
     // 只在光标确实还悬着的时候刷新，否则鼠标从没进过画面也会凭空冒出读数
+    double readoutX = m_lastCursorX;
     double readoutY = 0.0;
     const bool refreshReadout = m_cursorActive;
     if (refreshReadout) {
-        readoutY = valueAt(m_lastCursorX);
-        applyCursor(m_lastCursorX, readoutY);
+        const int index = nearestSampleIndex(m_lastCursorX);
+        readoutX = m_xData[index];
+        readoutY = m_yData[index];
+        applyCursor(readoutX, readoutY);
     }
 
     m_plot->replot(QCustomPlot::rpQueuedReplot);
 
     if (refreshReadout) {
-        emit cursorPosition(m_lastCursorX, readoutY);
+        emit cursorPosition(readoutX, readoutY);
     }
 }
 
@@ -302,6 +305,25 @@ double LineViewWidget::valueAt(double x) const
     return 0.0;
 }
 
+void LineViewWidget::setCursorDecimals(int xDecimals, int yDecimals)
+{
+    xDecimals = qBound(0, xDecimals, 9);
+    yDecimals = qBound(0, yDecimals, 9);
+    if (m_xCursorDecimals == xDecimals && m_yCursorDecimals == yDecimals) {
+        return;
+    }
+
+    m_xCursorDecimals = xDecimals;
+    m_yCursorDecimals = yDecimals;
+
+    // 光标已经在画面上时立刻按新精度重画，不用等鼠标再动一次
+    if (m_cursorActive && m_dataValid && !m_xData.isEmpty()) {
+        const int index = nearestSampleIndex(m_lastCursorX);
+        applyCursor(m_xData[index], m_yData[index]);
+        m_plot->layer(QLatin1String("overlay"))->replot();
+    }
+}
+
 void LineViewWidget::setXAxisLabel(const QString &label)
 {
     m_xAxisLabel = label;
@@ -423,6 +445,14 @@ void LineViewWidget::applyAxisRange()
     double maxX = m_xData.last();
     double rangeX = maxX - minX;
 
+    // 只有一个采样点（或所有 x 相同）时两端重合，图上看不出任何东西；
+    // 给一个最小跨度，让首帧/单点也有一块正常的绘图区
+    if (rangeX <= 0.0) {
+        minX -= 0.5;
+        maxX += 0.5;
+        rangeX = maxX - minX;
+    }
+
     if (m_xAxisRangeMode == AxisRangeMode::Auto) {
         m_plot->xAxis->setRange(minX - rangeX * 0.02, maxX + rangeX * 0.02);
     } else {
@@ -450,9 +480,7 @@ void LineViewWidget::mouseMoveEvent(QMouseEvent *event)
     }
 
     double dataX = widgetToDataX(event->pos().x());
-    int idx = qRound(dataX);
-    if (idx < 0) idx = 0;
-    if (idx >= m_xData.size()) idx = m_xData.size() - 1;
+    const int idx = nearestSampleIndex(dataX);
     double snappedX = m_xData[idx];
     double snappedY = m_yData[idx];
 
@@ -576,8 +604,8 @@ void LineViewWidget::applyCursor(double x, double y)
     m_cursorLine->setVisible(true);
 
     QString labelText = QString("X: %1\nY: %2")
-        .arg(x, 0, 'f', 1)
-        .arg(y, 0, 'f', 0);
+        .arg(x, 0, 'f', m_xCursorDecimals)
+        .arg(y, 0, 'f', m_yCursorDecimals);
 
     m_cursorLabel->setText(labelText);
 
@@ -608,6 +636,27 @@ double LineViewWidget::widgetToDataX(int widgetX) const
     double dataX = m_plot->xAxis->range().lower + ratio * rangeSpan;
 
     return dataX;
+}
+
+// m_xData 按升序排列（setData 的调用方保证）。不能像以前那样把 dataX
+// 四舍五入当下标用：时间轴的 x 不是 0,1,2...，那样取到的点和光标下的点无关
+int LineViewWidget::nearestSampleIndex(double x) const
+{
+    if (m_xData.isEmpty()) {
+        return 0;
+    }
+
+    auto it = std::lower_bound(m_xData.constBegin(), m_xData.constEnd(), x);
+    if (it == m_xData.constBegin()) {
+        return 0;
+    }
+    if (it == m_xData.constEnd()) {
+        return m_xData.size() - 1;
+    }
+
+    const int right = static_cast<int>(it - m_xData.constBegin());
+    const int left = right - 1;
+    return (x - m_xData[left] <= m_xData[right] - x) ? left : right;
 }
 
 QVector<double> LineViewWidget::extractRowData(const QImage &image) const

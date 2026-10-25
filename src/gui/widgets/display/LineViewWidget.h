@@ -62,6 +62,11 @@ public:
 
     double valueAt(double x) const;
 
+    //! 读数框的小数位。默认 (1, 0)：与改通用化之前的光谱读数一致
+    void setCursorDecimals(int xDecimals, int yDecimals);
+    int cursorXDecimals() const { return m_xCursorDecimals; }
+    int cursorYDecimals() const { return m_yCursorDecimals; }
+
     void setXAxisLabel(const QString &label);
     void setYAxisLabel(const QString &label);
 
@@ -110,6 +115,8 @@ private:
     void applyTheme();
     void updateCursor(double x, double y);
     void applyCursor(double x, double y);
+    //! m_xData 升序时，返回离 x 最近的采样点下标
+    int nearestSampleIndex(double x) const;
     double widgetToDataX(int widgetX) const;
     QVector<double> extractRowData(const QImage &image) const;
     void applyAxisRange();
@@ -141,6 +148,8 @@ private:
     double m_lastCursorX = 0.0;
     //! 光标当前是否还「在场」——鼠标进过画面且尚未离开
     bool m_cursorActive = false;
+    int m_xCursorDecimals = 1;
+    int m_yCursorDecimals = 0;
 };
 
 #endif // LINEVIEWWIDGET_H

@@ -334,6 +334,22 @@ private slots:
         QCOMPARE(right->scaleType(), QCPAxis::stLogarithmic);
         QVERIFY(dynamic_cast<QCPAxisTickerLog *>(right->ticker().data()) != nullptr);
     }
+
+    void test_single_point_keeps_a_usable_span()
+    {
+        LineViewWidget widget;
+        widget.resize(800, 600);
+
+        // 历史曲线刚打开时常常只有一个点；两端重合的话图上什么都看不到
+        widget.setData({ 42.0 }, { 7.0 });
+
+        QVERIFY2(widget.currentXMax() - widget.currentXMin() >= 1.0,
+                 qPrintable(QStringLiteral("x span = %1")
+                                .arg(widget.currentXMax() - widget.currentXMin())));
+        QVERIFY2(widget.currentYMax() - widget.currentYMin() >= 2.0,
+                 qPrintable(QStringLiteral("y span = %1")
+                                .arg(widget.currentYMax() - widget.currentYMin())));
+    }
 };
 
 QTEST_MAIN(TestSpectrumAxisRange)

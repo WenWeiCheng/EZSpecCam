@@ -5,6 +5,8 @@
 #include <QTest>
 #include <QVector>
 
+#include <limits>
+
 #include "LineViewWidget.h"
 #include "qcustomplot.h"
 
@@ -217,6 +219,62 @@ private slots:
         // 数据清空后光标状态也要一起清掉，新数据进来时别再冒出旧读数
         widget.setData(indices(100), ramp(100, 100.0));
         QVERIFY(!readout->visible());
+    }
+
+    void test_cursor_snaps_to_nearest_sample_on_non_integer_x()
+    {
+        LineViewWidget widget;
+        widget.resize(800, 600);
+
+        auto *plot = plotOf(&widget);
+        QVERIFY(plot);
+        QCPItemText *readout = readoutOf(plot);
+        QVERIFY(readout);
+
+        // 非整数、非等间距的 x：时间轴就是这种形状。把 dataX 四舍五入当下标用
+        // 会取到完全无关的点（甚至越界钳到最后一个点）
+        const QVector<double> x = { 10.0, 11.5, 13.2, 15.0, 18.0 };
+        const QVector<double> y = { 100.0, 200.0, 300.0, 400.0, 500.0 };
+        widget.setData(x, y);
+        showLayout(&widget);
+
+        const QRect area = plot->axisRect()->rect();
+        const int probeOffset = 200;
+        moveMouseOver(plot, area.left() + probeOffset);
+
+        // 光标下的原始数据 x，在测试这边独立算一次最近点
+        const double rawX = plot->xAxis->pixelToCoord(area.left() + probeOffset);
+        int nearest = 0;
+        double best = std::numeric_limits<double>::max();
+        for (int i = 0; i < x.size(); ++i) {
+            const double distance = qAbs(x[i] - rawX);
+            if (distance < best) {
+                best = distance;
+                nearest = i;
+            }
+        }
+
+        const QStringList lines = readout->text().split(QLatin1Char('\n'));
+        QCOMPARE(lines.value(0), QStringLiteral("X: %1").arg(x[nearest], 0, 'f', 1));
+        QCOMPARE(lines.value(1), QStringLiteral("Y: %1").arg(y[nearest], 0, 'f', 0));
+    }
+
+    void test_cursor_decimals_are_configurable()
+    {
+        LineViewWidget widget;
+        widget.resize(800, 600);
+        widget.setData({ 0.0, 1.0, 2.0, 3.0 }, { 100.25, 200.25, 300.25, 400.25 });
+        widget.setCursorDecimals(2, 3);
+        showLayout(&widget);
+
+        auto *plot = plotOf(&widget);
+        QVERIFY(plot);
+        QCPItemText *readout = readoutOf(plot);
+        QVERIFY(readout);
+
+        // 最左边落在第一个采样点上
+        moveMouseOver(plot, plot->axisRect()->rect().left() + 2);
+        QCOMPARE(readout->text(), QStringLiteral("X: 0.00\nY: 100.250"));
     }
 };
 
