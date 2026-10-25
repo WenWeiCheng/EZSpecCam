@@ -19,17 +19,21 @@
 - **Qt 6.2** 或更高版本（Windows 上使用 Qt 6.8）
 - **C++17** 编译器（Windows 上为 MSVC 2022；Linux 上为 GCC 11+）
 - **CMake 3.20+**
-- `hk16011` 驱动另需：Linux、厂商 SDK（用 `HK16011_ROOT` 指定）。`libHK16011.so` 运行时依赖 `libusb-1.0` 与 `libserialport`（构建 SDK 本身时才需要对应的 `-dev` 包）
+- `hk16011` 驱动另需：厂商 SDK（用 `HK16011_ROOT` 指定安装前缀，SDK 自带 CMake 包）。SDK 是共享库，`libusb-1.0` 与 `libserialport` 已并入其中，运行期只需把 `HK16011.dll` / `libHK16011.so` 放在可执行文件旁边（插件的部署步骤会自动拷）
 
 ## 快速开始
 
 ### Linux
 
-`qhyccd` 与 `hamamatsu` 仅支持 Windows，会被自动跳过。未安装 PICam SDK 时，`picam` 插件会带警告自行跳过；未设置 `HK16011_ROOT` 时，`hk16011` 插件同样带警告跳过。需要 Qt 6.2+、CMake 3.20+、GCC 11+ 以及 Ninja。
+`qhyccd` 与 `hamamatsu` 仅支持 Windows，会被自动跳过。未安装 PICam SDK 时，`picam` 插件会带警告自行跳过；未安装 HK16011 SDK 时，`hk16011` 插件同样带警告跳过。需要 Qt 6.2+、CMake 3.20+、GCC 11+ 以及 Ninja。
 
 ```bash
 # 可选：启用 hk16011 驱动
-export HK16011_ROOT=/path/to/hk16011/sdk/tree
+# 1) 构建并安装 04-driver（共享库 + CMake 包）
+cmake -S /path/to/04-driver -B /path/to/04-driver/build -DCMAKE_BUILD_TYPE=Release
+cmake --install /path/to/04-driver/build --prefix /opt/hk16011
+# 2) 指向前缀，而不是 SDK 源码树
+export HK16011_ROOT=/opt/hk16011
 ```
 
 ```bash
@@ -56,6 +60,18 @@ cd EZSpecCam
 .\deploy.bat                 # 将 release 构建产物打包到 .\deploy\
 .\build\msvc-debug\bin\Debug\ezspeccam.exe
 ```
+
+`hk16011` 在 Windows 上同样可用（设备需先按 04-driver 的 `hk16011/inf/` 绑到 WinUSB）。先安装 04-driver，再把 `HK16011_ROOT` 指向前缀：
+
+```powershell
+cmake -S D:\path\to\04-driver -B D:\path\to\04-driver\build -G "Visual Studio 17 2022" -A x64
+cmake --build D:\path\to\04-driver\build --config Release
+cmake --install D:\path\to\04-driver\build --config Release --prefix C:\sdk\hk16011
+$env:HK16011_ROOT = 'C:\sdk\hk16011'
+.\build_preset.bat debug
+```
+
+插件构建时会把 `HK16011.dll` 拷到 `plugins/drivers/` 和可执行文件目录，运行时不需要改 `PATH`。
 
 ## 架构
 
@@ -133,7 +149,7 @@ Qt GUI 应用程序：相机发现、连接管理、参数配置、实时图像�
 | QHYCCD | 硬件 | 支持真实的 QHY 相机 | QHY268M | [下载](https://www.qhyccd.cn/download/) |
 | Hamamatsu | 硬件 | 支持滨松相机 | C16091-10 | [下载](https://www.hamamatsu.com/jp/en/product/cameras/software/driver-software.html) |
 | PI | 硬件 | 支持 Princeton 相机 | PIXIS100B,PIXIS400B | [下载](https://www.princetoninstruments.com.cn/products_driver.html) |
-| HK16011 | 硬件 | CCD 光谱相机（Linux，仅厂商 SDK） | HK16011 | 随设备提供，见 `HK16011_ROOT` |
+| HK16011 | 硬件 | CCD 光谱相机（Windows/Linux，静态链接厂商 SDK） | HK16011 | 见 `04-driver`，用 `HK16011_ROOT` 指向前缀 |
 
 > **HK16011 说明**：温控遥测（`sensor_temp` / `environment_temp` / `tec_voltage` /
 > `tec_current`）由固件实时上报，驱动原样透传，不再对读数加任何「未实现」注记。

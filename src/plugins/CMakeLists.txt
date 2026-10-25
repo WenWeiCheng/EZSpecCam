@@ -12,11 +12,7 @@ endif()
 # to add unconditionally across platforms.
 add_subdirectory(picam)
 
-# hk16011 ships a Linux-only C SDK that is not installed by the vendor, and it
-# self-skips with WARNING + return() when HK16011_ROOT is unset — so it is
-# safe to add here too, but it can never build on Windows.
-if(NOT WIN32)
-    add_subdirectory(hk16011)
-else()
-    message(STATUS "Windows build: skipping hk16011 (Linux-only SDK)")
-endif()
+# hk16011's SDK is not installed by the vendor but ships a CMake package and
+# builds on both platforms. The subdirectory self-skips with a WARNING +
+# return() when HK16011_ROOT is unset, so it is safe to add unconditionally.
+add_subdirectory(hk16011)

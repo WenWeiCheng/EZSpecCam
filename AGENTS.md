@@ -53,7 +53,7 @@ EZSpecCam 是一个基于 Qt 6.8、C++17 的相机控制应用程序，负责相
 | `DespikeDialog` | 窗口 | `src/gui/widgets/dialogs/DespikeDialog.h` | 去尖峰参数（只剩主阈值） |
 | `MockCameraDriver` | 插件 | `src/plugins/mock/MockCameraDriver.cpp` | 用于测试的模拟相机 |
 | `QHYCCDDriver` | 插件 | `src/plugins/qhyccd/QHYCCDDriver.cpp` | QHYCCD 真实硬件驱动 |
-| `Hk16011Driver` | 插件 | `src/plugins/hk16011/Hk16011Driver.cpp` | HK16011 CCD 光谱相机驱动（Linux）→ 详见 `src/plugins/hk16011/AGENTS.md` |
+| `Hk16011Driver` | 插件 | `src/plugins/hk16011/Hk16011Driver.cpp` | HK16011 CCD 光谱相机驱动（Windows/Linux，SDK 作为 CMake 包 / 共享库）→ 详见 `src/plugins/hk16011/AGENTS.md` |
 | `SequenceRunner` | 类 | `src/cli/SequenceRunner.h` / `src/cli/SequenceRunner.cpp` | 解析并执行 JSON 事件序列脚本（`--sequence`） |
 
 ## 编码约定
@@ -151,7 +151,7 @@ ctest --preset linux-release
 - 根 CMakeLists.txt：设置输出目录后仍调用 `file(MAKE_DIRECTORY ...)` —— 略显冗余但无害
 - Windows 用 `build_preset.bat`，Linux 用 `build_preset.sh`，两者都只是对 `cmake --preset <platform>-<config>` 的封装。
 - Linux 预设默认只构建 mock 驱动；`qhyccd` / `hamamatsu` 依赖厂商 Windows SDK，在 Linux 上不可用。
-- Linux 上若设置了 `HK16011_ROOT`，则会额外构建 `hk16011` 插件及其测试（`test_hk16011_driver_HK16011`）。该测试在**没有接硬件时全部 `QSKIP`**，因此可以安全地留在 ctest 里。
+- 设置了 `HK16011_ROOT`（指向 04-driver 的安装前缀）时，Windows 与 Linux 都会额外构建 `hk16011` 插件及其测试（`test_hk16011_driver_HK16011`）。该测试在**没有接硬件时全部 `QSKIP`**，因此可以安全地留在 ctest 里。
 
 ## 构建可移植性
 
@@ -172,7 +172,7 @@ Linux 侧除厂商 SDK 外不读任何环境变量，Qt 与工具链全部来自
 
 | 环境变量 | 示例 | 用途 |
 |---------|---------|---------|
-| `HK16011_ROOT` | `/opt/hk16011` | HK16011 C SDK 源码树，需含 `include/hk16011.h` 与 `lib/libHK16011.so`；未设置时插件带警告跳过。插件编译本身只依赖该头文件与 `.so`，但 `libHK16011.so` 运行时需要 `libusb-1.0` 与 `libserialport`（构建 SDK 源码时才需对应的 `-dev` 包） |
+| `HK16011_ROOT` | `C:/sdk/hk16011` | 04-driver 的**安装前缀**（不是源码树）。SDK 自带 CMake 包 `lib/cmake/HK16011/`（`HK16011::HK16011`），是共享库，`libusb-1.0` / `libserialport` 已并入其中；插件用 `find_package(HK16011 CONFIG)` 定位，构建时把 `HK16011.dll` 拷到可执行文件目录。未设置时插件带警告跳过 |
 
 `linux-debug` / `linux-release` 预设中写死了 `"CMAKE_PREFIX_PATH": "/usr"`。这在多数发行版上成立，但如果 Qt 装在别处（`/opt`、自定义 prefix），请用 `CMakeUserPresets.json` 覆盖，**不要**直接改动被跟踪的 `CMakePresets.json`。
 

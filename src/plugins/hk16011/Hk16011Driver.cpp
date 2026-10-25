@@ -1213,6 +1213,14 @@ void Hk16011Driver::queueFrame(const HK16011_FrameStruct *frame)
         return;
     }
 
+    // Push mode: the SDK owns frame->data and frees it itself as soon as this
+    // callback returns (hk16011_frame.cpp, dispatch_frame), so the driver must
+    // neither keep the pointer nor free it. The pixels are copied below, which
+    // is the whole reason the queue holds QImages instead of SDK frames.
+    // HK16011_FreeFrame() belongs to the pull API (HK16011_FetchFrame), which
+    // this driver never calls; using free() on an SDK buffer would corrupt the
+    // library's heap — it may be built with a different CRT.
+
     const int width = static_cast<int>(frame->width);
     const int height = static_cast<int>(frame->height);
     const qsizetype byteCount = static_cast<qsizetype>(frame->width)

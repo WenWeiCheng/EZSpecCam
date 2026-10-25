@@ -24,7 +24,7 @@ plugins/
     ├── hamamatsu.json
     ├── HamamatsuDriver.cpp
     └── HamamatsuDriver.h
-└── hk16011/                    # Real HK16011 CCD spectrometer driver (Linux only)
+└── hk16011/                    # Real HK16011 CCD spectrometer driver (Windows/Linux, SDK as a CMake package)
     ├── AGENTS.md               # Device quirks + SDK integration notes — read before touching capture
     ├── CMakeLists.txt
     ├── hk16011.json

@@ -10,13 +10,19 @@
 | 项目 | 说明 |
 |------|------|
 | 公开头文件 | `include/hk16011.h` —— **仅此一个**，其余 `src/` 下的头文件属 SDK 私有，外部不得 include |
-| 产物 | `lib/libHK16011.so.1.0.0` + `.so.1` / `.so` 符号链接，SONAME 为 `libHK16011.so.1` |
-| 语言 | 纯 C99，`extern "C"`；句柄 `HK16011_DeviceHandle` 不透明 |
-| 传递依赖 | `libusb-1.0`、`libserialport`（`.so` 自身的 `DT_NEEDED`，链接时只需 `-lHK16011`） |
-| pkg-config | **没有**，需自行传 `-I` / `-L` / `-l` |
-| 设备 | Cypress FX2（VID `0x04B4` / PID `0x00F1`）+ CH340 UART 桥（VID `0x1A86`） |
+| 产物 | 共享库 `bin/HK16011.dll`（Linux：`lib/libHK16011.so`）+ 导入库 `lib/HK16011.lib`；`libusb-1.0` 与 `libserialport` 已静态并入，`HK16011.dll` 只依赖系统 DLL |
+| 传递依赖 | 无。插件只链 `HK16011::HK16011` 一个 target，不再手工补 `setupapi` / pthread 之类 |
+| CMake 包 | `lib/cmake/HK16011/`：`find_package(HK16011 CONFIG)` + `HK16011::HK16011`。target 自动带 include 目录和 `HK16011_SHARED` 编译宏（头文件据此走 `__declspec(dllimport)`） |
+| pkg-config | 没有，但也不再需要手工传 `-I` / `-L` / `-l` |
+| 设备 | Cypress FX2（VID `0x04B4` / PID `0x00F1`）+ CH340 UART 桥（VID `0x1A86`）；Windows 侧用 WinUSB（`04-driver/hk16011/inf/`） |
+| 平台 | Windows / Linux 共用同一棵 SDK 树（MSVC 2022 或 g++） |
 
-构建 SDK 本身：`mkdir -p lib && make lib`（`lib/` 目录不存在时 `make` 会直接失败）。
+构建并安装 SDK（安装前缀就是插件要的 `HK16011_ROOT`，包里的版本是 0.3.0）：
+
+```bash
+cmake -S 04-driver -B 04-driver/build -DCMAKE_BUILD_TYPE=Release
+cmake --install 04-driver/build --prefix C:/sdk/hk16011
+```
 
 **参数总量 35 个**，由 `LISTPARAMS` + 逐个 `GETINFO` 在 `HK16011_Open` 时探测并缓存。
 
@@ -159,7 +165,7 @@ EZSpecCam 漂移，与其让两份对不上，不如只留一份。`displayName`
 | Cooling | `tec_enable` `tec_set_temp` `sensor_temp` `environment_temp` `tec_voltage` `tec_current` |
 | Info | `camera_name` |
 | Advanced | `adc_gain_r` `adc_gain_g` `adc_gain_b` `adc_offset_r` `adc_offset_g` `adc_offset_b` `tec_kp` `tec_ki` `tec_kd` `mon_dwell_ms` |
-| Debug | `mock_mode` `cdsclk_delay` `image_width` `image_height` `bevel_left` `bevel_top` `bevel_right` `bevel_bottom` `blank_left` `blank_right` `acq_state` `frame_num_ready` `frame_capacity` `exception_flag` `exception_cnt` |
+| Debug | `mock_mode` `cdsclk_delay` `image_width` `image_height` `bevel_left` `bevel_top` `bevel_right` `bevel_bottom` `blank_left` `blank_right` `frame_capacity` `exception_flag` `exception_cnt` |
 
 **只读 ≠ Info。** `sensor_temp` 等四个遥测虽然只读，但归 `Cooling` —— 它们和
 `tec_set_temp` 是同一件事的设定端与读数端。归组看的是参数**拿来干什么**。
@@ -173,15 +179,21 @@ EZSpecCam 漂移，与其让两份对不上，不如只留一份。`displayName`
 ### isDynamic / isExtrinsic 与 parameterValue() 的实读
 
 `hk16011ParameterMetadata()` 同时给每个参数标注 `isDynamic` / `isExtrinsic`。
-四个 Cooling 遥测和 Debug 的 `acq_state` / `frame_num_ready` / `exception_flag` /
-`exception_cnt` 只读且会自行变化，两个标志都给 —— CameraTab 对
-`isReadOnly && isDynamic && isExtrinsic` 的参数每 1000 ms 轮询一次；
-`camera_name` / `frame_capacity` 恒定不变，两个都不给，轮询没有意义。
+四个 Cooling 遥测和 Debug 的 `exception_flag` / `exception_cnt` 只读且会自行变化，
+两个标志都给 —— CameraTab 对 `isReadOnly && isDynamic && isExtrinsic` 的参数
+每 1000 ms 轮询一次；`camera_name` / `frame_capacity` 恒定不变，两个都不给，
+轮询没有意义。
+
+> `acq_state` / `frame_num_ready` 是**有意**不在静态表里的：固件仍会通过
+> `LISTPARAMS` 上报它们，所以每次连接都会 `qInfo: not exposing unlisted
+> parameter ...` —— 这是白名单按设计在工作，不是异常。要恢复就把表项加回
+> `ParameterCategory::Debug`（并带 `isDynamic` / `isExtrinsic`），CameraTab
+> 才会重新轮询它们。
 
 `parameterValue()` 对这两类参数**每次调用都回设备实读**（与 PicamDriver /
 HamamatsuDriver 同一契约），实读成功就更新缓存，失败回落到缓存。代价是
-每次 GETPARAM 都是 ~9 ms 的 UART 往返：GUI 一个轮询 tick 串行读 8 个动态参数
-（约 70 ms，在 1 s 周期里占比很小），读遥测期间也会短暂占住 `m_mutex`、
+每次 GETPARAM 都是 ~9 ms 的 UART 往返：GUI 一个轮询 tick 串行读 6 个动态参数
+（约 55 ms，在 1 s 周期里占比很小），读遥测期间也会短暂占住 `m_mutex`、
 推迟 `deliverQueuedFrames()` —— 这是接受的取舍，**不要**在这里再加缓存或限频。
 
 ### `exposure_time_us` 的单位下拉
@@ -259,7 +271,7 @@ SDK 没有独立的发现接口，所以 `enumerate()` 直接 `HK16011_Open()` �
   再一次），而 `AppController` 跑在 `m_controllerThread` 上，**同时负责把驱动
   的 `frameReady()` 转发出去**。实时采集中触发扫描会卡住帧转发，而 SDK 帧队列
   只有 4 帧深，扫一次就可能丢帧。
-- 测试里每次 `connectAndGetId()` 都要付一次这 365 ms，全套 43 个用例约 45 秒。
+- 测试里每次 `connectAndGetId()` 都要付一次这 365 ms，全套 45 个用例约 45 秒。
 
 **另一个必须知道的副作用**：打开失败时相机会**直接从列表里消失**，
 而 `PluginLoader::scan()` 完全不处理 `enumerate()` 的返回值
@@ -277,14 +289,21 @@ SDK 没有独立的发现接口，所以 `enumerate()` 直接 `HK16011_Open()` �
 ## 构建
 
 ```bash
-export HK16011_ROOT=/path/to/hk16011/sdk/tree
-cmake --preset linux-debug
+export HK16011_ROOT=C:/sdk/hk16011      # 04-driver 的安装前缀
+cmake --preset msvc-release             # 或 linux-debug
 ```
 
-`HK16011_ROOT` 指向的目录需含 `include/hk16011.h` 与 `lib/libHK16011.so`。
-也可在 configure 阶段用 `-DHK16011_SDK_ROOT=<path>` 覆盖，或放进
-`CMakeUserPresets.json`。**未设置时插件带 `WARNING` 自行跳过**，不阻塞其余构建；
-需要硬失败时传 `-DEZSPECCAM_REQUIRE_HK16011=ON`。
+SDK 自带 CMake 包（`<prefix>/lib/cmake/HK16011/`），插件只写两条：
+`find_package(HK16011 CONFIG QUIET HINTS "${HK16011_ROOT}")` 和
+`target_link_libraries(... HK16011::HK16011)`。没有自定义探测脚本，也不再手工列
+archive 与系统库：
+
+| 关注点 | 处理方式 |
+|--------|----------|
+| 定位 | `HK16011_ROOT`（环境变量 → 同名 cache 变量）作为 `HINTS`；也可用 `-DHK16011_DIR=<prefix>/lib/cmake/HK16011` 或 `CMAKE_PREFIX_PATH` |
+| 依赖传递 | include 目录与 `HK16011_SHARED` 宏由 target 带过来；libusb / libserialport 已并进 DLL，不需要再补 `setupapi`、pthread |
+| 部署 | 插件模块单独进 `plugins/drivers/`；`HK16011.dll` 只拷到**可执行文件目录**（Windows 按 exe 目录解析插件依赖），Linux 用 RUNPATH 指向 SDK 的 lib 目录。**SDK 的库不能放进 `plugins/drivers/`** —— `PluginLoader` 会把该目录里每个文件都当插件去 `load()` |
+| 缺失时 | `find_package` 失败 → 插件带 `WARNING` 跳过；`-DEZSPECCAM_REQUIRE_HK16011=ON` 升级为硬错误 |
 
 **注意：仓库内任何被 Git 跟踪的文件都不得写死该路径**（见根 `AGENTS.md` 的「构建可移植性」）。
 
@@ -301,19 +320,18 @@ cmake --preset linux-debug
   紧超时会让测试变脆。
 - 参数往返用例会改动设备状态，务必在结束时把原值写回。
 
-测试的 `CMakeLists.txt` 会**复用** `src/plugins/hk16011` 已经解析好的
-`HK16011_SDK_ROOT`（那个子目录先被 `add_subdirectory`），而不是自己从
-`$ENV{HK16011_ROOT}` 重新推导一遍。早期版本只认自己的 `HK16011_TEST_SDK_ROOT`
-和环境变量，于是只要 SDK 是靠 `-D` 或上一轮 configure 遗留在 cache 里的值定位的，
+测试的 `CMakeLists.txt` 只写一个 `find_package(HK16011 CONFIG QUIET)`：插件那个
+子目录先跑过同一个包，`HK16011_DIR` 已经进了 cache，因此两边解析到的一定是同一个
+SDK，不会各自漂移。早期版本自己从 `$ENV{HK16011_ROOT}` 重新推导，
+于是只要 SDK 是靠 `-D` 或上一轮 configure 遗留在 cache 里的值定位的，
 测试 target 就会静默地 `return()` 掉 —— 插件照常编译，测试压根不存在，
 `ctest` 里也看不到，只剩一个过期的旧二进制躺在 `bin/Debug/` 里。
 
-覆盖范围：`enumerate` / 连接与重连 / 非法 id / 断开、参数表形状与逐个定义合法性、
-逐类别归属（Core/Cooling/Info/Advanced/Debug 各取代表，外加六个 `adc_*`）、
+覆盖范围：`enumerate` / 连接与重连 / 非法 id / 断开、逐个参数定义合法性、
 枚举的 label 与 token 双向换算、枚举写入是否真的到达设备（靠重连后复读）、
-`exposure_time_us` 单位换算、只读与 dynamic/extrinsic 标志、
+`exposure_time_us` 单位换算、
 14 个已验证可回读参数各一个用例、只读参数与 Cooling 遥测、越界与未知参数拒绝、
-批量语义与关键参数整批拒绝、单帧 / 定量 / 实时采集。共 49 项。
+批量语义与关键参数整批拒绝、单帧 / 定量 / 实时采集。共 45 项。
 
 ---
 
@@ -326,6 +344,11 @@ cmake --preset linux-debug
   旧结论（burst 恰好丢最后一帧、single 一帧不回）是 v1.13 之前的现象；
   现在三种模式都用 `StartFetch(0)`，有帧即读。
 - **不要**在帧回调里 emit Qt 信号或访问 QObject。
+- **不要**对回调收到的帧调用 `free()` 或 `HK16011_FreeFrame()`：push 模式下
+  帧由 SDK 在回调返回后自己释放（`hk16011_frame.cpp` 的 `dispatch_frame`），
+  插件在这里只做 `memcpy`。`HK16011_FreeFrame` 只针对 `HK16011_FetchFrame`
+  拉上来的帧（本驱动走 push，不用拉模式）；将来若改用拉模式，**必须**用
+  `HK16011_FreeFrame` —— 跨 CRT 的 `free()` 会破坏库自己的堆。
 - **不要**读取联合体里与 `type` 不匹配的成员。
 - **不要**让 `HK16011_ValueStruct` 指向一个活不过本次调用的缓冲区。
   `data.s.set` 是 `const char *`，如果它指向 `fromVariant()` 内部的局部 `QByteArray`，
@@ -335,7 +358,12 @@ cmake --preset linux-debug
   （见 `writeValue()` 里的 `QByteArray storage`）。
 - **不要**只把 `validValues` 换成 label 而不同时归一化读回来的值 ——
   下拉框会静默停在第 0 项，并把错误值写回去。
-- **不要**在 CMakeLists 里写死 SDK 的绝对路径。
+- **不要**在 CMakeLists 里写死 SDK 的绝对路径，也不要手工列 SDK 的 include 目录、
+  `.lib` 列表或系统库 —— 用 `HK16011::HK16011`。
+- **不要**把 `HK16011.dll` / `libHK16011.so` 拷进 `plugins/drivers/`：`PluginLoader`
+  会把该目录里每个文件都当插件 `load()`，这个普通共享库会被报成 plugin load
+  failure（`test_app_controller` 的 `loadFailSpy.count() == 0` 就是这么红的）。
+  它只该待在可执行文件目录（Windows），或由 RUNPATH 找到（Linux）。
 - **不要**为遥测（`sensor_temp` 等四个）断言具体数值 —— 读数跟着实际温度与 TEC 驱动走。
 - **不要**指望设备替 EZSpecCam 决定分类 —— 那份分类已经从 SDK 里删掉了，
   新增参数要自己往 `hk16011ParameterMetadata()` 里加，否则它不会出现在界面上。

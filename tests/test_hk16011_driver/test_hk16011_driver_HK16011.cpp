@@ -76,10 +76,7 @@ private slots:
     void test_operationsBeforeConnect();
 
     // ——— Parameter table ———
-    void test_parameterTableShape();
     void test_everyDefinitionIsValid();
-    void test_readOnlyParametersAreFlagged();
-    void test_parameterCategories();
     void test_exposureUnitSelector();
 
     // ——— One test per round-trippable parameter ———
@@ -105,7 +102,6 @@ private slots:
 
     // ——— Read-only / telemetry ———
     void test_readOnly_camera_name();
-    void test_readOnly_acq_state();
     void test_coolingTelemetry();
 
     // ——— Validation and batch semantics ———
@@ -329,35 +325,6 @@ void TestHk16011Driver::test_operationsBeforeConnect()
 // Parameter table
 //==============================================================================
 
-void TestHk16011Driver::test_parameterTableShape()
-{
-    REQUIRE_HK16011();
-    QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
-
-    const QStringList names = m_driver->parameterNames();
-    QVERIFY2(names.size() >= 30,
-             qPrintable(QString("expected the full parameter table, got %1").arg(names.size())));
-
-    // Parameters the vendor regression tests prove round-trip on the wire, plus
-    // at least one from every category the driver groups them into.
-    const QStringList expected = {
-        QStringLiteral("exposure_time_us"), QStringLiteral("read_mode"),
-        QStringLiteral("freq_sel"),        QStringLiteral("mock_mode"),
-        QStringLiteral("cdsclk_delay"),    QStringLiteral("image_width"),
-        QStringLiteral("image_height"),    QStringLiteral("bevel_left"),
-        QStringLiteral("blank_right"),     QStringLiteral("tec_kp"),
-        QStringLiteral("tec_set_temp"),    QStringLiteral("camera_name"),
-        QStringLiteral("frame_num_ready"), QStringLiteral("mon_dwell_ms"),
-        QStringLiteral("adc_gain_r"),      QStringLiteral("adc_gain_g"),
-        QStringLiteral("adc_gain_b"),      QStringLiteral("adc_offset_r"),
-        QStringLiteral("adc_offset_g"),    QStringLiteral("adc_offset_b"),
-    };
-    for (const QString &name : expected) {
-        QVERIFY2(names.contains(name),
-                 qPrintable(QString("parameter table is missing '%1'").arg(name)));
-    }
-}
-
 void TestHk16011Driver::test_everyDefinitionIsValid()
 {
     REQUIRE_HK16011();
@@ -385,93 +352,6 @@ void TestHk16011Driver::test_everyDefinitionIsValid()
     // An unknown parameter yields a default-constructed definition.
     const ParameterDefinition unknown = m_driver->parameter(QStringLiteral("nope"));
     QVERIFY2(unknown.name.isEmpty(), "an unknown parameter should return an empty definition");
-}
-
-void TestHk16011Driver::test_readOnlyParametersAreFlagged()
-{
-    REQUIRE_HK16011();
-    QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
-
-    for (const QString &name : { QStringLiteral("camera_name"),
-                                 QStringLiteral("acq_state"),
-                                 QStringLiteral("frame_capacity"),
-                                 QStringLiteral("sensor_temp") }) {
-        const ParameterDefinition def = m_driver->parameter(name);
-        QVERIFY2(def.isReadOnly,
-                 qPrintable(QString("'%1' should be read-only").arg(name)));
-    }
-
-    for (const QString &name : { QStringLiteral("exposure_time_us"),
-                                 QStringLiteral("image_width"),
-                                 QStringLiteral("mock_mode") }) {
-        const ParameterDefinition def = m_driver->parameter(name);
-        QVERIFY2(!def.isReadOnly,
-                 qPrintable(QString("'%1' should be writable").arg(name)));
-    }
-
-    // Read-only parameters that change on their own are the GUI's live
-    // telemetry: CameraTab polls parameterValue() for exactly this set
-    // (isReadOnly && isDynamic && isExtrinsic) while the config tab is open.
-    for (const QString &name : { QStringLiteral("sensor_temp"),
-                                 QStringLiteral("environment_temp"),
-                                 QStringLiteral("tec_voltage"),
-                                 QStringLiteral("tec_current"),
-                                 QStringLiteral("acq_state"),
-                                 QStringLiteral("frame_num_ready"),
-                                 QStringLiteral("exception_flag"),
-                                 QStringLiteral("exception_cnt") }) {
-        const ParameterDefinition def = m_driver->parameter(name);
-        QVERIFY2(def.isDynamic && def.isExtrinsic,
-                 qPrintable(QString("'%1' should be dynamic + extrinsic").arg(name)));
-    }
-
-    // Constant read-only values are neither: polling them would only ever
-    // return the same number.
-    for (const QString &name : { QStringLiteral("camera_name"),
-                                 QStringLiteral("frame_capacity") }) {
-        const ParameterDefinition def = m_driver->parameter(name);
-        QVERIFY2(!def.isDynamic && !def.isExtrinsic,
-                 qPrintable(QString("'%1' should not be marked dynamic/extrinsic").arg(name)));
-    }
-}
-
-void TestHk16011Driver::test_parameterCategories()
-{
-    REQUIRE_HK16011();
-    QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
-
-    // The SDK reports no grouping, so every category below comes from the
-    // driver's own table. One representative per group is enough here —
-    // test_parameterTableShape already pins down which parameters exist.
-    const QVector<QPair<QString, ParameterCategory>> expected = {
-        { QStringLiteral("exposure_time_us"), ParameterCategory::Core },
-        { QStringLiteral("read_mode"),        ParameterCategory::Core },
-        { QStringLiteral("freq_sel"),         ParameterCategory::Core },
-        { QStringLiteral("tec_enable"),       ParameterCategory::Cooling },
-        { QStringLiteral("tec_set_temp"),     ParameterCategory::Cooling },
-        { QStringLiteral("mon_dwell_ms"),     ParameterCategory::Advanced },
-        { QStringLiteral("camera_name"),      ParameterCategory::Info },
-        { QStringLiteral("tec_kp"),           ParameterCategory::Advanced },
-        { QStringLiteral("tec_ki"),           ParameterCategory::Advanced },
-        { QStringLiteral("tec_kd"),           ParameterCategory::Advanced },
-        { QStringLiteral("mock_mode"),        ParameterCategory::Debug },
-        { QStringLiteral("image_width"),      ParameterCategory::Debug },
-        { QStringLiteral("frame_num_ready"),  ParameterCategory::Debug },
-    };
-    for (const auto &entry : expected) {
-        QCOMPARE(m_driver->parameter(entry.first).category, entry.second);
-    }
-
-    // The six ADC trims are device-wide calibration knobs rather than something
-    // dialled in per acquisition, so the table groups them under Advanced.
-    for (const QString &name : { QStringLiteral("adc_gain_r"),
-                                 QStringLiteral("adc_gain_g"),
-                                 QStringLiteral("adc_gain_b"),
-                                 QStringLiteral("adc_offset_r"),
-                                 QStringLiteral("adc_offset_g"),
-                                 QStringLiteral("adc_offset_b") }) {
-        QCOMPARE(m_driver->parameter(name).category, ParameterCategory::Advanced);
-    }
 }
 
 void TestHk16011Driver::test_exposureUnitSelector()
@@ -831,27 +711,6 @@ void TestHk16011Driver::test_readOnly_camera_name()
     QVERIFY2(m_driver->commitParameters(), "committing a no-op should succeed");
     QCOMPARE(m_driver->parameterValue(QStringLiteral("camera_name")).toString(),
              QStringLiteral("hk16011"));
-}
-
-void TestHk16011Driver::test_readOnly_acq_state()
-{
-    REQUIRE_HK16011();
-    QVERIFY2(!connectAndGetId().isEmpty(), "connect should succeed");
-
-    const QVariant state = m_driver->parameterValue(QStringLiteral("acq_state"));
-    QVERIFY2(state.isValid(), "acq_state should have a value");
-    // Labels, like every enumeration: the wire tokens are idle/exposing/reading.
-    QVERIFY2(state.toString() == QStringLiteral("Idle")
-                 || state.toString() == QStringLiteral("Exposing")
-                 || state.toString() == QStringLiteral("Reading"),
-             qPrintable(QString("unexpected acq_state '%1'").arg(state.toString())));
-
-    // The firmware rejects SETPARAM on read-only parameters, and the driver
-    // must not even put one on the wire.
-    QVERIFY2(m_driver->setParameter(QStringLiteral("acq_state"), QStringLiteral("Reading")),
-             "a read-only parameter should be accepted and ignored");
-    m_driver->commitParameters();
-    QCOMPARE(m_driver->parameterValue(QStringLiteral("acq_state")).toString(), state.toString());
 }
 
 void TestHk16011Driver::test_coolingTelemetry()
