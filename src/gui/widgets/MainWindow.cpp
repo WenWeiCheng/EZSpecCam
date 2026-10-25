@@ -51,6 +51,39 @@ Q_LOGGING_CATEGORY(captureCategory, "Capture")
 
 namespace
 {
+/**
+ * Stops a worker thread and deletes it.
+ *
+ * A QThread must never be destroyed while its thread is still running — Qt
+ * aborts the process ("QThread: Destroyed while thread is still running").
+ * A fixed 2 s wait is not enough for the controller thread: the plugin scan it
+ * runs at startup is synchronous and takes seconds with several drivers
+ * installed (each enumerate() talks to hardware). So when the wait expires the
+ * thread is detached and left to delete itself once it finally finishes,
+ * instead of being deleted from under itself.
+ */
+void shutdownThread(QThread *&thread, const char *name, int timeoutMs = 5000)
+{
+    if (!thread)
+    {
+        return;
+    }
+
+    thread->quit();
+    if (thread->wait(timeoutMs))
+    {
+        delete thread;
+        thread = nullptr;
+        return;
+    }
+
+    qWarning().nospace() << "MainWindow: " << name << " still running after " << timeoutMs
+                         << " ms; detaching it so it can finish on its own";
+    thread->setParent(nullptr);
+    QObject::connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+    thread = nullptr;
+}
+
 //! Stable ASCII stem used for reference file names and save metadata.
 QString referenceFileStem(Calibration::ReferenceKind kind)
 {
@@ -362,26 +395,9 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    if (m_fileSaverThread) {
-        m_fileSaverThread->quit();
-        m_fileSaverThread->wait(2000);
-        delete m_fileSaverThread;
-        m_fileSaverThread = nullptr;
-    }
-
-    if (m_fileLoaderThread) {
-        m_fileLoaderThread->quit();
-        m_fileLoaderThread->wait(2000);
-        delete m_fileLoaderThread;
-        m_fileLoaderThread = nullptr;
-    }
-
-    if (m_controllerThread) {
-        m_controllerThread->quit();
-        m_controllerThread->wait(2000);
-        delete m_controllerThread;
-        m_controllerThread = nullptr;
-    }
+    shutdownThread(m_fileSaverThread, "file saver thread");
+    shutdownThread(m_fileLoaderThread, "file loader thread");
+    shutdownThread(m_controllerThread, "controller thread");
 }
 
 void MainWindow::saveFrameToFile(const QString &filePath)
@@ -2198,20 +2214,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
     QCoreApplication::processEvents();
 
-    if (m_fileSaverThread) {
-        m_fileSaverThread->quit();
-        m_fileSaverThread->wait(2000);
-        delete m_fileSaverThread;
-        m_fileSaverThread = nullptr;
-    }
-
-    if (m_controllerThread) {
-        m_controllerThread->quit();
-        if (m_controllerThread->wait(2000)) {
-            delete m_controllerThread;
-            m_controllerThread = nullptr;
-        }
-    }
+    shutdownThread(m_fileSaverThread, "file saver thread");
+    shutdownThread(m_controllerThread, "controller thread");
 
     event->accept();
 }
