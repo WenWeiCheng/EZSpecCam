@@ -224,7 +224,9 @@ bool ParameterHistoryWindow::exportCsv(const QString &filePath, QString *error) 
 
     const qint64 origin = m_store->originTimestamp(m_parameterName);
     for (const ParameterSample &sample : samples) {
-        stream << QString::number((sample.timestampMs - origin) / 1000.0, 'f', 3)
+        // 采样是 1 Hz 定时器驱动的，毫秒位只是事件循环抖动（656.001 / 656.999 这类），
+        // 收敛到 0.1 s 才有意义；精确时刻看后面的 timestamp 列
+        stream << QString::number((sample.timestampMs - origin) / 1000.0, 'f', 1)
                << ','
                << QDateTime::fromMSecsSinceEpoch(sample.timestampMs).toString(Qt::ISODateWithMs)
                << ','
