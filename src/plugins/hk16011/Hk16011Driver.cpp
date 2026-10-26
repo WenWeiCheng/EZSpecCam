@@ -166,13 +166,13 @@ const QMap<QString, ParameterMetadata> &hk16011ParameterMetadata()
         // —— Advanced ——
         { QStringLiteral("tec_kp"),
           { ParameterCategory::Advanced,
-            QStringLiteral("Proportional term of the cooler PID loop.") } },
+            QStringLiteral("Proportional term of the cooler PID loop.\nError is the temperature difference.") } },
         { QStringLiteral("tec_ki"),
           { ParameterCategory::Advanced,
-            QStringLiteral("Integral term of the cooler PID loop.") } },
+            QStringLiteral("Integral term of the cooler PID loop.\nError is the temperature difference.") } },
         { QStringLiteral("tec_kd"),
           { ParameterCategory::Advanced,
-            QStringLiteral("Derivative term of the cooler PID loop.") } },
+            QStringLiteral("Derivative term of the cooler PID loop.\nError is the temperature difference.") } },
 
         // —— Debug ——
         { QStringLiteral("mock_mode"),
