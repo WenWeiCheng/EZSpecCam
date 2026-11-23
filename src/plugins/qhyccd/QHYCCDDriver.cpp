@@ -456,9 +456,9 @@ bool QHYCCDDriver::commitParameters(QStringList *failedParameters)
     bool binningChanged = m_pendingParameters.contains("binning");
     if(binningChanged){
         int binFactor = m_pendingParameters.value("binning").toInt();
-        // update roi
-        int roiX = 0;
-        int roiY = 0;
+        // update roi; 用户侧是 1-based，SDK 侧是 0-based
+        int roiX = 1;
+        int roiY = 1;
         int roiW = m_imageWidth / binFactor;
         int roiH = m_imageHeight / binFactor;
         m_parameters.insert("roi_x", roiX);
@@ -466,16 +466,16 @@ bool QHYCCDDriver::commitParameters(QStringList *failedParameters)
         m_parameters.insert("roi_width", roiW);
         m_parameters.insert("roi_height", roiH);
         m_parameterDefinitions["roi_x"].defaultValue = roiX;
-        m_parameterDefinitions["roi_x"].constraint.maxValue = roiW - 1;
+        m_parameterDefinitions["roi_x"].constraint.maxValue = roiW;
         m_parameterDefinitions["roi_y"].defaultValue = roiY;
-        m_parameterDefinitions["roi_y"].constraint.maxValue = roiH - 1;
+        m_parameterDefinitions["roi_y"].constraint.maxValue = roiH;
         m_parameterDefinitions["roi_width"].defaultValue = roiW;
         m_parameterDefinitions["roi_width"].constraint.maxValue = roiW;
         m_parameterDefinitions["roi_height"].defaultValue = roiH;
         m_parameterDefinitions["roi_height"].constraint.maxValue = roiH;
         // Set binning via SDK - both wbin and hbin
         ret = SetQHYCCDBinMode(m_cameraHandle, binFactor, binFactor);
-        ret |= SetQHYCCDResolution(m_cameraHandle , roiX, roiY, roiW, roiH);
+        ret |= SetQHYCCDResolution(m_cameraHandle, roiX - 1, roiY - 1, roiW, roiH);
         if(ret != QHYCCD_SUCCESS){
             DRIVER_DEBUG << "Failed to set binning: " << ret;
             recordCriticalFailure("binning");
@@ -500,10 +500,10 @@ bool QHYCCDDriver::commitParameters(QStringList *failedParameters)
 
         int roiX = m_pendingParameters.contains("roi_x")
             ? m_pendingParameters.value("roi_x").toInt()
-            : m_parameters.value("roi_x", 0).toInt();
+            : m_parameters.value("roi_x", 1).toInt();
         int roiY = m_pendingParameters.contains("roi_y")
             ? m_pendingParameters.value("roi_y").toInt()
-            : m_parameters.value("roi_y", 0).toInt();
+            : m_parameters.value("roi_y", 1).toInt();
         int roiW = m_pendingParameters.contains("roi_width")
             ? m_pendingParameters.value("roi_width").toInt()
             : m_parameters.value("roi_width", imageWidth).toInt();
@@ -516,13 +516,17 @@ bool QHYCCDDriver::commitParameters(QStringList *failedParameters)
             roiW++;
         }
 
+        // 1-based 参数转成 SDK 需要的 0-based 像素索引
+        const int sdkX = roiX - 1;
+        const int sdkY = roiY - 1;
+
         // check roi parameters are valid and do not exceed image bounds
-        if (!(roiX >= 0 && roiX < imageWidth &&
-              roiY >= 0 && roiY < imageHeight &&
+        if (!(sdkX >= 0 && sdkX < imageWidth &&
+              sdkY >= 0 && sdkY < imageHeight &&
               roiW >= 1 && roiW <= imageWidth &&
               roiH >= 1 && roiH <= imageHeight &&
-              roiX + roiW <= imageWidth &&
-              roiY + roiH <= imageHeight)) {
+              sdkX + roiW <= imageWidth &&
+              sdkY + roiH <= imageHeight)) {
             DRIVER_DEBUG << "ROI validation failed - x:" << roiX << "y:" << roiY
                        << "w:" << roiW << "h:" << roiH << "image:" << imageWidth << "x" << imageHeight;
             recordCriticalFailure("roi_x");
@@ -534,7 +538,7 @@ bool QHYCCDDriver::commitParameters(QStringList *failedParameters)
             m_pendingParameters.remove("roi_width");
             m_pendingParameters.remove("roi_height");
         } else {
-            uint32_t ret = SetQHYCCDResolution(m_cameraHandle , roiX, roiY, roiW, roiH);
+            uint32_t ret = SetQHYCCDResolution(m_cameraHandle, sdkX, sdkY, roiW, roiH);
             if (ret != QHYCCD_SUCCESS) {
                 recordCriticalFailure("roi_x");
                 recordCriticalFailure("roi_y");
@@ -1075,36 +1079,39 @@ void QHYCCDDriver::initializeParameterDefinitions()
     }
 
     // ROI X
+    // ROI 偏移对用户暴露 1-based：第一列/第一行是 1。
+    // QHYCCD SDK 的 SetQHYCCDResolution() 使用 0-based，转换只发生在
+    // commitParameters() 调用 SDK 之前。
     param = ParameterDefinition();
     param.name = "roi_x";
     param.displayName = "ROI X Offset";
-    param.description = "Region of interest X offset in pixels";
+    param.description = "Region of interest X offset in pixels (1-based, first column is 1)";
     param.category = ParameterCategory::Core;
     param.type = ParameterType::IntRange;
-    param.constraint.minValue = 0;
-    param.constraint.maxValue = static_cast<int>(m_imageWidth) - 1;
+    param.constraint.minValue = 1;
+    param.constraint.maxValue = static_cast<int>(m_imageWidth);
     param.constraint.step = 1;
-    param.defaultValue = 0;
+    param.defaultValue = 1;
     param.isDynamic = true;
     param.order = 4.1f;
     m_parameterDefinitions.insert("roi_x", param);
-    m_parameters.insert("roi_x", 0);
+    m_parameters.insert("roi_x", 1);
 
     // ROI Y
     param = ParameterDefinition();
     param.name = "roi_y";
     param.displayName = "ROI Y Offset";
-    param.description = "Region of interest Y offset in pixels";
+    param.description = "Region of interest Y offset in pixels (1-based, first row is 1)";
     param.category = ParameterCategory::Core;
     param.type = ParameterType::IntRange;
-    param.constraint.minValue = 0;
-    param.constraint.maxValue = static_cast<int>(m_imageHeight) - 1;
+    param.constraint.minValue = 1;
+    param.constraint.maxValue = static_cast<int>(m_imageHeight);
     param.constraint.step = 1;
-    param.defaultValue = 0;
+    param.defaultValue = 1;
     param.isDynamic = true;
     param.order = 4.2f;
     m_parameterDefinitions.insert("roi_y", param);
-    m_parameters.insert("roi_y", 0);
+    m_parameters.insert("roi_y", 1);
 
     // ROI Width
     param = ParameterDefinition();

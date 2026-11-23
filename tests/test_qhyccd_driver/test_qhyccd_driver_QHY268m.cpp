@@ -699,11 +699,11 @@ private slots:
                  qPrintable(QString("roi_height maxValue should be %1 but got %2 at binning %3")
                             .arg(expectedHeightMax).arg(newHeightMax).arg(testBinning)));
 
-        // roi_x and roi_y maxValues should also be scaled (they represent max offset which scales with binning)
-        QVERIFY2(qAbs((newXMax+1) - (initialXMax+1) / testBinning) < 1e-6,
+        // roi_x and roi_y 的 maxValue 是 1-based 的最大列/行号，随 binning 缩放
+        QVERIFY2(qAbs(newXMax - initialXMax / testBinning) < 1e-6,
                  qPrintable(QString("roi_x maxValue should be %1 but got %2 at binning %3")
                             .arg(initialXMax / testBinning).arg(newXMax).arg(testBinning)));
-        QVERIFY2(qAbs((newYMax+1) - (initialYMax+1) / testBinning) < 1e-6,
+        QVERIFY2(qAbs(newYMax - initialYMax / testBinning) < 1e-6,
                  qPrintable(QString("roi_y maxValue should be %1 but got %2 at binning %3")
                             .arg(initialYMax / testBinning).arg(newYMax).arg(testBinning)));
 

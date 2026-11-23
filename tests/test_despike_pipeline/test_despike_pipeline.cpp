@@ -176,12 +176,13 @@ void TestDespikePipeline::test_row_range_limits_despike()
     despikeAction->setChecked(true);
     QCoreApplication::processEvents();
 
-    // 通过真实的 Row Range 对话框把范围设成第 20..27 行（0-based）
+    // 通过真实的 Row Range 对话框把范围设成第 21..28 行（1-based，
+    // 即内部 0-based 的 20..27）
     QVERIFY(QMetaObject::invokeMethod(&window, "on_rowRange_triggered"));
     QCoreApplication::processEvents();
     auto *rangeDialog = window.findChild<RowRangeDialog *>();
     QVERIFY(rangeDialog);
-    rangeDialog->setRange(20, 27);
+    rangeDialog->setRange(21, 28);
     QVERIFY(QMetaObject::invokeMethod(rangeDialog, "onApplyClicked"));
     QCoreApplication::processEvents();
 
@@ -222,7 +223,7 @@ void TestDespikePipeline::test_save_includes_despike()
     QCoreApplication::processEvents();
     auto *rangeDialog = window.findChild<RowRangeDialog *>();
     QVERIFY(rangeDialog);
-    rangeDialog->setRange(20, 27);
+    rangeDialog->setRange(21, 28);
     QVERIFY(QMetaObject::invokeMethod(rangeDialog, "onApplyClicked"));
     QCoreApplication::processEvents();
 

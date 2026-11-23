@@ -1088,16 +1088,17 @@ void PicamDriver::initializeRoisSubParameters()
 
     if (defaultErr == PicamError_None && defaultRois != nullptr && defaultRois->roi_count > 0) {
         const auto& droi = defaultRois->roi_array[0];
-        roiX.defaultValue = droi.x;
-        roiY.defaultValue = droi.y;
+        // SDK 的 ROI 偏移是 0-based；对用户暴露 1-based
+        roiX.defaultValue = droi.x + 1;
+        roiY.defaultValue = droi.y + 1;
         roiW.defaultValue = droi.width;
         roiH.defaultValue = droi.height;
         roiXB.defaultValue = droi.x_binning;
         roiYB.defaultValue = droi.y_binning;
         Picam_DestroyRois(defaultRois);
     } else {
-        roiX.defaultValue = 0;
-        roiY.defaultValue = 0;
+        roiX.defaultValue = 1;
+        roiY.defaultValue = 1;
         roiXB.defaultValue = 1;
         roiYB.defaultValue = 1;
         if (err == PicamError_None && constraint != nullptr) {
@@ -1111,13 +1112,14 @@ void PicamDriver::initializeRoisSubParameters()
 
     roiX.name = "roi_x";
     roiX.displayName = QStringLiteral("ROI X");
-    roiX.description = QStringLiteral("Region of interest X offset in pixels");
+    roiX.description = QStringLiteral("Region of interest X offset in pixels (1-based, first column is 1)");
     roiX.type = ParameterType::IntRange;
     roiX.category = ParameterCategory::Core;
     roiX.order = 200.0f;
     if (err == PicamError_None && constraint != nullptr) {
-        roiX.constraint.minValue = constraint->x_constraint.minimum;
-        roiX.constraint.maxValue = constraint->x_constraint.maximum;
+        // SDK 约束是 0-based；转成 1-based 后 min/max 各 +1
+        roiX.constraint.minValue = constraint->x_constraint.minimum + 1.0;
+        roiX.constraint.maxValue = constraint->x_constraint.maximum + 1.0;
         roiX.constraint.step = constraint->x_constraint.increment;
     }
     m_parameterDefinitions.insert("roi_x", roiX);
@@ -1126,13 +1128,14 @@ void PicamDriver::initializeRoisSubParameters()
 
     roiY.name = "roi_y";
     roiY.displayName = QStringLiteral("ROI Y");
-    roiY.description = QStringLiteral("Region of interest Y offset in pixels");
+    roiY.description = QStringLiteral("Region of interest Y offset in pixels (1-based, first row is 1)");
     roiY.type = ParameterType::IntRange;
     roiY.category = ParameterCategory::Core;
     roiY.order = 201.0f;
     if (err == PicamError_None && constraint != nullptr) {
-        roiY.constraint.minValue = constraint->y_constraint.minimum;
-        roiY.constraint.maxValue = constraint->y_constraint.maximum;
+        // SDK 约束是 0-based；转成 1-based 后 min/max 各 +1
+        roiY.constraint.minValue = constraint->y_constraint.minimum + 1.0;
+        roiY.constraint.maxValue = constraint->y_constraint.maximum + 1.0;
         roiY.constraint.step = constraint->y_constraint.increment;
     }
     m_parameterDefinitions.insert("roi_y", roiY);
@@ -1352,8 +1355,9 @@ bool PicamDriver::isRoiSubParam(const QString &name) const
 
 QVariant PicamDriver::getRoiSubValue(const QString &name) const
 {
-    if (name == "roi_x")         return QVariant(static_cast<int>(m_cachedRoi.x));
-    if (name == "roi_y")         return QVariant(static_cast<int>(m_cachedRoi.y));
+    // m_cachedRoi 始终保存 SDK 的 0-based 值；roi_x/roi_y 对外是 1-based
+    if (name == "roi_x")         return QVariant(static_cast<int>(m_cachedRoi.x) + 1);
+    if (name == "roi_y")         return QVariant(static_cast<int>(m_cachedRoi.y) + 1);
     if (name == "roi_width")     return QVariant(static_cast<int>(m_cachedRoi.width));
     if (name == "roi_height")    return QVariant(static_cast<int>(m_cachedRoi.height));
     if (name == "roi_x_binning") return QVariant(static_cast<int>(m_cachedRoi.x_binning));
@@ -1363,8 +1367,9 @@ QVariant PicamDriver::getRoiSubValue(const QString &name) const
 
 void PicamDriver::setRoiSubValue(const QString &name, const QVariant &value)
 {
-    if (name == "roi_x")         m_cachedRoi.x = value.toInt();
-    if (name == "roi_y")         m_cachedRoi.y = value.toInt();
+    // 用户侧 roi_x/roi_y 是 1-based，写回 SDK 缓存时转成 0-based
+    if (name == "roi_x")         m_cachedRoi.x = value.toInt() - 1;
+    if (name == "roi_y")         m_cachedRoi.y = value.toInt() - 1;
     if (name == "roi_width")     m_cachedRoi.width = value.toInt();
     if (name == "roi_height")    m_cachedRoi.height = value.toInt();
     if (name == "roi_x_binning") m_cachedRoi.x_binning = value.toInt();

@@ -812,14 +812,58 @@ private slots:
         QVERIFY2(hVal.toInt() == 1024, "roi_height should be 1024 after commit");
     }
 
+    void test_roi_definition_is_one_based()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        const ParameterDefinition x = m_driver->parameter("roi_x");
+        const ParameterDefinition y = m_driver->parameter("roi_y");
+        QCOMPARE(x.constraint.minValue, 1.0);
+        QCOMPARE(y.constraint.minValue, 1.0);
+        QCOMPARE(x.defaultValue.toInt(), 1);
+        QCOMPARE(y.defaultValue.toInt(), 1);
+    }
+
+    void test_roi_offset_is_one_based_in_capture()
+    {
+        m_driver->connectToCamera("mock-001");
+
+        // 基准：整幅 gradient 图，第 0 行第 1 列的值
+        QSignalSpy fullSpy(m_driver, &ICameraDriver::frameReady);
+        QSignalSpy fullStoppedSpy(m_driver, &ICameraDriver::captureStopped);
+        QVERIFY2(m_driver->startCapture(1), "Should start full-frame capture");
+        QVERIFY2(fullSpy.wait(1000), "Should receive full frame");
+        QVERIFY2(fullStoppedSpy.wait(1000), "Full-frame capture should stop");
+        QSharedPointer<QImage> full = fullSpy.takeFirst().at(0).value<QSharedPointer<QImage>>();
+        QVERIFY(full && !full->isNull());
+        const ushort expected = reinterpret_cast<const ushort *>(full->constScanLine(0))[1];
+
+        // roi_x = 2（1-based）应裁掉第一列，新图 (0,0) 等于原图 (1,0)
+        m_driver->setParameter("roi_x", 2);
+        m_driver->setParameter("roi_y", 1);
+        m_driver->setParameter("roi_width", 2047);
+        m_driver->setParameter("roi_height", 2048);
+        QVERIFY2(m_driver->commitParameters(), "Should commit 1-based ROI");
+
+        QSignalSpy cropSpy(m_driver, &ICameraDriver::frameReady);
+        QSignalSpy cropStoppedSpy(m_driver, &ICameraDriver::captureStopped);
+        QVERIFY2(m_driver->startCapture(1), "Should start ROI capture");
+        QVERIFY2(cropSpy.wait(1000), "Should receive ROI frame");
+        QVERIFY2(cropStoppedSpy.wait(1000), "ROI capture should stop");
+        QSharedPointer<QImage> crop = cropSpy.takeFirst().at(0).value<QSharedPointer<QImage>>();
+        QVERIFY(crop && !crop->isNull());
+        QCOMPARE(crop->width(), 2047);
+        QCOMPARE(reinterpret_cast<const ushort *>(crop->constScanLine(0))[0], expected);
+    }
+
     void test_roi_full_sensor()
     {
         m_driver->connectToCamera("mock-001");
 
-        bool result = m_driver->setParameter("roi_x", 0);
-        QVERIFY2(result == true, "Should set roi_x to 0");
-        result = m_driver->setParameter("roi_y", 0);
-        QVERIFY2(result == true, "Should set roi_y to 0");
+        bool result = m_driver->setParameter("roi_x", 1);
+        QVERIFY2(result == true, "Should set roi_x to 1 (first column)");
+        result = m_driver->setParameter("roi_y", 1);
+        QVERIFY2(result == true, "Should set roi_y to 1 (first row)");
         result = m_driver->setParameter("roi_width", 2048);
         QVERIFY2(result == true, "Should set roi_width to 2048");
         result = m_driver->setParameter("roi_height", 2048);
@@ -830,8 +874,8 @@ private slots:
         QVariant yVal = m_driver->parameterValue("roi_y");
         QVariant wVal = m_driver->parameterValue("roi_width");
         QVariant hVal = m_driver->parameterValue("roi_height");
-        QVERIFY2(xVal.toInt() == 0, "roi_x should be 0 for full sensor");
-        QVERIFY2(yVal.toInt() == 0, "roi_y should be 0 for full sensor");
+        QVERIFY2(xVal.toInt() == 1, "roi_x should be 1 for full sensor (1-based)");
+        QVERIFY2(yVal.toInt() == 1, "roi_y should be 1 for full sensor (1-based)");
         QVERIFY2(wVal.toInt() == 2048, "roi_width should be 2048 for full sensor");
         QVERIFY2(hVal.toInt() == 2048, "roi_height should be 2048 for full sensor");
     }
@@ -840,8 +884,8 @@ private slots:
     {
         m_driver->connectToCamera("mock-001");
 
-        bool result = m_driver->setParameter("roi_x", -1);
-        QVERIFY2(result == false, "Should reject roi_x = -1 (below min of 0)");
+        bool result = m_driver->setParameter("roi_x", 0);
+        QVERIFY2(result == false, "Should reject roi_x = 0 (below 1-based min of 1)");
     }
 
     void test_roi_x_above_max()
@@ -849,7 +893,7 @@ private slots:
         m_driver->connectToCamera("mock-001");
 
         bool result = m_driver->setParameter("roi_x", 3000);
-        QVERIFY2(result == false, "Should reject roi_x = 3000 (above max 2047 for mock-001)");
+        QVERIFY2(result == false, "Should reject roi_x = 3000 (above max 2048 for mock-001)");
     }
 
     void test_roi_width_zero()
@@ -1081,8 +1125,8 @@ private slots:
     {
         m_driver->connectToCamera("mock-001");
 
-        m_driver->setParameter("roi_x", 0);
-        m_driver->setParameter("roi_y", 0);
+        m_driver->setParameter("roi_x", 1);
+        m_driver->setParameter("roi_y", 1);
         m_driver->setParameter("roi_width", 512);
         m_driver->setParameter("roi_height", 512);
         QVERIFY2(m_driver->commitParameters() == true, "Should commit ROI parameters");
@@ -1109,8 +1153,8 @@ private slots:
         m_driver->connectToCamera("mock-001");
 
         m_driver->setParameter("binning", 2);
-        m_driver->setParameter("roi_x", 0);
-        m_driver->setParameter("roi_y", 0);
+        m_driver->setParameter("roi_x", 1);
+        m_driver->setParameter("roi_y", 1);
         m_driver->setParameter("roi_width", 2048);
         m_driver->setParameter("roi_height", 2048);
         QVERIFY2(m_driver->commitParameters() == true, "Should commit binning parameters");

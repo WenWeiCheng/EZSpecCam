@@ -81,8 +81,8 @@ void TestRowRangeDialogEdgeCases::test_setImageHeight_zero_does_not_crash()
 {
     RowRangeDialog dialog;
     dialog.setImageHeight(0);
-    QVERIFY(dialog.startRow() >= 0);
-    QVERIFY(dialog.endRow() >= 0);
+    QCOMPARE(dialog.startRow(), 1);
+    QCOMPARE(dialog.endRow(), 1);
 }
 
 void TestRowRangeDialogEdgeCases::test_setRange_after_zero_height_does_not_crash()
@@ -90,17 +90,18 @@ void TestRowRangeDialogEdgeCases::test_setRange_after_zero_height_does_not_crash
     RowRangeDialog dialog;
     dialog.setImageHeight(0);
     dialog.setRange(0, 0);
-    QVERIFY(dialog.startRow() >= 0);
-    QVERIFY(dialog.endRow() >= 0);
+    // 没有图像时范围钳在 1-based 的最小值，不能出现 0 或负数
+    QCOMPARE(dialog.startRow(), 1);
+    QCOMPARE(dialog.endRow(), 1);
 }
 
 void TestRowRangeDialogEdgeCases::test_setImageHeight_one_works()
 {
     RowRangeDialog dialog;
     dialog.setImageHeight(1);
-    dialog.setRange(0, 0);
-    QCOMPARE(dialog.startRow(), 0);
-    QCOMPARE(dialog.endRow(), 0);
+    dialog.setRange(1, 1);
+    QCOMPARE(dialog.startRow(), 1);
+    QCOMPARE(dialog.endRow(), 1);
 }
 
 void TestRowRangeDialogEdgeCases::test_setImageHeight_normal_works()
@@ -156,7 +157,7 @@ void TestRowRangeDialogEdgeCases::test_spectrum_view_with_original_allows_row_ra
 {
     // 模拟 spectrumView 状态：image=1 行, originalImage=2D。
     // 验证使用 originalImage.height() 作为对话框高度时，
-    // spinbox 范围是 [1, h]，不是 [1, 1]。
+    // 1-based spinbox 范围是 [1, h]，而不是被锁成 [1, 1]。
     QTemporaryDir tmp;
     QVERIFY(tmp.isValid());
 
@@ -187,11 +188,11 @@ void TestRowRangeDialogEdgeCases::test_spectrum_view_with_original_allows_row_ra
 
     RowRangeDialog dialog;
     dialog.setImageHeight(dialogHeight);
-    // 0-based 闭区间，默认覆盖整图：最后一行是 height - 1
-    QCOMPARE(dialog.startRow(), 0);
-    QCOMPARE(dialog.endRow(), 1023);
+    // 1-based 闭区间，默认覆盖整图：第一行是 1，最后一行是 height
+    QCOMPARE(dialog.startRow(), 1);
+    QCOMPARE(dialog.endRow(), 1024);
 
-    // 可以设置任意子范围（行号与 Profile 窗口显示的一致）
+    // 可以设置任意子范围
     dialog.setRange(100, 200);
     QCOMPARE(dialog.startRow(), 100);
     QCOMPARE(dialog.endRow(), 200);
@@ -199,10 +200,9 @@ void TestRowRangeDialogEdgeCases::test_spectrum_view_with_original_allows_row_ra
 
 void TestRowRangeDialogEdgeCases::test_dialog_range_selects_the_profiled_row()
 {
-    // Profile 标题里的 "Row Y=439" 是 0-based 行索引，对话框也按 0-based 输入；
-    // MainWindow 把它 +1 交给 PostProcess::verticalBinning（1-based）。
-    // 这里验证这条链路取到的正是第 439 行，而不是差一行的第 438 行。
-    const int row = 439;
+    // 对话框输入的是 1-based 行号，直接传给 PostProcess::verticalBinning。
+    // 这里验证第 440 行（1-based）取到的正是 0-based 索引 439 的像素行。
+    const int row = 440;
     QImage img = make2DImage(64, 512);
 
     RowRangeDialog dialog;
@@ -213,11 +213,9 @@ void TestRowRangeDialogEdgeCases::test_dialog_range_selects_the_profiled_row()
 
     ImageData frame;
     frame.image = img;
-    PostProcess::verticalBinning(frame,
-                                 RowRangeDialog::toBinningRow(dialog.startRow()),
-                                 RowRangeDialog::toBinningRow(dialog.endRow()));
+    PostProcess::verticalBinning(frame, dialog.startRow(), dialog.endRow());
 
-    const ushort *rowData = reinterpret_cast<const ushort *>(img.constScanLine(row));
+    const ushort *rowData = reinterpret_cast<const ushort *>(img.constScanLine(row - 1));
     QCOMPARE(frame.spectrum.size(), 64);
     for (int x = 0; x < 64; ++x) {
         QCOMPARE(frame.spectrum[x], static_cast<quint64>(rowData[x]));

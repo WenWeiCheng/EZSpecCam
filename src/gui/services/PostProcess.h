@@ -8,6 +8,8 @@ struct ImageData;
 namespace PostProcess
 {
 
+//! 垂直合并 startRow..endRow 行（1-based 闭区间；endRow < 0 表示最后一行）。
+//! 输出同时写入 frame.spectrum（每列求和）和 1 行高的 frame.image。
 void verticalBinning(ImageData &frame, int startRow, int endRow);
 void applyDarkCalibration(ImageData &frame, const QImage *darkFrame, int customBias);
 

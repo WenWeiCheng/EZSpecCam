@@ -10,6 +10,23 @@
 #include <QRegularExpression>
 #include <qobject.h>
 
+namespace {
+
+// 旧版配置把 roi_x / roi_y 存成 0-based；现在参数 API 是 1-based，
+// 0 等价于第一列/第一行。读取旧配置时顺手迁移，避免 GUI 显示和实际
+// 驱动状态不一致。
+void migrateLegacyRoiOffsets(QVariantMap &parameters)
+{
+    for (const char *name : {"roi_x", "roi_y"}) {
+        auto it = parameters.find(QString::fromLatin1(name));
+        if (it != parameters.end() && it.value().toInt() == 0) {
+            it.value() = 1;
+        }
+    }
+}
+
+} // namespace
+
 
 AppController::AppController(QObject *parent)
     : QObject(parent)
@@ -327,6 +344,7 @@ QVariantMap AppController::loadDynamicConfig(const QString &cameraId)
         return QVariantMap();
     }
 
+    migrateLegacyRoiOffsets(parameters);
     return parameters;
 }
 

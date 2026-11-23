@@ -523,8 +523,8 @@ private slots:
 
         qDebug() << "Full sensor size:" << fullWidth.toInt() << "x" << fullHeight.toInt();
 
-        QVERIFY2(m_driver->setParameter("roi_x", 0), "setParameter roi_x");
-        QVERIFY2(m_driver->setParameter("roi_y", 0), "setParameter roi_y");
+        QVERIFY2(m_driver->setParameter("roi_x", 1), "setParameter roi_x (1-based first column)");
+        QVERIFY2(m_driver->setParameter("roi_y", 1), "setParameter roi_y (1-based first row)");
         QVERIFY2(m_driver->setParameter("roi_width", fullWidth), "setParameter roi_width");
         QVERIFY2(m_driver->setParameter("roi_height", fullHeight), "setParameter roi_height");
         QVERIFY2(m_driver->commitParameters(), "commitParameters for full-sensor ROI");
@@ -603,8 +603,8 @@ private slots:
 
         m_driver->stopCapture();
 
-        QVERIFY2(m_driver->setParameter("roi_x", 0), "reset roi_x");
-        QVERIFY2(m_driver->setParameter("roi_y", 0), "reset roi_y");
+        QVERIFY2(m_driver->setParameter("roi_x", 1), "reset roi_x to 1-based first column");
+        QVERIFY2(m_driver->setParameter("roi_y", 1), "reset roi_y to 1-based first row");
         QVERIFY2(m_driver->setParameter("roi_width", fullWidth), "reset roi_width");
         QVERIFY2(m_driver->setParameter("roi_height", fullHeight), "reset roi_height");
         QVERIFY2(m_driver->setParameter("roi_x_binning", 1), "reset roi_x_binning");
@@ -679,8 +679,8 @@ private slots:
 
         m_driver->stopCapture();
 
-        QVERIFY2(m_driver->setParameter("roi_x", 0), "reset roi_x");
-        QVERIFY2(m_driver->setParameter("roi_y", 0), "reset roi_y");
+        QVERIFY2(m_driver->setParameter("roi_x", 1), "reset roi_x to 1-based first column");
+        QVERIFY2(m_driver->setParameter("roi_y", 1), "reset roi_y to 1-based first row");
         QVERIFY2(m_driver->setParameter("roi_x_binning", 1), "reset binning 1");
         QVERIFY2(m_driver->setParameter("roi_y_binning", 1), "reset binning 1");
         QVERIFY2(m_driver->commitParameters(), "commit binning reset");

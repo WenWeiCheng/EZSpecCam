@@ -29,6 +29,10 @@ qhyccd/
 | SDK manual | `sdk/manual.md` |
 
 ## CONVENTIONS
+- `roi_x` / `roi_y` are **1-based** in the EZSpecCam parameter API (first
+  column/row is 1). The QHYCCD SDK's `SetQHYCCDResolution()` is 0-based, so
+  `commitParameters()` subtracts 1 only at the SDK call boundary. Do not store
+  0-based values in `m_parameters`, or the GUI and metadata will disagree.
 - Follow existing qhyccd test patterns for signal/event structure
 - Use async signals for frame delivery (never block main thread)
 - Stream mode support via `stream_mode` parameter

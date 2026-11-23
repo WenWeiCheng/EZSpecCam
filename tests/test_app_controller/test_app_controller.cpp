@@ -218,6 +218,22 @@ private slots:
         QCOMPARE(loadedParams["enabled"].toBool(), true);
     }
 
+    void test_load_dynamic_config_migrates_legacy_zero_roi_offsets()
+    {
+        const QString testCameraId = "test-camera-legacy-roi";
+
+        QVariantMap legacyParams;
+        legacyParams["roi_x"] = 0;
+        legacyParams["roi_y"] = 0;
+        legacyParams["roi_width"] = 512;
+        m_controller->saveDynamicConfig(testCameraId, legacyParams);
+
+        const QVariantMap loaded = m_controller->loadDynamicConfig(testCameraId);
+        QCOMPARE(loaded.value("roi_x").toInt(), 1);
+        QCOMPARE(loaded.value("roi_y").toInt(), 1);
+        QCOMPARE(loaded.value("roi_width").toInt(), 512);
+    }
+
     void test_scan_plugins_loads_mock_driver()
     {
         QTemporaryDir tempDir;

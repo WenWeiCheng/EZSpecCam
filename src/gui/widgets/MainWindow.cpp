@@ -1326,16 +1326,15 @@ void MainWindow::on_rowRange_triggered()
     RowRangeDialog *dialog = new RowRangeDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setImageHeight(imageHeight);
-    // 对话框是 0-based（和 Profile 行号一致），成员/meta 是 1-based
-    dialog->setRange(RowRangeDialog::fromBinningRow(m_vBinStartRow),
-                     RowRangeDialog::fromBinningRow(
-                         m_vBinEndRow < 0 ? imageHeight : m_vBinEndRow));
+    // 对话框和成员/meta 都用 1-based，直接传入即可
+    dialog->setRange(m_vBinStartRow,
+                     m_vBinEndRow < 0 ? imageHeight : m_vBinEndRow);
     dialog->show();
 
     connect(dialog, &RowRangeDialog::applyClicked, this, [this](int startRow, int endRow) {
-        // 对话框给的是 0-based 行索引，转成 verticalBinning/metadata 用的 1-based
-        m_vBinStartRow = RowRangeDialog::toBinningRow(startRow);
-        m_vBinEndRow = RowRangeDialog::toBinningRow(endRow);
+        // 对话框给的就是 verticalBinning/metadata 使用的 1-based 行号
+        m_vBinStartRow = startRow;
+        m_vBinEndRow = endRow;
 
         m_vBinEnabled = true;
         ui->menuActionVerticalBinning->blockSignals(true);

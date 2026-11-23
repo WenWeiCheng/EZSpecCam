@@ -139,6 +139,17 @@ struct ParameterDefinition {
 | `isExtrinsic` | Shown in UI but greyed out; changes via `errorOccurred` or polling |
 | `needReconnect` | Changing value triggers disconnect/reconnect prompt in GUI |
 
+**Coordinate conventions (user-facing values):**
+
+- `roi_x` / `roi_y` are **1-based**: the first column/row is `1`. Drivers
+  translate to the SDK's 0-based offsets only inside the driver (at the
+  cache / SDK-call boundary), so `ParameterDefinition` constraints/defaults
+  and `parameterValue()` are consistent with what the GUI shows.
+- The GUI vertical-binning / despike row range is also **1-based** everywhere
+  (`RowRangeDialog`, `MainWindow::m_vBinStartRow/m_vBinEndRow`, metadata
+  `vBinStartRow`/`vBinEndRow`, and `PostProcess::verticalBinning()`).
+  Image/SDK pixel indices remain 0-based internally.
+
 **`isValid()` logic:**
 - Name must be non-empty.
 - Non-read-only parameters must have valid constraints.

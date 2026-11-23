@@ -547,35 +547,37 @@ void MockCameraDriver::initializeParameterDefinitions(const QString &cameraId)
     m_parameterDefinitions.insert("offset", param);
     m_parameters.insert("offset", 0.0);
 
+    // ROI 偏移对用户暴露 1-based：第一列/第一行是 1。
+    // SDK 和 QImage 使用 0-based，转换只在 generateFrame() 的裁剪边界处发生。
     param = ParameterDefinition();
     param.name = "roi_x";
     param.displayName = "ROI X Offset";
-    param.description = "Region of interest X offset in pixels";
+    param.description = "Region of interest X offset in pixels (1-based, first column is 1)";
     param.category = ParameterCategory::Core;
     param.type = ParameterType::IntRange;
-    param.constraint.minValue = 0;
-    param.constraint.maxValue = maxWidth - 1;
+    param.constraint.minValue = 1;
+    param.constraint.maxValue = maxWidth;
     param.constraint.step = 1;
-    param.defaultValue = 0;
+    param.defaultValue = 1;
     param.isDynamic = true;
     param.order = 4.1f;
     m_parameterDefinitions.insert("roi_x", param);
-    m_parameters.insert("roi_x", 0);
+    m_parameters.insert("roi_x", 1);
 
     param = ParameterDefinition();
     param.name = "roi_y";
     param.displayName = "ROI Y Offset";
-    param.description = "Region of interest Y offset in pixels";
+    param.description = "Region of interest Y offset in pixels (1-based, first row is 1)";
     param.category = ParameterCategory::Core;
     param.type = ParameterType::IntRange;
-    param.constraint.minValue = 0;
-    param.constraint.maxValue = maxHeight - 1;
+    param.constraint.minValue = 1;
+    param.constraint.maxValue = maxHeight;
     param.constraint.step = 1;
-    param.defaultValue = 0;
+    param.defaultValue = 1;
     param.isDynamic = true;
     param.order = 4.2f;
     m_parameterDefinitions.insert("roi_y", param);
-    m_parameters.insert("roi_y", 0);
+    m_parameters.insert("roi_y", 1);
 
     param = ParameterDefinition();
     param.name = "roi_width";
@@ -800,8 +802,9 @@ QImage MockCameraDriver::generateFrame()
     }
 
     if (roiWidth > 0 && roiHeight > 0 && !verticalBinning) {
-        int cropX = qBound(0, roiX, fullWidth - 1);
-        int cropY = qBound(0, roiY, fullHeight - 1);
+        // 参数是 1-based，QImage::copy() 需要 0-based
+        int cropX = qBound(0, roiX - 1, fullWidth - 1);
+        int cropY = qBound(0, roiY - 1, fullHeight - 1);
         int cropWidth = qMin(roiWidth, fullWidth - cropX);
         int cropHeight = qMin(roiHeight, fullHeight - cropY);
         image = image.copy(cropX, cropY, cropWidth, cropHeight);

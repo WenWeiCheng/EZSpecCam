@@ -135,6 +135,12 @@ typedef struct {
 
 EZSpecCam represents ROI as **separate scalar parameters**: `roi_x`, `roi_y`, `roi_width`, `roi_height`, plus `binning`.
 
+**Coordinate convention:** `roi_x` / `roi_y` are **1-based** at the EZSpecCam
+API boundary (the first column/row is 1). PICam's `PicamRoi.x` / `.y` are
+0-based, so `PicamDriver` subtracts 1 when writing `m_cachedRoi` and adds 1
+when reading it back. Constraints and defaults are shifted the same way, so
+the GUI never sees a zero offset.
+
 ### Solution: Decompose in Driver
 
 **Phase 1 — Single ROI only** (most common case):
@@ -143,8 +149,8 @@ The driver decomposes `PicamParameter_Rois` into these EZSpecCam parameters:
 
 | EZSpecCam Name | Type | Source | Constraint Source |
 |---------------|------|--------|-------------------|
-| `roi_x` | `IntRange` | `roi_array[0].x` | `RoisConstraint.x_constraint` |
-| `roi_y` | `IntRange` | `roi_array[0].y` | `RoisConstraint.y_constraint` |
+| `roi_x` | `IntRange` | `roi_array[0].x + 1` (1-based) | `RoisConstraint.x_constraint`, min/max +1 |
+| `roi_y` | `IntRange` | `roi_array[0].y + 1` (1-based) | `RoisConstraint.y_constraint`, min/max +1 |
 | `roi_width` | `IntRange` | `roi_array[0].width` | `RoisConstraint.width_constraint` |
 | `roi_height` | `IntRange` | `roi_array[0].height` | `RoisConstraint.height_constraint` |
 | `roi_x_binning` | `IntCollection` | `roi_array[0].x_binning` | `RoisConstraint.x_binning_limits` |
@@ -157,10 +163,12 @@ READ  (parameterValue):
   1. Check if the requested param is an ROI sub-param
   2. If ROI not yet cached, call Picam_GetParameterRoisValue(PicamParameter_Rois)
   3. Return the corresponding field from roi_array[0]
+     (`roi_x`/`roi_y` add 1 to convert the SDK's 0-based offset)
   4. Call Picam_DestroyRois() to free SDK-allocated memory
 
 WRITE (setParameter):
-  1. Cache the incoming sub-param value locally
+  1. Cache the incoming sub-param value locally (`roi_x`/`roi_y` subtract 1
+     before storing in the 0-based `m_cachedRoi`)
   2. On commitParameters(), assemble a PicamRois from cached sub-params
   3. Call Picam_SetParameterRoisValue(PicamParameter_Rois, &assembled)
   4. Call Picam_CommitParameters()

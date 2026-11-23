@@ -197,10 +197,9 @@ private:
     QString m_autoSaveDir;
 
     bool m_vBinEnabled = false;
-    //! 行范围，1-based 闭区间（与 metadata 的 vBinStartRow/vBinEndRow 一致）。
-    //! PostProcess::verticalBinning 也按 1-based 解释，调用处不要做转换；
-    //! 只有 RowRangeDialog 是 0-based（和 Profile 的行号一致），边界在
-    //! on_rowRange_triggered 里转换
+    //! 行范围，1-based 闭区间（与 metadata 的 vBinStartRow/vBinEndRow、
+    //! RowRangeDialog 以及 PostProcess::verticalBinning 的解释一致）。
+    //! 调用处不要做 ±1 转换
     int m_vBinStartRow = 1;
     //! -1 表示「到最后一行」
     int m_vBinEndRow = -1;

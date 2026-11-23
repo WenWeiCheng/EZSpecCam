@@ -160,8 +160,10 @@ gui/
   auto-save writes the same processed frame. Toggling despike, changing the
   threshold or changing the row range rebuilds from `m_preDespikeFrame`
 - Both views share one Process menu toggle. The row range is `m_vBinStartRow` /
-  `m_vBinEndRow` (1-based, `-1` = last row), independent of whether vbin is on;
-  rows outside it are copied unchanged and never despiked
+  `m_vBinEndRow` (1-based, `-1` = last row), independent of whether vbin is on.
+  `RowRangeDialog` is 1-based too, so `on_rowRange_triggered` passes the
+  spin-box values straight through — do not add ±1 conversions there.
+  Rows outside it are copied unchanged and never despiked
 - With vbin + a partial row range, the live pipeline only despikes the ROI and
   leaves `m_currentFrame.originalImage` as the raw 2D frame. `saveFrameToFile()`
   rebuilds the full despiked 2D with the same row range before handing the
