@@ -76,6 +76,7 @@ private slots:
 
     void onCrosshairCleared();
     void onCrosshairMoved(const QPointF &position, int value);
+    void on_profileRequested(const QPointF &position);
 
     void onLiveModeTriggered();
     void onSingleModeTriggered();
@@ -122,6 +123,9 @@ private:
     void updateFpsDisplay();
     void onFpsTimerTimeout();
     void showStatusMessage(const QString &message, int timeoutMs = 3000);
+    //! 打开（必要时创建）Profile 窗口并刷新到指定像素，供 P 快捷键和
+    //! 图像右键菜单共用
+    void showProfileAt(const QPointF &position);
     void startReferenceAcquisition(Calibration::ReferenceKind kind, int frameCount,
                                    double exposure);
     void cancelReferenceAcquisition(const QString &reason);

@@ -2,6 +2,10 @@
 #include <QVBoxLayout>
 #include <QMouseEvent>
 #include <QKeyEvent>
+#include <QContextMenuEvent>
+#include <QMenu>
+#include <QAction>
+#include <QtMath>
 #include <QDebug>
 #include <QFontMetricsF>
 #include <QTimer>
@@ -757,14 +761,17 @@ bool ImageViewWidget::eventFilter(QObject *obj, QEvent *event)
                     }
                 }
                 return true;
-            } else if (me->button() == Qt::RightButton) {
-                if (me->modifiers() & Qt::ControlModifier) {
-                    clearCrosshairs();
-                } else {
-                    resetZoomToFit();
-                }
-                return true;
             }
+        } else if (event->type() == QEvent::ContextMenu) {
+            auto *ce = static_cast<QContextMenuEvent *>(event);
+            // Ctrl+右键仍是「删掉十字线」的快捷操作；普通右键弹出菜单，
+            // 让只有鼠标的用户也能增删十字线、看 profile
+            if (ce->modifiers() & Qt::ControlModifier) {
+                clearCrosshairs();
+            } else {
+                showContextMenu(ce->pos());
+            }
+            return true;
         } else if (event->type() == QEvent::MouseMove) {
             auto *me = static_cast<QMouseEvent *>(event);
             if (m_rubberBand->isVisible()) {
@@ -846,6 +853,89 @@ QPointF ImageViewWidget::widgetToImageCoords(int widgetX, int widgetY) const
     double y = m_plot->yAxis->pixelToCoord(widgetY);
 
     return QPointF(x, y);
+}
+
+// 右键菜单要把「鼠标在哪」变成一个确定的像素。widgetToImageCoords() 对
+// 绘图区外的点会沿直线外推，这里把结果夹回图像内；insideImage 额外告诉
+// 调用方该点原本是否真的落在图像上——按比例居中时绘图区两侧有留白，
+// 那里没有像素可读，菜单项应当置灰而不是悄悄落到最近的边缘
+QPoint ImageViewWidget::imagePixelAt(const QPoint &widgetPos, bool *insideImage) const
+{
+    if (insideImage) {
+        *insideImage = false;
+    }
+
+    if (!m_imageValid || m_originalImage.isNull() || !m_plot) {
+        return QPoint(0, 0);
+    }
+
+    if (insideImage) {
+        *insideImage = m_plot->axisRect()->rect().contains(widgetPos);
+    }
+
+    const QPointF coords = widgetToImageCoords(widgetPos.x(), widgetPos.y());
+    const int x = qBound(0, static_cast<int>(qFloor(coords.x())), m_originalImage.width() - 1);
+    const int y = qBound(0, static_cast<int>(qFloor(coords.y())), m_originalImage.height() - 1);
+    return QPoint(x, y);
+}
+
+QMenu *ImageViewWidget::createContextMenu(const QPoint &widgetPos)
+{
+    auto *menu = new QMenu(this);
+    menu->setObjectName(QStringLiteral("imageContextMenu"));
+    const bool hasImage = m_imageValid && !m_originalImage.isNull();
+
+    bool insideImage = false;
+    const QPoint pixel = imagePixelAt(widgetPos, &insideImage);
+
+    QAction *addAction = menu->addAction(tr("Add crosshair at mouse"));
+    addAction->setObjectName(QStringLiteral("contextActionAddCrosshair"));
+    addAction->setEnabled(hasImage && insideImage);
+    connect(addAction, &QAction::triggered, this, [this, pixel]() {
+        addCrosshair(pixel.x(), pixel.y());
+    });
+
+    QAction *removeAction = menu->addAction(tr("Remove crosshair"));
+    removeAction->setObjectName(QStringLiteral("contextActionRemoveCrosshair"));
+    removeAction->setEnabled(!m_crosshairs.isEmpty());
+    connect(removeAction, &QAction::triggered, this, &ImageViewWidget::clearCrosshairs);
+
+    QMenu *profileMenu = menu->addMenu(tr("View profile"));
+    profileMenu->setObjectName(QStringLiteral("contextMenuProfile"));
+
+    QAction *profileAtMouse = profileMenu->addAction(tr("At mouse"));
+    profileAtMouse->setObjectName(QStringLiteral("contextActionProfileAtMouse"));
+    profileAtMouse->setEnabled(hasImage && insideImage);
+    connect(profileAtMouse, &QAction::triggered, this, [this, pixel]() {
+        // 「在鼠标位置放置 crosshair 并显示 profile」：先落十字线，
+        // 再让 MainWindow 按同一个坐标打开/刷新 Profile 窗口
+        addCrosshair(pixel.x(), pixel.y());
+        emit profileRequested(QPointF(pixel));
+    });
+
+    QAction *profileAtCrosshair = profileMenu->addAction(tr("At crosshair"));
+    profileAtCrosshair->setObjectName(QStringLiteral("contextActionProfileAtCrosshair"));
+    profileAtCrosshair->setEnabled(!m_crosshairs.isEmpty());
+    connect(profileAtCrosshair, &QAction::triggered, this, [this]() {
+        emit profileRequested(m_currentCrosshairPos);
+    });
+
+    // 右键原本直接复位缩放。现在让位给菜单，这个常用操作收成菜单最后一项，
+    // 纯鼠标用户仍然找得到
+    menu->addSeparator();
+    QAction *resetZoomAction = menu->addAction(tr("Reset zoom to fit"));
+    resetZoomAction->setObjectName(QStringLiteral("contextActionResetZoom"));
+    resetZoomAction->setEnabled(hasImage);
+    connect(resetZoomAction, &QAction::triggered, this, &ImageViewWidget::resetZoomToFit);
+
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+    return menu;
+}
+
+void ImageViewWidget::showContextMenu(const QPoint &widgetPos)
+{
+    QMenu *menu = createContextMenu(widgetPos);
+    menu->popup(m_plot->mapToGlobal(widgetPos));
 }
 
 void ImageViewWidget::calculateDownsampleFactors()

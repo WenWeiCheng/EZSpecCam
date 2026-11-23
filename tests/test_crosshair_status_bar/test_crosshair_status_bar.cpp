@@ -9,8 +9,11 @@
 // QStatusBar::showMessage() and into the state label, because the notice and
 // the readout were being painted into the same rectangle.
 #include <QApplication>
+#include <QAction>
+#include <QContextMenuEvent>
 #include <QImage>
 #include <QLabel>
+#include <QMenu>
 #include <QSpinBox>
 #include <QStatusBar>
 #include <QTest>
@@ -19,6 +22,8 @@
 #include "widgets/MainWindow.h"
 #include "widgets/dialogs/CameraConfigDialog.h"
 #include "widgets/display/ImageViewWidget.h"
+#include "widgets/display/ProfileWindow.h"
+#include "qcustomplot.h"
 
 // 状态栏里有好几个 QLabel，「State:」开头的那一格才是状态
 static QString stateLabelTextOf(MainWindow &window)
@@ -46,6 +51,7 @@ private slots:
     void test_capture_mode_never_takes_over_the_crosshair_strip();
     void test_capture_mode_is_always_shown_in_the_state_label();
     void test_capture_mode_shortcut_syncs_the_config_dialog();
+    void test_view_profile_context_action_opens_profile_window();
 
 private:
     QTimer *m_modalDismiss = nullptr;
@@ -304,6 +310,51 @@ void TestCrosshairStatusBar::test_capture_mode_shortcut_syncs_the_config_dialog(
     QCoreApplication::processEvents();
     QVERIFY2(stateLabelTextOf(window).endsWith("Mode: Live"),
              qPrintable(stateLabelTextOf(window)));
+}
+
+// 图像上的右键菜单不只是控件自己发信号：MainWindow 得真的把 Profile
+// 窗口打开、刷新到鼠标处。这条走完整条链路（菜单 → 信号 → 窗口）。
+void TestCrosshairStatusBar::test_view_profile_context_action_opens_profile_window()
+{
+    MainWindow window;
+    window.resize(1130, 870);
+    window.show();
+    QCoreApplication::processEvents();
+
+    auto *view = window.findChild<ImageViewWidget *>();
+    QVERIFY(view);
+    view->setImage(rampImage16());
+    QCoreApplication::processEvents();
+
+    auto *plot = view->findChild<QCustomPlot *>();
+    QVERIFY(plot);
+    plot->replot();
+    QCoreApplication::processEvents();
+    const QRect area = plot->axisRect()->rect();
+    QVERIFY2(area.width() > 0 && area.height() > 0, "图像绘图区还没有几何尺寸");
+
+    QContextMenuEvent event(QContextMenuEvent::Mouse, area.center(),
+                            plot->mapToGlobal(area.center()));
+    QCoreApplication::sendEvent(plot, &event);
+    QCoreApplication::processEvents();
+
+    auto *action = window.findChild<QAction *>(QStringLiteral("contextActionProfileAtMouse"));
+    QVERIFY2(action, "右键菜单里没有 View profile/at mouse");
+    QVERIFY(action->isEnabled());
+    action->trigger();
+    QCoreApplication::processEvents();
+
+    QCOMPARE(view->crosshairCount(), 1);
+
+    auto *profile = window.findChild<ProfileWindow *>();
+    QVERIFY2(profile, "View profile 没有创建 Profile 窗口");
+    QVERIFY2(profile->isVisible(), "View profile 之后 Profile 窗口没有显示");
+
+    // 菜单还开着会占住弹出抓取，留着会影响窗口析构
+    for (QMenu *menu : view->findChildren<QMenu *>()) {
+        menu->close();
+    }
+    QCoreApplication::processEvents();
 }
 
 QTEST_MAIN(TestCrosshairStatusBar)

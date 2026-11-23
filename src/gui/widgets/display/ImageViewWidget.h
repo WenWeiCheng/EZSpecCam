@@ -16,6 +16,7 @@ class QCPColorMap;
 class QCPColorScale;
 class QCPItemLine;
 class QCPItemText;
+class QMenu;
 
 class ImageViewWidget : public QWidget
 {
@@ -95,6 +96,9 @@ signals:
     void crosshairMoved(const QPointF &position, int value);
     void crosshairsCleared();
     void pixelInfo(int x, int y, int value);
+    //! 右键菜单「View profile」选中后发出。位置保证是当前十字线所在像素，
+    //! 由 MainWindow 负责打开/更新 Profile 窗口
+    void profileRequested(const QPointF &position);
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
@@ -118,6 +122,11 @@ private:
     QPen crosshairPen() const;
     QPen crosshairHaloPen() const;
     QPointF widgetToImageCoords(int widgetX, int widgetY) const;
+    //! 把控件坐标落到合法像素上（越界时夹回图像内）。insideImage 返回该点
+    //! 是否真的落在图像区域内 —— 图像按比例居中时，绘图区两侧的留白没有像素
+    QPoint imagePixelAt(const QPoint &widgetPos, bool *insideImage) const;
+    QMenu *createContextMenu(const QPoint &widgetPos);
+    void showContextMenu(const QPoint &widgetPos);
     void updateCursorReadout(const QPoint &widgetPos);
     void updateDisplayData();
     void calculateDownsampleFactors();

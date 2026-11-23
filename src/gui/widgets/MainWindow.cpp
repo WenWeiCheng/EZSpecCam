@@ -241,6 +241,8 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::onCrosshairCleared);
     connect(m_imageViewWidget, &ImageViewWidget::crosshairMoved,
             this, &MainWindow::onCrosshairMoved);
+    connect(m_imageViewWidget, &ImageViewWidget::profileRequested,
+            this, &MainWindow::on_profileRequested);
     connect(m_appController, &AppController::stateChanged,
             this, &MainWindow::onCameraStateChanged);
     connect(m_appController, &AppController::frameReady,
@@ -1765,23 +1767,47 @@ void MainWindow::on_profile_triggered()
         m_profileWindow = new ProfileWindow(this);
     }
 
-    if (m_imageViewWidget->hasImage()) {
-        QImage img = m_imageViewWidget->image();
-    }
-
-    m_profileWindow->show();
-
+    // 没有十字线时仍然打开一个空的 Profile 窗口，保持原有行为：
+    // 用户可以先开窗，再在图上放十字线
     if (m_imageViewWidget->crosshairCount() > 0) {
         QList<QPointF> positions = m_imageViewWidget->crosshairPositions();
         if (!positions.isEmpty()) {
-            QPointF pos = positions.first();
-            int x = static_cast<int>(pos.x());
-            int y = static_cast<int>(pos.y());
-            QVector<double> rowData = m_imageViewWidget->extractRowAsVector(y);
-            QVector<double> colData = m_imageViewWidget->extractColumnAsVector(x);
-            m_profileWindow->updateProfile(x, y, rowData, colData);
+            showProfileAt(positions.first());
+            return;
         }
     }
+
+    m_profileWindow->show();
+    m_profileWindow->raise();
+}
+
+void MainWindow::on_profileRequested(const QPointF &position)
+{
+    showProfileAt(position);
+}
+
+void MainWindow::showProfileAt(const QPointF &position)
+{
+    if (!m_imageViewWidget->hasImage()) {
+        return;
+    }
+
+    if (!m_profileWindow) {
+        m_profileWindow = new ProfileWindow(this);
+    }
+
+    const int x = static_cast<int>(position.x());
+    const int y = static_cast<int>(position.y());
+    QVector<double> rowData = m_imageViewWidget->extractRowAsVector(y);
+    QVector<double> colData = m_imageViewWidget->extractColumnAsVector(x);
+    if (rowData.isEmpty() || colData.isEmpty()) {
+        return;
+    }
+
+    m_profileWindow->updateProfile(x, y, rowData, colData);
+    m_profileWindow->show();
+    // 只抬到前面，不抢焦点：用 P 打开 profile 后用户往往还要用方向键挪十字线
+    m_profileWindow->raise();
 }
 
 void MainWindow::on_histogram_triggered()
