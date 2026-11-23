@@ -22,6 +22,7 @@ tests/
 ├── test_despike/                   # PostProcess::despikeImage algorithm + row-range tests
 ├── test_despike_dialog/            # DespikeDialog single-parameter behaviour
 ├── test_despike_pipeline/          # MainWindow despike → vbin → display pipeline + row range
+├── test_gui_services/              # Pure GUI services: statistics, histogram binning, CSV, file naming
 └── test_view_widgets_perf/         # View widget performance tests
 ```
 
@@ -35,6 +36,7 @@ tests/
 | Despike parameters dialog | `test_despike_dialog/test_despike_dialog.cpp` |
 | Despike pipeline (spectrum from despiked data, row range, save state) | `test_despike_pipeline/test_despike_pipeline.cpp` |
 | Despike benchmarks (6000×4000 full image / 100 rows, prints FPS) | `test_postprocess_perf/test_postprocess_perf.cpp` |
+| Pure GUI services (no QCustomPlot) | `test_gui_services/` |
 | Performance benchmarks | `test_view_widgets_perf/` |
 
 ## CONVENTIONS

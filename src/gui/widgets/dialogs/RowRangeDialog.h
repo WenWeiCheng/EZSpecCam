@@ -38,6 +38,9 @@ private slots:
     void onHeightChanged(int height);
 
 private:
+    //! Validate the current spin-box values and emit applyClicked() on success.
+    bool applyRange();
+
     QSpinBox *m_startSpinBox;
     QSpinBox *m_endSpinBox;
     QPushButton *m_okButton;

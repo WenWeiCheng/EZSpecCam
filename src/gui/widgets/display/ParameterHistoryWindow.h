@@ -5,7 +5,7 @@
 #include <QString>
 #include <QVector>
 
-#include "../config/ParameterHistoryStore.h"
+#include "../../services/ParameterHistoryStore.h"
 
 class QLabel;
 class QPushButton;
@@ -13,7 +13,7 @@ class QSpinBox;
 class LineViewWidget;
 
 //! 单个遥测参数的曲线窗口：显示滑动窗口里的历史值，可改窗口长度、清空、导出 CSV。
-//! 窗口是 CameraTab 的子对象，每轮遥测轮询后由 CameraTab 调 refresh() 更新。
+//! 窗口是 CameraConfigDialog 的子对象，每轮遥测轮询后由对话框调 refresh() 更新。
 class ParameterHistoryWindow : public QDialog
 {
     Q_OBJECT

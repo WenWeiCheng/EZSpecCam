@@ -18,8 +18,6 @@ public:
                        const QVector<double> &horizontalData,
                        const QVector<double> &verticalData);
 
-    void setImageSize(int width, int height);
-
 private:
     void setupUi();
 
@@ -27,8 +25,6 @@ private:
     LineViewWidget *m_verticalProfile;
     QLabel *m_horizontalLabel;
     QLabel *m_verticalLabel;
-    int m_imageWidth;
-    int m_imageHeight;
 };
 
 #endif // PROFILEWINDOW_H

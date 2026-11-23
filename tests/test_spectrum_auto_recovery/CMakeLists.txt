@@ -14,13 +14,14 @@ add_executable(test_spectrum_auto_recovery
     ${CMAKE_SOURCE_DIR}/src/gui/workers/FileLoaderWorker.cpp
     ${CMAKE_SOURCE_DIR}/src/formats/IImageFormatHandler.h
     ${CMAKE_SOURCE_DIR}/src/formats/SaveTypes.h
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets/PostProcess.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/services/PostProcess.cpp
 )
 
 target_include_directories(test_spectrum_auto_recovery PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/gui
     ${CMAKE_SOURCE_DIR}/src/gui/widgets
+    ${CMAKE_SOURCE_DIR}/src/gui/services
     ${CMAKE_SOURCE_DIR}/src/gui/workers
 )
 

@@ -4,7 +4,9 @@ target_sources(test_parameter_history_window PRIVATE
     test_parameter_history_window.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/Theme.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/qcustomplot.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets/config/ParameterHistoryStore.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/services/AppSettings.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/services/HistoryCsvExporter.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/services/ParameterHistoryStore.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/LineViewWidget.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/ParameterHistoryWindow.cpp
 )
@@ -18,8 +20,8 @@ target_include_directories(test_parameter_history_window PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/gui
     ${CMAKE_SOURCE_DIR}/src/gui/widgets
+    ${CMAKE_SOURCE_DIR}/src/gui/services
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets/config
 )
 set_target_properties(test_parameter_history_window PROPERTIES
     Qt6::MinimalQt6 TRUE

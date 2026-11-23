@@ -5,7 +5,7 @@ find_package(OpenMP REQUIRED)
 add_executable(test_postprocess_perf)
 target_sources(test_postprocess_perf PRIVATE
     test_postprocess_perf.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets/PostProcess.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/services/PostProcess.cpp
 )
 target_link_libraries(test_postprocess_perf PRIVATE
     ezspeccam_core
@@ -15,6 +15,6 @@ target_link_libraries(test_postprocess_perf PRIVATE
 target_include_directories(test_postprocess_perf PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/core
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets
+    ${CMAKE_SOURCE_DIR}/src/gui/services
 )
 add_test(NAME test_postprocess_perf COMMAND test_postprocess_perf)

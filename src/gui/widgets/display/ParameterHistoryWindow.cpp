@@ -1,29 +1,25 @@
 #include "ParameterHistoryWindow.h"
 
 #include "LineViewWidget.h"
+#include "../../services/AppSettings.h"
+#include "../../services/HistoryCsvExporter.h"
 
 #include <QDateTime>
 #include <QDir>
-#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
-#include <QSettings>
 #include <QSpinBox>
 #include <QStandardPaths>
-#include <QTextStream>
 #include <QVBoxLayout>
 
 namespace {
 
 constexpr int kMinimumWidth = 640;
 constexpr int kMinimumHeight = 400;
-//! 导出时记住上次的目录，和标定 Save As 用同一套做法
-const char *kLastExportDirKey = "parameterHistory/lastExportDirectory";
-
 QString parameterLabel(const QString &parameterName, const ParameterDefinition &definition)
 {
     return definition.displayName.isEmpty() ? parameterName : definition.displayName;
@@ -171,8 +167,7 @@ void ParameterHistoryWindow::onExportClicked()
         return;
     }
 
-    QSettings settings;
-    QString directory = settings.value(QLatin1String(kLastExportDirKey)).toString();
+    QString directory = AppSettings::historyExportDirectory();
     if (directory.isEmpty() || !QDir(directory).exists()) {
         directory = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
     }
@@ -195,7 +190,7 @@ void ParameterHistoryWindow::onExportClicked()
         return;
     }
 
-    settings.setValue(QLatin1String(kLastExportDirKey), QFileInfo(path).absolutePath());
+    AppSettings::setHistoryExportDirectory(QFileInfo(path).absolutePath());
     m_statusLabel->setText(tr("Exported %1 pts to %2")
                                .arg(m_store->count(m_parameterName))
                                .arg(QFileInfo(path).fileName()));
@@ -203,44 +198,6 @@ void ParameterHistoryWindow::onExportClicked()
 
 bool ParameterHistoryWindow::exportCsv(const QString &filePath, QString *error) const
 {
-    const QVector<ParameterSample> samples = m_store->samples(m_parameterName);
-    if (samples.isEmpty()) {
-        if (error) {
-            *error = tr("There are no samples to export.");
-        }
-        return false;
-    }
-
-    QFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        if (error) {
-            *error = tr("Cannot open %1 for writing: %2").arg(filePath, file.errorString());
-        }
-        return false;
-    }
-
-    QTextStream stream(&file);
-    stream << "elapsed_s,timestamp,value\n";
-
-    const qint64 origin = m_store->originTimestamp(m_parameterName);
-    for (const ParameterSample &sample : samples) {
-        // 采样是 1 Hz 定时器驱动的，毫秒位只是事件循环抖动（656.001 / 656.999 这类），
-        // 收敛到 0.1 s 才有意义；精确时刻看后面的 timestamp 列
-        stream << QString::number((sample.timestampMs - origin) / 1000.0, 'f', 1)
-               << ','
-               << QDateTime::fromMSecsSinceEpoch(sample.timestampMs).toString(Qt::ISODateWithMs)
-               << ','
-               << QString::number(sample.value, 'g', 12)
-               << '\n';
-    }
-
-    stream.flush();
-    if (file.error() != QFileDevice::NoError) {
-        if (error) {
-            *error = tr("Failed to write %1: %2").arg(filePath, file.errorString());
-        }
-        return false;
-    }
-
-    return true;
+    return HistoryCsvExporter::write(filePath, m_store->samples(m_parameterName),
+                                     m_store->originTimestamp(m_parameterName), error);
 }

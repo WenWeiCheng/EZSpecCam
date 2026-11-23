@@ -2,7 +2,6 @@
 #include "../ui/MainWindowUi.h"
 #include "../DebugMacros.h"
 #include "../Theme.h"
-#include "config/CameraTab.h"
 #include "display/ImageViewWidget.h"
 #include "display/LineViewWidget.h"
 #include "CameraTypes.h"
@@ -14,10 +13,10 @@
 #include "dialogs/DespikeDialog.h"
 #include "dialogs/ScaleControlDialog.h"
 #include "dialogs/DisplayStyleDialog.h"
-#include "config/CameraConfigDialog.h"
-#include "config/DataTab.h"
-#include "../ui/CameraConfigDialogUi.h"
-#include "PostProcess.h"
+#include "dialogs/CameraConfigDialog.h"
+#include "../services/AppSettings.h"
+#include "../services/FileNaming.h"
+#include "../services/PostProcess.h"
 #include "../workers/FileSaverWorker.h"
 #include "../workers/FileLoaderWorker.h"
 #include "formats/SaveTypes.h"
@@ -29,7 +28,6 @@
 #include <QDebug>
 #include <QTimer>
 #include <QCoreApplication>
-#include <QSettings>
 #include <QFileDialog>
 #include <QStandardPaths>
 #include <QDateTime>
@@ -38,6 +36,7 @@
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QFileInfo>
+#include <QSizePolicy>
 #include <qobject.h>
 
 #include <algorithm>
@@ -84,47 +83,12 @@ void shutdownThread(QThread *&thread, const char *name, int timeoutMs = 5000)
     thread = nullptr;
 }
 
-//! Stable ASCII stem used for reference file names and save metadata.
-QString referenceFileStem(Calibration::ReferenceKind kind)
-{
-    switch (kind) {
-    case Calibration::ReferenceKind::MatchedDark:
-        return QStringLiteral("dark");
-    case Calibration::ReferenceKind::Bias:
-        return QStringLiteral("bias");
-    case Calibration::ReferenceKind::LongDark:
-        return QStringLiteral("long_dark");
-    case Calibration::ReferenceKind::Flat:
-        return QStringLiteral("flat");
-    case Calibration::ReferenceKind::VffEntry:
-        return QStringLiteral("vff_flat");
-    }
-    return QStringLiteral("reference");
-}
-
-QString defaultReferenceFileName(const QString &stem,
-                                 const Calibration::ReferenceFrame &reference)
-{
-    QString name = stem;
-    if (reference.exposure > 0.0) {
-        QString exposure = QString::number(reference.exposure, 'g', 6);
-        exposure.replace(QLatin1Char('.'), QLatin1Char('p'));
-        name += QStringLiteral("_%1s").arg(exposure);
-    }
-    if (reference.frameCount > 0) {
-        name += QStringLiteral("_avg%1").arg(reference.frameCount);
-    }
-    name += QLatin1Char('_');
-    name += QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_hhmmss"));
-    return name;
-}
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new MainWindowUi(this))
     , m_appController(nullptr)
-    , m_cameraTab(nullptr)
     , m_imageViewWidget(nullptr)
     , m_spectrumViewWidget(nullptr)
     , m_fpsTimer(new QTimer(this))
@@ -133,10 +97,17 @@ MainWindow::MainWindow(QWidget *parent)
     // 和旧实现保持同一个默认输出偏置，用户不必每次重新输入
     m_darkSettings.outputOffset = 1000;
 
-    // 必须在 setupUi 之前：绘图控件是在那里创建的，创建时就会按当前主题取色
+    // 必须在 setupUi 之前：绘图控件在这里创建，创建时就会按当前主题取色
     restoreTheme();
 
-    ui->setupUi(this);
+    m_imageViewWidget = new ImageViewWidget(this);
+    m_spectrumViewWidget = new LineViewWidget(this);
+    m_spectrumViewWidget->setXAxisLabel("X (pixels)");
+    m_spectrumViewWidget->setYAxisLabel("Intensity");
+    m_imageViewWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_spectrumViewWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+    ui->setupUi(this, m_imageViewWidget, m_spectrumViewWidget);
 
     // 状态栏那一格的内容以后统一由 updateStateLabel() 拼，初始值也从这里给，
     // 不再让 MainWindowUi 里写死的 "State: Disconnected" 和实际格式对不上
@@ -155,9 +126,6 @@ MainWindow::MainWindow(QWidget *parent)
 
 
     m_appController = new AppController(nullptr);
-
-    m_imageViewWidget = ui->imageViewWidget;
-    m_spectrumViewWidget = ui->spectrumViewWidget;
 
     m_scaleDialog = new ScaleControlDialog(this);
     m_scaleDialog->setImageScaleType(0);
@@ -388,9 +356,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_frameTimer.start();
     updateToolbarState();
 
-    QSettings settings;
-    bool autoSaveEnabled = settings.value("data/autoSaveEnabled", false).toBool();
-    ui->menuActionAutoSaveToggle->setChecked(autoSaveEnabled);
+    ui->menuActionAutoSaveToggle->setChecked(AppSettings::autoSaveEnabled());
 }
 
 MainWindow::~MainWindow()
@@ -473,8 +439,7 @@ void MainWindow::on_actionSaveFrameAs_triggered()
         return;
     }
 
-    QSettings settings;
-    QString saveDir = settings.value("data/lastSaveAsDirectory").toString();
+    QString saveDir = AppSettings::lastSaveAsDirectory();
     if (saveDir.isEmpty() || !QDir(saveDir).exists()) {
         saveDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
     }
@@ -485,15 +450,11 @@ void MainWindow::on_actionSaveFrameAs_triggered()
 
     dialog.setNameFilters(m_fileSaverWorker->availableFormatNames());
 
-    QDateTime now = QDateTime::currentDateTime();
-    QString prefix = settings.value("data/filenamePrefix", "").toString();
-    QString suffix = settings.value("data/filenameSuffix", "").toString();
-    QString imageFormat = settings.value("data/imageFormat", "TIFF").toString();
-    QString ext = imageFormat.toLower();
-    QString prefixStr = prefix.isEmpty() ? "" : prefix + "_";
-    QString suffixStr = suffix.isEmpty() ? "" : "_" + suffix;
-    QString defaultName = QString("%1img_%2%3.%4").arg(prefixStr).arg(now.toString("yyyyMMdd_hhmmss_zzz")).arg(suffixStr).arg(ext);
-    dialog.selectFile(defaultName);
+    const QDateTime now = QDateTime::currentDateTime();
+    const QString imageFormat = AppSettings::imageFormat();
+    dialog.selectFile(FileNaming::frameFileName(AppSettings::filenamePrefix(),
+                                                AppSettings::filenameSuffix(),
+                                                imageFormat, now));
 
     if (imageFormat == QStringLiteral("TIFF")) {
         dialog.selectNameFilter(QStringLiteral("TIFF Image (*.tiff *.tif)"));
@@ -507,7 +468,7 @@ void MainWindow::on_actionSaveFrameAs_triggered()
 
     QString filePath = dialog.selectedFiles().first();
     QFileInfo fileInfo(filePath);
-    settings.setValue("data/lastSaveAsDirectory", fileInfo.absoluteDir().absolutePath());
+    AppSettings::setLastSaveAsDirectory(fileInfo.absoluteDir().absolutePath());
 
     saveFrameToFile(filePath);
 }
@@ -520,8 +481,7 @@ void MainWindow::on_actionSaveFrame_triggered()
         return;
     }
 
-    QSettings settings;
-    QString saveDir = settings.value("data/autoSaveDirectory", "").toString();
+    const QString saveDir = AppSettings::autoSaveDirectory();
 
     if (saveDir.isEmpty()) {
         QMessageBox::warning(this, tr("No Save Directory"),
@@ -529,34 +489,27 @@ void MainWindow::on_actionSaveFrame_triggered()
         return;
     }
 
-    QDateTime now = QDateTime::currentDateTime();
-    QString prefix = settings.value("data/filenamePrefix", "").toString();
-    QString suffix = settings.value("data/filenameSuffix", "").toString();
-    QString imageFormat = settings.value("data/imageFormat", "TIFF").toString();
-    QString ext = imageFormat.toLower();
-    QString prefixStr = prefix.isEmpty() ? "" : prefix + "_";
-    QString suffixStr = suffix.isEmpty() ? "" : "_" + suffix;
-    QString fileName = QString("%1img_%2%3.%4").arg(prefixStr).arg(now.toString("yyyyMMdd_hhmmss_zzz")).arg(suffixStr).arg(ext);
-    QString filePath = saveDir + "/" + fileName;
+    const QDateTime now = QDateTime::currentDateTime();
+    const QString fileName = FileNaming::frameFileName(AppSettings::filenamePrefix(),
+                                                       AppSettings::filenameSuffix(),
+                                                       AppSettings::imageFormat(), now);
+    const QString filePath = QDir(saveDir).filePath(fileName);
 
     saveFrameToFile(filePath);
 }
 
 void MainWindow::on_actionAutoSaveToggle_triggered(bool checked)
 {
-    QSettings settings;
-    settings.setValue("data/autoSaveEnabled", checked);
-    if (m_configDialog && m_configDialog->getUi() && m_configDialog->getUi()->dataTab
-        && m_configDialog->getUi()->dataTab->isAutoSaveEnabled() != checked) {
-        m_configDialog->getUi()->dataTab->setAutoSaveEnabled(checked);
+    AppSettings::setAutoSaveEnabled(checked);
+    if (m_configDialog && m_configDialog->isAutoSaveEnabled() != checked) {
+        m_configDialog->setAutoSaveEnabled(checked);
     }
     showStatusMessage(checked ? tr("Auto-save enabled") : tr("Auto-save disabled"), 2000);
 }
 
 void MainWindow::on_actionChangeAutoSaveDir_triggered()
 {
-    QSettings settings;
-    QString currentDir = settings.value("data/autoSaveDirectory").toString();
+    QString currentDir = AppSettings::autoSaveDirectory();
     if (currentDir.isEmpty() || !QDir(currentDir).exists()) {
         currentDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
     }
@@ -568,18 +521,16 @@ void MainWindow::on_actionChangeAutoSaveDir_triggered()
         return;
     }
 
-    settings.setValue("data/autoSaveDirectory", dir);
-    if (m_configDialog && m_configDialog->getUi() && m_configDialog->getUi()->dataTab
-        && m_configDialog->getUi()->dataTab->autoSaveDirectory() != dir) {
-        m_configDialog->getUi()->dataTab->setAutoSaveDirectory(dir);
+    AppSettings::setAutoSaveDirectory(dir);
+    if (m_configDialog && m_configDialog->autoSaveDirectory() != dir) {
+        m_configDialog->setAutoSaveDirectory(dir);
     }
     showStatusMessage(tr("Auto-save directory set to: %1").arg(dir), 3000);
 }
 
 void MainWindow::on_actionOpenFrame_triggered()
 {
-    QSettings settings;
-    QString openDir = settings.value("data/lastOpenDirectory").toString();
+    QString openDir = AppSettings::lastOpenDirectory();
     if (openDir.isEmpty() || !QDir(openDir).exists()) {
         openDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
     }
@@ -600,7 +551,7 @@ void MainWindow::on_actionOpenFrame_triggered()
 
     QString filePath = dialog.selectedFiles().first();
     QFileInfo fileInfo(filePath);
-    settings.setValue("data/lastOpenDirectory", fileInfo.absoluteDir().absolutePath());
+    AppSettings::setLastOpenDirectory(fileInfo.absoluteDir().absolutePath());
 
     QMetaObject::invokeMethod(m_fileLoaderWorker, "loadFrame",
         Qt::QueuedConnection,
@@ -741,10 +692,8 @@ void MainWindow::on_actionConfig_triggered()
     m_configDialog = new CameraConfigDialog(this);
     m_configDialog->setAppController(m_appController);
     m_configDialog->setModal(false);
-    if (auto *dataTab = m_configDialog->getUi()->dataTab) {
-        connect(dataTab, &DataTab::autoSaveToggled,
-                ui->menuActionAutoSaveToggle, &QAction::setChecked);
-    }
+    connect(m_configDialog, &CameraConfigDialog::autoSaveToggled,
+            ui->menuActionAutoSaveToggle, &QAction::setChecked);
     // 状态栏上的 Mode 要一直跟着对话框里那个下拉框走：用户在对话框里改了，
     // 不用再按一次快捷键
     connect(m_configDialog, &CameraConfigDialog::captureModeChanged,
@@ -974,7 +923,7 @@ void MainWindow::onSaveReferenceRequested(int kind)
     }
 
     const QString filePath = askReferenceSavePath(referenceKind, *reference,
-                                                  referenceFileStem(referenceKind));
+                                                  FileNaming::referenceStem(referenceKind));
     if (!filePath.isEmpty()) {
         saveReferenceFrameToFile(kind, filePath);
     }
@@ -994,7 +943,7 @@ void MainWindow::onSaveVffEntryRequested(int index)
 
     const QString filePath = askReferenceSavePath(Calibration::ReferenceKind::VffEntry,
                                                   sorted.at(index),
-                                                  referenceFileStem(
+                                                  FileNaming::referenceStem(
                                                       Calibration::ReferenceKind::VffEntry));
     if (!filePath.isEmpty()) {
         saveVffEntryToFile(index, filePath);
@@ -1005,17 +954,16 @@ QString MainWindow::askReferenceSavePath(Calibration::ReferenceKind kind,
                                          const Calibration::ReferenceFrame &reference,
                                          const QString &stem)
 {
-    QSettings settings;
-    QString saveDir = settings.value("calibration/lastSaveDirectory").toString();
+    QString saveDir = AppSettings::calibrationSaveDirectory();
     if (saveDir.isEmpty() || !QDir(saveDir).exists()) {
         // 第一次给参考帧找目录时，沿用普通图像的另存位置比凭空猜一个更好
-        saveDir = settings.value("data/lastSaveAsDirectory").toString();
+        saveDir = AppSettings::lastSaveAsDirectory();
     }
     if (saveDir.isEmpty() || !QDir(saveDir).exists()) {
         saveDir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
     }
 
-    const QString imageFormat = settings.value("data/imageFormat", "TIFF").toString();
+    const QString imageFormat = AppSettings::imageFormat();
     const QString extension = (imageFormat.compare(QStringLiteral("CSV"), Qt::CaseInsensitive) == 0)
         ? QStringLiteral("csv")
         : QStringLiteral("tiff");
@@ -1024,7 +972,9 @@ QString MainWindow::askReferenceSavePath(Calibration::ReferenceKind kind,
     dialog.setAcceptMode(QFileDialog::AcceptSave);
     dialog.setFileMode(QFileDialog::AnyFile);
     dialog.setNameFilters(m_fileSaverWorker->availableFormatNames());
-    dialog.selectFile(defaultReferenceFileName(stem, reference) + QLatin1Char('.') + extension);
+    dialog.selectFile(FileNaming::referenceFileName(stem, reference,
+                                                    QDateTime::currentDateTime())
+                      + QLatin1Char('.') + extension);
     if (extension == QStringLiteral("csv")) {
         dialog.selectNameFilter(QStringLiteral("CSV File (*.csv)"));
     } else {
@@ -1036,8 +986,7 @@ QString MainWindow::askReferenceSavePath(Calibration::ReferenceKind kind,
     }
 
     const QString filePath = dialog.selectedFiles().first();
-    settings.setValue("calibration/lastSaveDirectory",
-                      QFileInfo(filePath).absoluteDir().absolutePath());
+    AppSettings::setCalibrationSaveDirectory(QFileInfo(filePath).absoluteDir().absolutePath());
     return filePath;
 }
 
@@ -1090,7 +1039,7 @@ void MainWindow::saveReferencePlane(Calibration::ReferenceKind kind,
     request.frame.parameters[QStringLiteral("exposureSeconds")] = reference.exposure;
     request.frame.parameters[QStringLiteral("averagedFrames")] = reference.frameCount;
     request.frame.softwareSettings[QStringLiteral("calibrationReference")] =
-        referenceFileStem(kind);
+        FileNaming::referenceStem(kind);
 
     showStatusMessage(tr("Saving %1: %2")
                           .arg(referenceName(kind), QFileInfo(filePath).fileName()), 3000);
@@ -1283,8 +1232,7 @@ void MainWindow::on_showAxes_triggered(bool checked)
 
 void MainWindow::restoreTheme()
 {
-    QSettings settings;
-    const QString value = settings.value("ui/themeMode").toString();
+    const QString value = AppSettings::themeMode();
     if (value == QStringLiteral("dark")) {
         Theme::instance()->setMode(Theme::Mode::Dark);
     } else if (value == QStringLiteral("light")) {
@@ -1297,11 +1245,11 @@ void MainWindow::setThemeMode(Theme::Mode mode)
 {
     // 用户选了 Light/Dark 就存下来，下次启动直接用；选 System 时把这个键删掉，
     // 好让「跟随系统」恢复成默认值而不是记住上一次的强制选择
-    QSettings settings;
     if (mode == Theme::Mode::System) {
-        settings.remove("ui/themeMode");
+        AppSettings::setThemeMode(QString());
     } else {
-        settings.setValue("ui/themeMode", mode == Theme::Mode::Dark ? "dark" : "light");
+        AppSettings::setThemeMode(mode == Theme::Mode::Dark ? QStringLiteral("dark")
+                                                           : QStringLiteral("light"));
     }
 
     Theme::instance()->setMode(mode);
@@ -1631,8 +1579,7 @@ void MainWindow::onCameraFrameReady(const ImageData &frame)
     rebuildDespikeAndBinning();
     updateToolbarState();
 
-    QSettings settings2;
-    if (settings2.value("data/autoSaveEnabled", false).toBool()) {
+    if (AppSettings::autoSaveEnabled()) {
         on_actionSaveFrame_triggered();
     }
 }
@@ -1821,7 +1768,6 @@ void MainWindow::on_profile_triggered()
 
     if (m_imageViewWidget->hasImage()) {
         QImage img = m_imageViewWidget->image();
-        m_profileWindow->setImageSize(img.width(), img.height());
     }
 
     m_profileWindow->show();
@@ -1936,8 +1882,8 @@ QString MainWindow::captureModeName(CaptureMode mode)
 int MainWindow::captureCountForMode(CaptureMode mode) const
 {
     // 帧数一律取自 Config 对话框，和「Start」按钮走的是同一份设置。对话框
-    // 还没被打开过时没有可读的值，用 CameraTab 的初始值兜底（模式默认
-    // Single，帧数默认 5）
+    // 还没被打开过时没有可读的值，用 Configuration 对话框的初始值兜底
+    // （模式默认 Single，帧数默认 5）
     if (m_configDialog) {
         return m_configDialog->getCaptureCount();
     }
@@ -1991,7 +1937,7 @@ void MainWindow::onBurstModeTriggered()
 void MainWindow::updateToolbarState()
 {
     if (!m_appController) {
-        ui->actionConfig->setEnabled(false);
+        ui->menuActionConfig->setEnabled(false);
         ui->toolbarActionConfig->setEnabled(false);
         ui->actionStart->setEnabled(false);
         ui->actionStop->setEnabled(false);

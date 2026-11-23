@@ -11,15 +11,14 @@
 #include <QApplication>
 #include <QImage>
 #include <QLabel>
+#include <QSpinBox>
 #include <QStatusBar>
 #include <QTest>
 #include <QTimer>
 
 #include "widgets/MainWindow.h"
-#include "widgets/config/CameraConfigDialog.h"
-#include "widgets/config/CameraTab.h"
+#include "widgets/dialogs/CameraConfigDialog.h"
 #include "widgets/display/ImageViewWidget.h"
-#include "ui/CameraConfigDialogUi.h"
 
 // 状态栏里有好几个 QLabel，「State:」开头的那一格才是状态
 static QString stateLabelTextOf(MainWindow &window)
@@ -273,9 +272,7 @@ void TestCrosshairStatusBar::test_capture_mode_shortcut_syncs_the_config_dialog(
 
     auto *config = window.findChild<CameraConfigDialog *>();
     QVERIFY2(config, "Config 对话框没有创建出来");
-    auto *tab = config->getUi()->cameraTab;
-    QVERIFY(tab);
-    auto *countSpin = tab->ui->captureCountSpinBox;
+    auto *countSpin = config->findChild<QSpinBox *>(QStringLiteral("captureCountSpinBox"));
     QVERIFY(countSpin);
 
     struct { const char *slot; const char *mode; } cases[] = {
@@ -303,7 +300,7 @@ void TestCrosshairStatusBar::test_capture_mode_shortcut_syncs_the_config_dialog(
     QCOMPARE(config->getCaptureCount(), 7);
 
     // 反过来：直接在对话框里改模式，状态栏要跟着变
-    tab->setCaptureMode(QStringLiteral("Live"));
+    config->setCaptureMode(QStringLiteral("Live"));
     QCoreApplication::processEvents();
     QVERIFY2(stateLabelTextOf(window).endsWith("Mode: Live"),
              qPrintable(stateLabelTextOf(window)));

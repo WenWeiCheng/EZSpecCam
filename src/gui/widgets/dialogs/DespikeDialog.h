@@ -3,7 +3,7 @@
 
 #include <QDialog>
 
-#include "../PostProcess.h"
+#include "../../services/PostProcess.h"
 
 class QDoubleSpinBox;
 

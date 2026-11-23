@@ -1,5 +1,6 @@
 #include "HistogramWindow.h"
 #include "HistogramViewWidget.h"
+#include "../../services/HistogramBinner.h"
 
 #include <QCheckBox>
 #include <QHBoxLayout>
@@ -83,7 +84,7 @@ void HistogramWindow::setImage(const QImage &image)
 
     // 阈值控件的量程跟着图像格式走：8 位图配一个 65535 的默认阈值的话，
     // 永远没有像素能命中，过曝数会一直是 0，看着像没检测
-    const int maxValue = (image.format() == QImage::Format_Grayscale16) ? kMaxValue16Bit : 255;
+    const int maxValue = HistogramBinner::maxValueForImage(image);
     if (maxValue != m_maxValue) {
         m_maxValue = maxValue;
         m_thresholdSpin->setRange(0, maxValue);
@@ -114,7 +115,8 @@ void HistogramWindow::setValuesPerBin(int value)
 }
 
 // 一趟扫描同时出直方图和过曝数：live 模式下每帧都要跑，
-// 而过曝判据就是那一个阈值，不值得为它再扫一遍
+// 而过曝判据就是那一个阈值，不值得为它再扫一遍。
+// 分箱本身在 services/HistogramBinner，窗口只负责把结果交给控件。
 void HistogramWindow::recompute()
 {
     m_binCenters.clear();
@@ -128,51 +130,12 @@ void HistogramWindow::recompute()
         return;
     }
 
-    const int width = m_image.width();
-    const int height = m_image.height();
-    m_totalPixels = width * height;
-
-    // 值域是 0..maxValue 含两端，一共 maxValue+1 个取值。箱数由「每箱取值数」
-    // 反推，再把箱宽摊回来，好让所有箱子正好铺满值域：否则最后一个箱子
-    // 往往只剩几个取值，横坐标的量程也还会超出数据范围
-    const int valueCount = m_maxValue + 1;
-    const int binCount = qMax(1, (valueCount + m_valuesPerBin - 1) / m_valuesPerBin);
-    const double binWidth = static_cast<double>(valueCount) / binCount;
-
-    QVector<int> counts(binCount, 0);
-
-    if (m_image.format() == QImage::Format_Grayscale16) {
-        for (int y = 0; y < height; ++y) {
-            const quint16 *line = reinterpret_cast<const quint16 *>(
-                m_image.constBits() + y * m_image.bytesPerLine());
-            for (int x = 0; x < width; ++x) {
-                const int value = line[x];
-                const int bin = qBound(0, static_cast<int>(value / binWidth), binCount - 1);
-                ++counts[bin];
-                if (value >= m_threshold) {
-                    ++m_overexposedCount;
-                }
-            }
-        }
-    } else {
-        for (int y = 0; y < height; ++y) {
-            for (int x = 0; x < width; ++x) {
-                const int value = qGray(m_image.pixel(x, y));
-                const int bin = qBound(0, static_cast<int>(value / binWidth), binCount - 1);
-                ++counts[bin];
-                if (value >= m_threshold) {
-                    ++m_overexposedCount;
-                }
-            }
-        }
-    }
-
-    m_binCenters.reserve(binCount);
-    m_binCounts.reserve(binCount);
-    for (int i = 0; i < binCount; ++i) {
-        m_binCenters.append((i + 0.5) * binWidth);
-        m_binCounts.append(counts.at(i));
-    }
+    const HistogramResult result = HistogramBinner::compute(m_image, m_maxValue,
+                                                           m_valuesPerBin, m_threshold);
+    m_binCenters = result.binCenters;
+    m_binCounts = result.binCounts;
+    m_overexposedCount = result.overexposedCount;
+    m_totalPixels = result.totalPixels;
 
     m_histogram->setHistogram(m_binCenters, m_binCounts);
     updateOverexposureReadout();

@@ -42,15 +42,15 @@ EZSpecCam 是一个基于 Qt 6.8、C++17 的相机控制应用程序，负责相
 | `ICameraDriver` | 接口 | `src/core/ICameraDriver.h` | 所有相机驱动的契约 → 详细文档见 `src/core/ICameraDriver.md` |
 | `AppController` | 类 | `src/gui/AppController.h` | GUI 状态机（Disconnected→Connecting→Connected→Acquiring→Error） |
 | `MainWindow` | 类 | `src/gui/widgets/MainWindow.h` | 主窗口，持有全部控件 |
-| `MainWindowUi` | 类 | `src/gui/ui/MainWindowUi.h` | 拆分出来的 UI 搭建（工具栏、菜单、停靠窗口） |
-| `CameraTab` | 控件 | `src/gui/widgets/config/CameraTab.h` | 相机参数配置标签页 |
+| `MainWindowUi` | 类 | `src/gui/ui/MainWindowUi.h` | 只负责布局的 UI 搭建（菜单、工具栏、状态栏、中央堆栈） |
+| `CameraConfigDialog` | 窗口 | `src/gui/widgets/dialogs/CameraConfigDialog.h` | Camera/Data/Plugins 三页合一的配置窗口（含连接、参数面板与遥测历史） |
 | `ImageViewWidget` | 控件 | `src/gui/widgets/display/ImageViewWidget.h` | 基于 QCustomPlot 的图像渲染 |
 | `LineViewWidget` | 控件 | `src/gui/widgets/display/LineViewWidget.h` | 通用 x-y 曲线控件（光谱图、Profile、参数历史共用） |
-| `ParameterHistoryStore` | 类 | `src/gui/widgets/config/ParameterHistoryStore.h` | 遥测参数的固定长度历史窗口，CameraTab 每轮轮询追加 |
+| `ParameterHistoryStore` | 类 | `src/gui/services/ParameterHistoryStore.h` | 遥测参数的固定长度历史窗口，CameraConfigDialog 每轮轮询追加 |
 | `ParameterHistoryWindow` | 窗口 | `src/gui/widgets/display/ParameterHistoryWindow.h` | 单参数历史曲线：改窗口长度、清空、导出 CSV |
 | `Calibration::apply` | 函数 | `src/core/Calibration.cpp` | 暗场两种方法（同曝光相减 / 偏置+暗电流线性缩放）与平场两种方法（复用暗场模型后做均值归一化 / 可变曝光拟合）的统一入口 |
 | `CalibrationDialog` | 窗口 | `src/gui/widgets/dialogs/CalibrationDialog.h` | Dark/Flat 两个标签页；参考帧可 Acquire 到内存、从文件加载，或 Save As 另存到本地；曝光时间手动输入 |
-| `PostProcess::despikeImage` | 函数 | `src/gui/widgets/PostProcess.cpp` | 图像去尖峰（按行估计噪声 + 3×3 孤立像素判据 + 行范围，OpenMP 并行） |
+| `PostProcess::despikeImage` | 函数 | `src/gui/services/PostProcess.cpp` | 图像去尖峰（按行估计噪声 + 3×3 孤立像素判据 + 行范围，OpenMP 并行） |
 | `MainWindow::rebuildDespikeAndBinning` | 方法 | `src/gui/widgets/MainWindow.cpp` | 去尖峰 → 垂直合并 → 显示/保存；开关、阈值、行范围变化时从校正后原图重建 |
 | `DespikeDialog` | 窗口 | `src/gui/widgets/dialogs/DespikeDialog.h` | 去尖峰参数（只剩主阈值） |
 | `MockCameraDriver` | 插件 | `src/plugins/mock/MockCameraDriver.cpp` | 用于测试的模拟相机 |

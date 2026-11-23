@@ -11,7 +11,7 @@ add_executable(test_row_range_dialog
     test_row_range_dialog.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/workers/FileLoaderWorker.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/dialogs/RowRangeDialog.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets/PostProcess.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/services/PostProcess.cpp
 )
 
 target_include_directories(test_row_range_dialog PRIVATE

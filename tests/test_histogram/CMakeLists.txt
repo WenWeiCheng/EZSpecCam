@@ -7,6 +7,7 @@ target_sources(test_histogram PRIVATE
     ${CMAKE_SOURCE_DIR}/src/gui/Theme.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/HistogramViewWidget.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/HistogramWindow.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/services/HistogramBinner.cpp
 )
 target_link_libraries(test_histogram PRIVATE
     ezspeccam_core

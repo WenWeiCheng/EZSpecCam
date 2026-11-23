@@ -1,8 +1,8 @@
 #include "MainWindowUi.h"
-#include "../widgets/display/ImageViewWidget.h"
-#include "../widgets/display/LineViewWidget.h"
 
+#include <QFrame>
 #include <QMenuBar>
+#include <QStatusBar>
 #include <QMenu>
 #include <QMainWindow>
 #include <QIcon>
@@ -11,40 +11,7 @@
 #include <qnamespace.h>
 
 MainWindowUi::MainWindowUi(QObject *parent)
-    : m_parent(parent)
-    , actionConfig(nullptr)
-    , actionAbout(nullptr)
-    , actionStart(nullptr)
-    , actionStop(nullptr)
-    , stateLabel(nullptr)
-    , frameCountLabel(nullptr)
-    , fpsLabel(nullptr)
-    , coordLabel(nullptr)
-    , toolBar(nullptr)
-    , menuActionSaveFrame(nullptr)
-    , menuActionConfig(nullptr)
-    , menuActionAbout(nullptr)
-    , toolbarActionConfig(nullptr)
-    , centralStackedWidget(nullptr)
-    , imageViewWidget(nullptr)
-    , spectrumViewWidget(nullptr)
-    , menuActionShowAxes(nullptr)
-    , menuActionFillWindow(nullptr)
-    , menuActionDisplayStyle(nullptr)
-    , menuActionProfile(nullptr)
-    , menuActionHistogram(nullptr)
-    , menuActionStatistics(nullptr)
-    , menuActionPostProcess(nullptr)
-    , menuActionVerticalBinning(nullptr)
-    , menuActionRowRange(nullptr)
-    , menuActionDespike(nullptr)
-    , menuActionDespikeSettings(nullptr)
-    , menuActionCalibration(nullptr)
-    , menuActionSaveFrameAs(nullptr)
-    , menuActionAutoSaveToggle(nullptr)
-    , menuActionChangeAutoSaveDir(nullptr)
-    , menuActionOpenFrame(nullptr)
-    , menuActionScale(nullptr)
+    : QObject(parent)
 {
 }
 
@@ -52,7 +19,8 @@ MainWindowUi::~MainWindowUi()
 {
 }
 
-void MainWindowUi::setupUi(QMainWindow *mainWindow)
+void MainWindowUi::setupUi(QMainWindow *mainWindow, QWidget *imageViewWidget,
+                           QWidget *spectrumViewWidget)
 {
     if (!mainWindow) {
         return;
@@ -64,7 +32,7 @@ void MainWindowUi::setupUi(QMainWindow *mainWindow)
     createMenuBar(mainWindow);
     createToolBar(mainWindow);
     createStatusBar(mainWindow);
-    setupCentralWidget(mainWindow);
+    setupCentralWidget(mainWindow, imageViewWidget, spectrumViewWidget);
 }
 
 void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
@@ -98,13 +66,10 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
 
     menuFile->addSeparator();
 
-    menuActionSaveFrame = menuActionSaveFrame;
-
     QMenu *menuCamera = menuBar->addMenu("&Camera");
     menuActionConfig = new QAction("&Config", mainWindow);
     menuActionConfig->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_C));
     menuCamera->addAction(menuActionConfig);
-    actionConfig = menuActionConfig;
 
     QMenu *menuAnalyse = menuBar->addMenu("&Analyse");
     menuActionStatistics = new QAction("&Statistics", mainWindow);
@@ -193,7 +158,6 @@ void MainWindowUi::createMenuBar(QMainWindow *mainWindow)
     QMenu *menuHelp = menuBar->addMenu("&Help");
     menuActionAbout = new QAction("&About", mainWindow);
     menuHelp->addAction(menuActionAbout);
-    actionAbout = menuActionAbout;
 }
 
 void MainWindowUi::createToolBar(QMainWindow *mainWindow)
@@ -269,36 +233,11 @@ void MainWindowUi::setCrosshairInfo(const QString &text)
     coordLabel->setVisible(!text.isEmpty());
 }
 
-void MainWindowUi::initializeLabels()
-{
-    if (stateLabel) {
-        stateLabel->setText("State: Disconnected");
-    }
-    if (frameCountLabel) {
-        frameCountLabel->setText("Frames: 0");
-    }
-    if (fpsLabel) {
-        fpsLabel->setText("FPS: 0");
-    }
-    setCrosshairInfo(QString());
-}
-
-void MainWindowUi::setupCentralWidget(QMainWindow *mainWindow)
+void MainWindowUi::setupCentralWidget(QMainWindow *mainWindow, QWidget *imageViewWidget,
+                                      QWidget *spectrumViewWidget)
 {
     centralStackedWidget = new QStackedWidget(mainWindow);
-
-    imageViewWidget = new ImageViewWidget(centralStackedWidget);
-    spectrumViewWidget = new LineViewWidget(centralStackedWidget);
-
-    // 曲线控件是通用的，主轴标题由具体视图自己给；这里是光谱视图
-    spectrumViewWidget->setXAxisLabel("X (pixels)");
-    spectrumViewWidget->setYAxisLabel("Intensity");
-
-    imageViewWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    spectrumViewWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-
     centralStackedWidget->addWidget(imageViewWidget);
     centralStackedWidget->addWidget(spectrumViewWidget);
-
     mainWindow->setCentralWidget(centralStackedWidget);
 }

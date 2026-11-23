@@ -5,7 +5,7 @@
 add_executable(test_parameter_widgets)
 target_sources(test_parameter_widgets PRIVATE
     test_parameter_widgets.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets/config/ParameterWidgetFactory.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/widgets/common/ParameterWidgetFactory.cpp
 )
 target_link_libraries(test_parameter_widgets PRIVATE
     ezspeccam_core
@@ -16,7 +16,7 @@ target_include_directories(test_parameter_widgets PRIVATE
     ${CMAKE_SOURCE_DIR}/src/core
     ${CMAKE_SOURCE_DIR}/src/gui
     ${CMAKE_SOURCE_DIR}/src/gui/widgets
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets/config
+    ${CMAKE_SOURCE_DIR}/src/gui/widgets/common
 )
 set_target_properties(test_parameter_widgets PROPERTIES
     Qt6::MinimalQt6 TRUE

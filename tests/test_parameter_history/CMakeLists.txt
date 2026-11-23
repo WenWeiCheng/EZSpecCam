@@ -1,8 +1,8 @@
-# Sliding-window history buffer behind CameraTab's telemetry polling.
+# Sliding-window history buffer behind CameraConfigDialog's telemetry polling.
 add_executable(test_parameter_history)
 target_sources(test_parameter_history PRIVATE
     test_parameter_history.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets/config/ParameterHistoryStore.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/services/ParameterHistoryStore.cpp
 )
 target_link_libraries(test_parameter_history PRIVATE
     ezspeccam_core
@@ -11,7 +11,7 @@ target_link_libraries(test_parameter_history PRIVATE
 target_include_directories(test_parameter_history PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/gui
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets/config
+    ${CMAKE_SOURCE_DIR}/src/gui/services
 )
 set_target_properties(test_parameter_history PROPERTIES
     Qt6::MinimalQt6 TRUE

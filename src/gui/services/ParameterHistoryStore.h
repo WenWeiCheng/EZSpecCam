@@ -19,7 +19,7 @@ struct ParameterSample
 //! 只读/动态/外因参数的历史值。每个参数一条队列，所有参数共用同一个
 //! 固定长度的滑动窗口。
 //!
-//! CameraTab 每个轮询 tick 追加一次。窗口长度可以随时从外部改：缩小时立刻
+//! CameraConfigDialog 每个轮询 tick 追加一次。窗口长度可以随时从外部改：缩小时立刻
 //! 丢掉最老的样本，放大只影响以后的样本（已经丢掉的补不回来）。
 class ParameterHistoryStore : public QObject
 {
@@ -49,7 +49,7 @@ public:
     //! 窗口滚掉老样本后原点不变，曲线横轴才不会跟着一起跳
     qint64 originTimestamp(const QString &name) const;
 
-    //! 只读 + 动态 + 外因：CameraTab 每秒轮询的那批遥测
+    //! 只读 + 动态 + 外因：CameraConfigDialog 每秒轮询的那批遥测
     static bool isTelemetryParameter(const ParameterDefinition &def);
     //! 遥测里能画成曲线的数值型；字符串/布尔状态（如 sensor_cooler_status）画不了
     static bool isPlottableTelemetry(const ParameterDefinition &def);

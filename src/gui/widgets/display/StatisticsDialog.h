@@ -2,13 +2,11 @@
 #define STATISTICSDIALOG_H
 
 #include <QDialog>
-#include <QLabel>
-#include <QPushButton>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QGridLayout>
-#include <QImage>
-#include <QVector>
+
+#include "../../services/ImageStatistics.h"
+
+class QLabel;
+class QPushButton;
 
 class StatisticsDialog : public QDialog
 {
@@ -21,24 +19,17 @@ public:
     void setSpectrumData(const QVector<double> &data);
 
 private:
-    void calculateImageStatistics(const QImage &image);
-    void calculateSpectrumStatistics(const QVector<double> &data);
     void updateDisplay();
 
-    QLabel *m_minLabel;
-    QLabel *m_maxLabel;
-    QLabel *m_avgLabel;
-    QLabel *m_stdDevLabel;
-    QLabel *m_pixelCountLabel;
-    QLabel *m_dataTypeLabel;
-    QPushButton *m_closeButton;
+    QLabel *m_minLabel = nullptr;
+    QLabel *m_maxLabel = nullptr;
+    QLabel *m_avgLabel = nullptr;
+    QLabel *m_stdDevLabel = nullptr;
+    QLabel *m_pixelCountLabel = nullptr;
+    QLabel *m_dataTypeLabel = nullptr;
+    QPushButton *m_closeButton = nullptr;
 
-    double m_min;
-    double m_max;
-    double m_avg;
-    double m_stdDev;
-    quint64 m_pixelCount;
-    QString m_dataType;
+    ImageStatistics m_statistics;
 };
 
 #endif // STATISTICSDIALOG_H

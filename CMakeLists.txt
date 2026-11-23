@@ -127,30 +127,26 @@ set(EZSPECCAM_GUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/qcustomplot.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/MainWindow.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/MainWindow.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/PostProcess.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/PostProcess.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/services/PostProcess.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/services/PostProcess.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/MainWindowUi.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/MainWindowUi.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/CameraTab.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/CameraTab.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/ParameterHistoryStore.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/ParameterHistoryStore.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/CameraTabUi.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/CameraTabUi.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/LoadingIndicator.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/LoadingIndicator.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/ParameterWidgetFactory.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/ParameterWidgetFactory.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/DataTab.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/DataTab.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/DataTabUi.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/DataTabUi.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/PluginTab.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/PluginTab.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/CameraConfigDialog.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/config/CameraConfigDialog.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/CameraConfigDialogUi.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/ui/CameraConfigDialogUi.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/services/ParameterHistoryStore.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/services/ParameterHistoryStore.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/services/AppSettings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/services/AppSettings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/services/FileNaming.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/services/FileNaming.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/services/HistoryCsvExporter.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/services/HistoryCsvExporter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/services/HistogramBinner.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/services/HistogramBinner.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/services/ImageStatistics.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/services/ImageStatistics.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/common/LoadingIndicator.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/common/LoadingIndicator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/common/ParameterWidgetFactory.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/common/ParameterWidgetFactory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/StatisticsDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/StatisticsDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/display/ProfileWindow.h
@@ -174,6 +170,8 @@ set(EZSPECCAM_GUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/formats/CsvFormatHandler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/RowRangeDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/RowRangeDialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/CameraConfigDialog.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/CameraConfigDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/CalibrationDialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/CalibrationDialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gui/widgets/dialogs/ScaleControlDialog.h

@@ -5,7 +5,7 @@ target_sources(test_theme PRIVATE
     ${CMAKE_SOURCE_DIR}/src/gui/Theme.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/qcustomplot.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/LineViewWidget.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets/PostProcess.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/services/PostProcess.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/widgets/display/ImageViewWidget.cpp
 )
 target_link_libraries(test_theme PRIVATE

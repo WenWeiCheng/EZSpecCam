@@ -2,7 +2,7 @@
 add_executable(test_dark_calibration)
 target_sources(test_dark_calibration PRIVATE
     test_dark_calibration.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets/PostProcess.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/services/PostProcess.cpp
 )
 target_link_libraries(test_dark_calibration PRIVATE
     ezspeccam_core
@@ -11,6 +11,6 @@ target_link_libraries(test_dark_calibration PRIVATE
 target_include_directories(test_dark_calibration PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/core
-    ${CMAKE_SOURCE_DIR}/src/gui/widgets
+    ${CMAKE_SOURCE_DIR}/src/gui/services
 )
 add_test(NAME test_dark_calibration COMMAND test_dark_calibration)

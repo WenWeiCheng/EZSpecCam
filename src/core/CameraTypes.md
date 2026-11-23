@@ -301,4 +301,4 @@ CameraError ◄── errorOccurred ── ICameraDriver ── frameReady ─�
 - `src/core/ICameraDriver.md` — the interface that consumes all types defined here
 - `src/core/ICameraDriver.h` — interface definition with signals
 - `src/plugins/mock/` — reference driver showing parameter definition patterns
-- `src/gui/widgets/config/CameraTab.h` — GUI that renders parameters from `ParameterDefinition`
+- `src/gui/widgets/dialogs/CameraConfigDialog.h` — GUI that renders parameters from `ParameterDefinition`

@@ -12,8 +12,6 @@ ProfileWindow::ProfileWindow(QWidget *parent)
     , m_verticalProfile(nullptr)
     , m_horizontalLabel(nullptr)
     , m_verticalLabel(nullptr)
-    , m_imageWidth(0)
-    , m_imageHeight(0)
 {
     setWindowTitle("Profile");
     setMinimumSize(800, 400);
@@ -66,10 +64,4 @@ void ProfileWindow::updateProfile(int x, int y,
 
     m_horizontalLabel->setText(QString("Horizontal Profile (Row Y=%1)").arg(y));
     m_verticalLabel->setText(QString("Vertical Profile (Column X=%1)").arg(x));
-}
-
-void ProfileWindow::setImageSize(int width, int height)
-{
-    m_imageWidth = width;
-    m_imageHeight = height;
 }

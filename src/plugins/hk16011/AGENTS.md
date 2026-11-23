@@ -180,14 +180,14 @@ EZSpecCam 漂移，与其让两份对不上，不如只留一份。`displayName`
 
 `hk16011ParameterMetadata()` 同时给每个参数标注 `isDynamic` / `isExtrinsic`。
 四个 Cooling 遥测和 Debug 的 `exception_flag` / `exception_cnt` 只读且会自行变化，
-两个标志都给 —— CameraTab 对 `isReadOnly && isDynamic && isExtrinsic` 的参数
+两个标志都给 —— CameraConfigDialog 对 `isReadOnly && isDynamic && isExtrinsic` 的参数
 每 1000 ms 轮询一次；`camera_name` / `frame_capacity` 恒定不变，两个都不给，
 轮询没有意义。
 
 > `acq_state` / `frame_num_ready` 是**有意**不在静态表里的：固件仍会通过
 > `LISTPARAMS` 上报它们，所以每次连接都会 `qInfo: not exposing unlisted
 > parameter ...` —— 这是白名单按设计在工作，不是异常。要恢复就把表项加回
-> `ParameterCategory::Debug`（并带 `isDynamic` / `isExtrinsic`），CameraTab
+> `ParameterCategory::Debug`（并带 `isDynamic` / `isExtrinsic`），CameraConfigDialog
 > 才会重新轮询它们。
 
 `parameterValue()` 对这两类参数**每次调用都回设备实读**（与 PicamDriver /

@@ -99,21 +99,27 @@ int RowRangeDialog::endRow() const
 
 void RowRangeDialog::onOkClicked()
 {
-    if (m_startSpinBox->value() > m_endSpinBox->value()) {
-        QMessageBox::warning(this, "Invalid Range", "Start row must be less than or equal to end row.");
-        return;
+    if (applyRange()) {
+        accept();
     }
-    emit applyClicked(m_startSpinBox->value(), m_endSpinBox->value());
-    accept();
 }
 
 void RowRangeDialog::onApplyClicked()
 {
-    if (m_startSpinBox->value() > m_endSpinBox->value()) {
-        QMessageBox::warning(this, "Invalid Range", "Start row must be less than or equal to end row.");
-        return;
+    applyRange();
+}
+
+bool RowRangeDialog::applyRange()
+{
+    const int start = m_startSpinBox->value();
+    const int end = m_endSpinBox->value();
+    if (start > end) {
+        QMessageBox::warning(this, QStringLiteral("Invalid Range"),
+                             QStringLiteral("Start row must be less than or equal to end row."));
+        return false;
     }
-    emit applyClicked(m_startSpinBox->value(), m_endSpinBox->value());
+    emit applyClicked(start, end);
+    return true;
 }
 
 void RowRangeDialog::onHeightChanged(int height)

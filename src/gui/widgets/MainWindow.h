@@ -6,17 +6,15 @@
 #include <QElapsedTimer>
 #include <QTimer>
 #include <QShortcut>
-#include <QSettings>
 #include <QThread>
 
 #include "../AppController.h"
 #include "../Theme.h"
 #include "../workers/FileLoaderWorker.h"
 #include "Calibration.h"
-#include "PostProcess.h"
+#include "../services/PostProcess.h"
 
 class MainWindowUi;
-class CameraTab;
 class CameraConfigDialog;
 class ImageViewWidget;
 class LineViewWidget;
@@ -36,8 +34,6 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow() override;
-
-    MainWindowUi *getUi() const { return ui; }
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -136,7 +132,7 @@ private:
     QString referenceName(Calibration::ReferenceKind kind) const;
     //! Reference card held in the settings, or nullptr for VffEntry/unknown.
     const Calibration::ReferenceFrame *referenceForKind(Calibration::ReferenceKind kind) const;
-    //! Common Save As path picker: remembers the last directory in QSettings.
+    //! Common Save As path picker: remembers the last directory via AppSettings.
     QString askReferenceSavePath(Calibration::ReferenceKind kind,
                                  const Calibration::ReferenceFrame &reference,
                                  const QString &stem);
@@ -245,7 +241,6 @@ private:
     QShortcut *shortcutLive = nullptr;
     QShortcut *shortcutSingle = nullptr;
     QShortcut *shortcutBurst = nullptr;
-    CameraTab *m_cameraTab;
     ImageViewWidget *m_imageViewWidget;
     LineViewWidget *m_spectrumViewWidget;
 };

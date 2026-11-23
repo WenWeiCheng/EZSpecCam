@@ -7,7 +7,7 @@
 #include <QFileInfo>
 
 #include "widgets/dialogs/RowRangeDialog.h"
-#include "widgets/PostProcess.h"
+#include "services/PostProcess.h"
 #include "gui/workers/FileLoaderWorker.h"
 #include "formats/TiffFormatHandler.h"
 #include "formats/SaveTypes.h"
